@@ -1,0 +1,10 @@
+# Always revalidate the app bundle so a re-uploaded app.js/app.css takes effect
+# immediately (stable filenames have no cache-busting hash).
+<FilesMatch "\.(js|css)$">
+  Header set Cache-Control "no-cache, must-revalidate"
+</FilesMatch>
+
+# config.json must never be cached — it is edited in place per deployment.
+<FilesMatch "config\.json$">
+  Header set Cache-Control "no-cache, must-revalidate"
+</FilesMatch>
