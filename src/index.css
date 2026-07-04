@@ -5,3 +5,12 @@ body,
   padding: 0;
   height: 100%;
 }
+
+/*
+ * Sloppiness is locked to "Architect" app-wide, so remove its control from the
+ * properties panel. The radio group's name="sloppiness" is a stable, semantic
+ * hook from Excalidraw's source; the enforcement lives in code, this is cosmetic.
+ */
+.excalidraw fieldset:has(input[name="sloppiness"]) {
+  display: none;
+}

@@ -4,3 +4,4 @@ public/fonts
 *.local
 .DS_Store
 *.log
+working/

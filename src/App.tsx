@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from "react";
 import { Excalidraw, FONT_FAMILY } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 
@@ -9,9 +16,11 @@ import type { DocumentSummary } from "./storage/types";
 import { downloadFile, openLocalFile } from "./storage/local-file-provider";
 import {
   applyContentsToScene,
+  ARCHITECT_ROUGHNESS,
   exportJpg,
   exportPng,
   exportSvgString,
+  normalizeRoughness,
   serializeScene,
   type ExcalidrawAPI,
 } from "./lib/excalidraw-scene";
@@ -21,6 +30,11 @@ import { OpenDialog } from "./ui/OpenDialog";
 import type { SaveDestination } from "./ui/dialog-types";
 
 const AUTOSAVE_DELAY_MS = 800;
+
+/** The element list Excalidraw hands `onChange` on every scene update. */
+type SceneChangeElements = Parameters<
+  NonNullable<ComponentProps<typeof Excalidraw>["onChange"]>
+>[0];
 
 export default function App() {
   const apiRef = useRef<ExcalidrawAPI | null>(null);
@@ -47,7 +61,15 @@ export default function App() {
 
   // Debounced auto-save of the working document to IndexedDB.
   const autosaveTimer = useRef<number | null>(null);
-  const handleChange = useCallback(() => {
+  const handleChange = useCallback((elements: SceneChangeElements) => {
+    // Sloppiness is locked to Architect. New elements already draw at roughness 0
+    // and imports are normalized on load; this only catches pasted foreign
+    // elements. The scan is cheap and updateScene runs only when a stray exists,
+    // so it re-normalizes without looping.
+    if (elements.some((el) => el.roughness !== ARCHITECT_ROUGHNESS)) {
+      apiRef.current?.updateScene({ elements: normalizeRoughness(elements) });
+    }
+
     if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current);
     autosaveTimer.current = window.setTimeout(async () => {
       const api = apiRef.current;

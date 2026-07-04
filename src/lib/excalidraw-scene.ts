@@ -6,6 +6,9 @@ import {
 } from "@excalidraw/excalidraw";
 import type { ComponentProps } from "react";
 import type { Excalidraw } from "@excalidraw/excalidraw";
+import { ARCHITECT_ROUGHNESS, normalizeRoughness } from "./roughness";
+
+export { ARCHITECT_ROUGHNESS, normalizeRoughness } from "./roughness";
 
 /** The imperative handle Excalidraw hands us via the `excalidrawAPI` prop. */
 export type ExcalidrawAPI = NonNullable<
@@ -29,7 +32,12 @@ export async function applyContentsToScene(
 ): Promise<void> {
   const blob = new Blob([contents], { type: "application/json" });
   const scene = await loadFromBlob(blob, null, null);
-  api.updateScene({ elements: scene.elements, appState: scene.appState });
+  api.updateScene({
+    // Normalize imported elements and reset the inherited default so the
+    // opened file cannot reintroduce a non-Architect sloppiness.
+    elements: normalizeRoughness(scene.elements),
+    appState: { ...scene.appState, currentItemRoughness: ARCHITECT_ROUGHNESS },
+  });
   if (scene.files) {
     api.addFiles(Object.values(scene.files));
   }
