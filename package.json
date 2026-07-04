@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Standalone visual workspace built on Excalidraw with local, IndexedDB, and Google Drive storage.",
   "scripts": {
+    "build:excalidraw": "cd vendor/excalidraw && yarn install --frozen-lockfile && yarn build:package",
     "predev": "node scripts/copy-excalidraw-fonts.mjs",
     "dev": "vite",
     "prebuild": "node scripts/copy-excalidraw-fonts.mjs",
@@ -14,7 +15,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@excalidraw/excalidraw": "^0.18.1",
+    "@excalidraw/excalidraw": "file:vendor/excalidraw/packages/excalidraw",
     "idb": "^8.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
