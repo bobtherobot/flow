@@ -3,6 +3,36 @@
 Wimp builds to a fully static, self-contained bundle. There is no server, no
 database, and no external CDN dependency at runtime.
 
+## Run & test locally
+
+**Fresh clone (once):** build the vendored Excalidraw fork first — see
+[First-time setup](#first-time-setup-building-from-source) below. In short:
+
+```bash
+git submodule update --init
+nvm use                 # node 22 (see .nvmrc) — required to build the fork
+npm run build:excalidraw
+npm install
+```
+
+**Start the dev server** (hot-reloading app at http://localhost:5173):
+
+```bash
+npm run dev
+```
+
+**Test the app:**
+
+```bash
+npm test           # unit tests (Vitest)
+npm run typecheck  # type-check (tsc --noEmit)
+npm run build      # full production build -> ./dist
+npm run preview    # serve the production build (http://localhost:4173)
+```
+
+> Editing files under `vendor/excalidraw/` (the fork)? Re-run
+> `npm run build:excalidraw`, then restart `npm run dev` to pick up the change.
+
 ## First-time setup (building from source)
 
 Wimp is built on a **fork of Excalidraw**, vendored as a git submodule at
