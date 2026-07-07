@@ -5,3 +5,5 @@ public/fonts
 .DS_Store
 *.log
 working/
+test-results/
+playwright-report/
