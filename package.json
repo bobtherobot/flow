@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "file:vendor/excalidraw/packages/excalidraw",
+    "@radix-ui/react-menubar": "^1.1.20",
     "idb": "^8.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

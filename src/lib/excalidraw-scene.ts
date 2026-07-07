@@ -15,6 +15,9 @@ export type ExcalidrawAPI = NonNullable<
   Parameters<NonNullable<ComponentProps<typeof Excalidraw>["excalidrawAPI"]>>[0]
 >;
 
+/** Raster/vector formats wimp can export the canvas to. */
+export type ImageFormat = "png" | "svg" | "jpg";
+
 /** Serialize the current canvas to a `.excalidraw` JSON string. */
 export function serializeScene(api: ExcalidrawAPI): string {
   return serializeAsJSON(
