@@ -1,7 +1,7 @@
 # Design: Desktop Menu Bar + Preferences (global sloppiness)
 
 **Date:** 2026-07-06
-**Status:** Approved (pending spec review)
+**Status:** Implemented (2026-07-07)
 **Branch context:** builds on `feat/fork-excalidraw-text-color`
 
 ## 1. Summary
