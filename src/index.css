@@ -14,3 +14,13 @@ body,
 .excalidraw fieldset:has(input[name="sloppiness"]) {
   display: none;
 }
+
+/*
+ * wimp provides its own File/View/Help menu bar, so Excalidraw's hamburger
+ * ("main menu") button is redundant. `.dropdown-menu-button` is the stable
+ * trigger class from Excalidraw's source; hiding it degrades gracefully (worst
+ * case the button reappears) rather than breaking.
+ */
+.excalidraw .dropdown-menu-button {
+  display: none;
+}

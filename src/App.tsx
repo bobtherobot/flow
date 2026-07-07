@@ -9,24 +9,35 @@ import {
 import { Excalidraw, FONT_FAMILY } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 
-import { CustomMenu, type ImageFormat } from "./app/CustomMenu";
 import { loadConfig } from "./app/config";
+import { getSloppiness, setSloppiness } from "./app/preferences";
 import { IndexedDbProvider } from "./storage/indexeddb-provider";
 import type { DocumentSummary } from "./storage/types";
 import { downloadFile, openLocalFile } from "./storage/local-file-provider";
 import {
   applyContentsToScene,
-  ARCHITECT_ROUGHNESS,
   exportJpg,
   exportPng,
   exportSvgString,
   normalizeRoughness,
   serializeScene,
   type ExcalidrawAPI,
+  type ImageFormat,
 } from "./lib/excalidraw-scene";
+import { type Sloppiness } from "./lib/roughness";
+import {
+  resetZoom,
+  toggleGrid,
+  zoomIn,
+  zoomOut,
+  zoomToFit,
+} from "./lib/view-actions";
 import { ensureExtension, stripExtension } from "./lib/filename";
+import { MenuBar } from "./ui/menubar/MenuBar";
 import { SaveDialog } from "./ui/SaveDialog";
 import { OpenDialog } from "./ui/OpenDialog";
+import { PreferencesDialog } from "./ui/PreferencesDialog";
+import { AboutDialog } from "./ui/AboutDialog";
 import type { SaveDestination } from "./ui/dialog-types";
 
 const AUTOSAVE_DELAY_MS = 800;
@@ -44,8 +55,17 @@ export default function App() {
   const [currentName, setCurrentName] = useState("Untitled");
   const [saveOpen, setSaveOpen] = useState(false);
   const [openOpen, setOpenOpen] = useState(false);
+  const [prefsOpen, setPrefsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [internalDocs, setInternalDocs] = useState<DocumentSummary[]>([]);
   const [appName, setAppName] = useState("Wimp");
+
+  // App-wide sloppiness preference. `sloppinessRef` mirrors it so the stable
+  // onChange handler and async import paths read the current value without
+  // stale closures or re-registering the Excalidraw onChange prop.
+  const [sloppiness, setSloppinessState] = useState<Sloppiness>(() => getSloppiness());
+  const sloppinessRef = useRef(sloppiness);
+  sloppinessRef.current = sloppiness;
 
   // Google Drive is wired in a later phase; sign-in is not available yet.
   const isGoogleConnected = false;
@@ -62,19 +82,18 @@ export default function App() {
   // Debounced auto-save of the working document to IndexedDB.
   const autosaveTimer = useRef<number | null>(null);
   const handleChange = useCallback((elements: SceneChangeElements) => {
-    // Sloppiness is locked to Architect. New elements already draw at roughness 0
-    // and imports are normalized on load; this only catches pasted foreign
-    // elements. The scan is cheap and updateScene runs only when a stray exists,
-    // so it re-normalizes without looping.
-    if (elements.some((el) => el.roughness !== ARCHITECT_ROUGHNESS)) {
-      apiRef.current?.updateScene({ elements: normalizeRoughness(elements) });
+    // New elements draw at the preference and imports are normalized on load;
+    // this only catches stray pasted foreign elements. Cheap scan, and
+    // updateScene runs only when a stray exists, so it can't loop.
+    const target = sloppinessRef.current;
+    if (elements.some((el) => el.roughness !== target)) {
+      apiRef.current?.updateScene({ elements: normalizeRoughness(elements, target) });
     }
 
     if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current);
     autosaveTimer.current = window.setTimeout(async () => {
       const api = apiRef.current;
       if (!api) return;
-      // Don't persist an untouched blank scratch canvas.
       if (api.getSceneElements().length === 0 && !currentId) return;
       const saved = await provider.save({
         id: currentId,
@@ -118,7 +137,7 @@ export default function App() {
       if (!api) return;
       const doc = await provider.load(id);
       if (!doc) return;
-      await applyContentsToScene(api, doc.contents);
+      await applyContentsToScene(api, doc.contents, sloppinessRef.current);
       setCurrentId(doc.id);
       setCurrentName(doc.name);
     },
@@ -131,7 +150,7 @@ export default function App() {
     if (!api) return;
     const file = await openLocalFile();
     if (!file) return;
-    await applyContentsToScene(api, file.contents);
+    await applyContentsToScene(api, file.contents, sloppinessRef.current);
     setCurrentId(undefined);
     setCurrentName(stripExtension(file.name, "excalidraw"));
   }, []);
@@ -151,23 +170,69 @@ export default function App() {
     [currentName],
   );
 
+  const handleNew = useCallback(() => {
+    apiRef.current?.resetScene();
+    setCurrentId(undefined);
+    setCurrentName("Untitled");
+  }, []);
+
+  const handleClearCanvas = useCallback(() => {
+    apiRef.current?.updateScene({ elements: [] });
+  }, []);
+
+  const handleChangeSloppiness = useCallback((next: Sloppiness) => {
+    setSloppinessState(next);
+    setSloppiness(next);
+    const api = apiRef.current;
+    if (!api) return;
+    api.updateScene({
+      elements: normalizeRoughness(api.getSceneElements(), next),
+      appState: { currentItemRoughness: next },
+    });
+  }, []);
+
+  const handleShowShortcuts = useCallback(() => {
+    setPrefsOpen(false);
+    apiRef.current?.updateScene({ appState: { openDialog: { name: "help" } } });
+  }, []);
+
+  const withApi = (fn: (api: ExcalidrawAPI) => void) => () => {
+    const api = apiRef.current;
+    if (api) fn(api);
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0 }} aria-label={appName}>
-      <Excalidraw
-        excalidrawAPI={(api) => {
-          apiRef.current = api;
-        }}
-        theme="light"
-        onChange={handleChange}
-        initialData={{
-          appState: {
-            currentItemRoughness: 0, // clean/precise, not hand-drawn
-            currentItemFontFamily: FONT_FAMILY.Nunito, // clean sans, self-hosted
-          },
-        }}
-      >
-        <CustomMenu onOpen={openOpenDialog} onSave={openSaveDialog} onExport={handleExport} />
-      </Excalidraw>
+      <MenuBar
+        onNew={handleNew}
+        onOpen={openOpenDialog}
+        onSave={openSaveDialog}
+        onExport={handleExport}
+        onPreferences={() => setPrefsOpen(true)}
+        onClearCanvas={handleClearCanvas}
+        onZoomIn={withApi(zoomIn)}
+        onZoomOut={withApi(zoomOut)}
+        onZoomToFit={withApi(zoomToFit)}
+        onResetZoom={withApi(resetZoom)}
+        onToggleGrid={withApi(toggleGrid)}
+        onAbout={() => setAboutOpen(true)}
+      />
+
+      <div style={{ position: "fixed", inset: "var(--wimp-menubar-h) 0 0 0" }}>
+        <Excalidraw
+          excalidrawAPI={(api) => {
+            apiRef.current = api;
+          }}
+          theme="light"
+          onChange={handleChange}
+          initialData={{
+            appState: {
+              currentItemRoughness: sloppiness,
+              currentItemFontFamily: FONT_FAMILY.Nunito,
+            },
+          }}
+        />
+      </div>
 
       {saveOpen && (
         <SaveDialog
@@ -190,6 +255,17 @@ export default function App() {
           onOpenGoogle={googleComingSoon}
         />
       )}
+
+      {prefsOpen && (
+        <PreferencesDialog
+          sloppiness={sloppiness}
+          onChangeSloppiness={handleChangeSloppiness}
+          onShowShortcuts={handleShowShortcuts}
+          onClose={() => setPrefsOpen(false)}
+        />
+      )}
+
+      {aboutOpen && <AboutDialog appName={appName} onClose={() => setAboutOpen(false)} />}
     </div>
   );
 }

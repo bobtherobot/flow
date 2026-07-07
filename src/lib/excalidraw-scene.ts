@@ -6,7 +6,7 @@ import {
 } from "@excalidraw/excalidraw";
 import type { ComponentProps } from "react";
 import type { Excalidraw } from "@excalidraw/excalidraw";
-import { ARCHITECT_ROUGHNESS, normalizeRoughness } from "./roughness";
+import { normalizeRoughness, DEFAULT_SLOPPINESS, type Sloppiness } from "./roughness";
 
 export { ARCHITECT_ROUGHNESS, normalizeRoughness } from "./roughness";
 
@@ -28,18 +28,18 @@ export function serializeScene(api: ExcalidrawAPI): string {
   );
 }
 
-/** Load a `.excalidraw` JSON string onto the canvas, replacing current content. */
+/** Load a `.excalidraw` JSON string onto the canvas, replacing current content.
+ *  Imported elements are normalized to the app-wide sloppiness `target`. */
 export async function applyContentsToScene(
   api: ExcalidrawAPI,
   contents: string,
+  target: Sloppiness = DEFAULT_SLOPPINESS,
 ): Promise<void> {
   const blob = new Blob([contents], { type: "application/json" });
   const scene = await loadFromBlob(blob, null, null);
   api.updateScene({
-    // Normalize imported elements and reset the inherited default so the
-    // opened file cannot reintroduce a non-Architect sloppiness.
-    elements: normalizeRoughness(scene.elements),
-    appState: { ...scene.appState, currentItemRoughness: ARCHITECT_ROUGHNESS },
+    elements: normalizeRoughness(scene.elements, target),
+    appState: { ...scene.appState, currentItemRoughness: target },
   });
   if (scene.files) {
     api.addFiles(Object.values(scene.files));
