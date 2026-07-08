@@ -1,6 +1,8 @@
 import { DEFAULT_SLOPPINESS, isSloppiness, type Sloppiness } from "../lib/roughness";
+import { DEFAULT_UNIT, isUnit, type Unit } from "../lib/units";
 
 const SLOPPINESS_KEY = "flow.sloppiness";
+const UNITS_KEY = "flow.units";
 
 /** Read the app-wide sloppiness preference, falling back to the default. */
 export function getSloppiness(): Sloppiness {
@@ -19,6 +21,25 @@ export function getSloppiness(): Sloppiness {
 export function setSloppiness(value: Sloppiness): void {
   try {
     localStorage.setItem(SLOPPINESS_KEY, String(value));
+  } catch {
+    // Quota / disabled storage: preference simply won't persist this session.
+  }
+}
+
+/** Read the preferred display unit for length controls (default px). */
+export function getUnits(): Unit {
+  try {
+    const raw = localStorage.getItem(UNITS_KEY);
+    return isUnit(raw) ? raw : DEFAULT_UNIT;
+  } catch {
+    return DEFAULT_UNIT;
+  }
+}
+
+/** Persist the preferred display unit. */
+export function setUnits(value: Unit): void {
+  try {
+    localStorage.setItem(UNITS_KEY, value);
   } catch {
     // Quota / disabled storage: preference simply won't persist this session.
   }

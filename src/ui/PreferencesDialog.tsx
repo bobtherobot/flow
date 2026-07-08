@@ -4,53 +4,67 @@ import {
   SLOPPINESS_ORDER,
   type Sloppiness,
 } from "../lib/roughness";
+import { UNITS, type Unit } from "../lib/units";
 import "./dialogs.css";
 import "./preferences-dialog.css";
 
 export interface PreferencesDialogProps {
   sloppiness: Sloppiness;
   onChangeSloppiness: (value: Sloppiness) => void;
+  units: Unit;
+  onChangeUnits: (value: Unit) => void;
   onShowShortcuts: () => void;
   onClose: () => void;
 }
+
+const UNIT_NAMES: Record<Unit, string> = {
+  px: "Pixels (px)",
+  pt: "Points (pt)",
+  mm: "Millimetres (mm)",
+  cm: "Centimetres (cm)",
+  in: "Inches (in)",
+};
 
 type Category = "general" | "keyboard";
 
 export function PreferencesDialog({
   sloppiness,
   onChangeSloppiness,
+  units,
+  onChangeUnits,
   onShowShortcuts,
   onClose,
 }: PreferencesDialogProps) {
   const [category, setCategory] = useState<Category>("general");
   const titleId = useId();
+  const unitsId = useId();
 
   return (
     <div
-      className="wimp-dialog-backdrop"
+      className="flow-dialog-backdrop"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="wimp-dialog wimp-prefs"
+        className="flow-dialog flow-prefs"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <div className="wimp-dialog__header">
-          <h2 className="wimp-dialog__title" id={titleId}>
+        <div className="flow-dialog__header">
+          <h2 className="flow-dialog__title" id={titleId}>
             Preferences
           </h2>
         </div>
 
-        <div className="wimp-prefs__body">
-          <nav className="wimp-prefs__nav" role="tablist" aria-label="Preferences categories">
+        <div className="flow-prefs__body">
+          <nav className="flow-prefs__nav" role="tablist" aria-label="Preferences categories">
             <button
               type="button"
               role="tab"
               aria-selected={category === "general"}
-              className="wimp-prefs__tab"
+              className="flow-prefs__tab"
               onClick={() => setCategory("general")}
             >
               General
@@ -59,16 +73,16 @@ export function PreferencesDialog({
               type="button"
               role="tab"
               aria-selected={category === "keyboard"}
-              className="wimp-prefs__tab"
+              className="flow-prefs__tab"
               onClick={() => setCategory("keyboard")}
             >
               Keyboard
             </button>
           </nav>
 
-          <div className="wimp-prefs__panel">
+          <div className="flow-prefs__panel">
             {category === "general" && (
-              <fieldset className="wimp-choice" style={{ border: 0, margin: 0, padding: 0 }}>
+              <fieldset className="flow-choice" style={{ border: 0, margin: 0, padding: 0 }}>
                 <legend
                   style={{
                     fontSize: "0.8125rem",
@@ -80,28 +94,46 @@ export function PreferencesDialog({
                   Sloppiness
                 </legend>
                 {SLOPPINESS_ORDER.map((value) => (
-                  <label className="wimp-option" key={value}>
+                  <label className="flow-option" key={value}>
                     <input
                       type="radio"
                       name="sloppiness"
                       checked={sloppiness === value}
                       onChange={() => onChangeSloppiness(value)}
                     />
-                    <span className="wimp-option__label">{SLOPPINESS_LABELS[value]}</span>
+                    <span className="flow-option__label">{SLOPPINESS_LABELS[value]}</span>
                   </label>
                 ))}
               </fieldset>
             )}
 
+            {category === "general" && (
+              <div className="flow-field flow-prefs__units">
+                <label htmlFor={unitsId}>Units</label>
+                <select
+                  id={unitsId}
+                  className="flow-input"
+                  value={units}
+                  onChange={(e) => onChangeUnits(e.target.value as Unit)}
+                >
+                  {UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {UNIT_NAMES[u]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {category === "keyboard" && (
-              <div className="wimp-prefs__keyboard">
-                <p className="wimp-prefs__hint">
+              <div className="flow-prefs__keyboard">
+                <p className="flow-prefs__hint">
                   View the current keyboard shortcuts. Editing shortcuts is coming
                   in a future update.
                 </p>
                 <button
                   type="button"
-                  className="wimp-btn wimp-btn--ghost"
+                  className="flow-btn flow-btn--ghost"
                   onClick={onShowShortcuts}
                 >
                   Show keyboard shortcuts
@@ -111,8 +143,8 @@ export function PreferencesDialog({
           </div>
         </div>
 
-        <div className="wimp-dialog__footer">
-          <button type="button" className="wimp-btn wimp-btn--primary" onClick={onClose}>
+        <div className="flow-dialog__footer">
+          <button type="button" className="flow-btn flow-btn--primary" onClick={onClose}>
             Done
           </button>
         </div>

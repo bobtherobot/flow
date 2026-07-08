@@ -5,18 +5,21 @@ import { PreferencesDialog } from "./PreferencesDialog";
 
 function setup(overrides = {}) {
   const onChangeSloppiness = vi.fn();
+  const onChangeUnits = vi.fn();
   const onShowShortcuts = vi.fn();
   const onClose = vi.fn();
   render(
     <PreferencesDialog
       sloppiness={0}
       onChangeSloppiness={onChangeSloppiness}
+      units="px"
+      onChangeUnits={onChangeUnits}
       onShowShortcuts={onShowShortcuts}
       onClose={onClose}
       {...overrides}
     />,
   );
-  return { onChangeSloppiness, onShowShortcuts, onClose };
+  return { onChangeSloppiness, onChangeUnits, onShowShortcuts, onClose };
 }
 
 describe("PreferencesDialog", () => {
@@ -31,6 +34,14 @@ describe("PreferencesDialog", () => {
     const { onChangeSloppiness } = setup();
     await userEvent.click(screen.getByRole("radio", { name: "Cartoonist" }));
     expect(onChangeSloppiness).toHaveBeenCalledWith(2);
+  });
+
+  it("shows the units selector and fires onChangeUnits", async () => {
+    const { onChangeUnits } = setup();
+    const select = screen.getByLabelText("Units");
+    expect(select).toHaveValue("px");
+    await userEvent.selectOptions(select, "mm");
+    expect(onChangeUnits).toHaveBeenCalledWith("mm");
   });
 
   it("switches to the Keyboard category and fires onShowShortcuts", async () => {

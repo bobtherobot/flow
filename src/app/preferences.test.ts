@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getSloppiness, setSloppiness } from "./preferences";
+import { getSloppiness, setSloppiness, getUnits, setUnits } from "./preferences";
 
 // Mock localStorage with a simple in-memory implementation
 const mockStorage: Record<string, string> = {};
@@ -43,12 +43,32 @@ describe("sloppiness preference", () => {
   });
 
   it("falls back to the default on a corrupt stored value", () => {
-    localStorage.setItem("wimp.sloppiness", "banana");
+    localStorage.setItem("flow.sloppiness", "banana");
     expect(getSloppiness()).toBe(0);
   });
 
   it("falls back to the default on an out-of-range stored value", () => {
-    localStorage.setItem("wimp.sloppiness", "7");
+    localStorage.setItem("flow.sloppiness", "7");
     expect(getSloppiness()).toBe(0);
+  });
+});
+
+describe("units preference", () => {
+  beforeEach(() => {
+    Object.keys(mockStorage).forEach((key) => delete mockStorage[key]);
+  });
+
+  it("defaults to px when unset", () => {
+    expect(getUnits()).toBe("px");
+  });
+
+  it("round-trips a set unit", () => {
+    setUnits("mm");
+    expect(getUnits()).toBe("mm");
+  });
+
+  it("falls back to px on an unknown stored value", () => {
+    localStorage.setItem("flow.units", "furlong");
+    expect(getUnits()).toBe("px");
   });
 });

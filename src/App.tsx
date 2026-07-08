@@ -10,7 +10,8 @@ import { Excalidraw, FONT_FAMILY } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 
 import { loadConfig } from "./app/config";
-import { getSloppiness, setSloppiness } from "./app/preferences";
+import { getSloppiness, setSloppiness, getUnits, setUnits } from "./app/preferences";
+import { type Unit } from "./lib/units";
 import { IndexedDbProvider } from "./storage/indexeddb-provider";
 import type { DocumentSummary } from "./storage/types";
 import { downloadFile, openLocalFile } from "./storage/local-file-provider";
@@ -67,6 +68,13 @@ export default function App() {
   const [sloppiness, setSloppinessState] = useState<Sloppiness>(() => getSloppiness());
   const sloppinessRef = useRef(sloppiness);
   sloppinessRef.current = sloppiness;
+
+  // Preferred display unit for length controls (stroke width etc.).
+  const [units, setUnitsState] = useState<Unit>(() => getUnits());
+  const handleChangeUnits = useCallback((next: Unit) => {
+    setUnitsState(next);
+    setUnits(next);
+  }, []);
 
   // Google Drive is wired in a later phase; sign-in is not available yet.
   const isGoogleConnected = false;
@@ -262,6 +270,8 @@ export default function App() {
         <PreferencesDialog
           sloppiness={sloppiness}
           onChangeSloppiness={handleChangeSloppiness}
+          units={units}
+          onChangeUnits={handleChangeUnits}
           onShowShortcuts={handleShowShortcuts}
           onClose={() => setPrefsOpen(false)}
         />
