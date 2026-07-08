@@ -24,10 +24,54 @@ const STROKE_STYLES: IconOption<"solid" | "dashed" | "dotted">[] = [
   { value: "dotted", label: "Dotted", icon: svg(line("0.5 3")) },
 ];
 
+/** Excalidraw's own arrow-type glyphs (Tabler icons, 24×24, 2px stroke). */
+const arrowTypeIcon = (children: React.ReactNode) => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    {children}
+  </svg>
+);
+
 const ARROW_TYPES: IconOption<"sharp" | "round" | "elbow">[] = [
-  { value: "sharp", label: "Sharp", icon: svg(<path d="M2 11 L10 3 L18 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />) },
-  { value: "round", label: "Round", icon: svg(<path d="M2 11 Q10 1 18 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none" />) },
-  { value: "elbow", label: "Elbow", icon: svg(<path d="M2 11 L2 5 L18 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />) },
+  {
+    value: "sharp",
+    label: "Sharp",
+    icon: arrowTypeIcon(
+      <>
+        <path d="M6 18l12 -12" />
+        <path d="M18 10v-4h-4" />
+      </>,
+    ),
+  },
+  {
+    value: "round",
+    label: "Curved",
+    icon: arrowTypeIcon(
+      <>
+        <path d="M16,12L20,9L16,6" />
+        <path d="M6 20c0 -6.075 4.925 -11 11 -11h3" />
+      </>,
+    ),
+  },
+  {
+    value: "elbow",
+    label: "Elbow",
+    icon: arrowTypeIcon(
+      <>
+        <path d="M4,19L10,19C11.097,19 12,18.097 12,17L12,9C12,7.903 12.903,7 14,7L21,7" />
+        <path d="M18 4l3 3l-3 3" />
+      </>,
+    ),
+  },
 ];
 
 /** Arrowhead glyph at the right end of a short line. */
@@ -149,7 +193,7 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
       </div>
 
       <div className="flow-ctl-row" aria-disabled={arrowsDisabled || undefined}>
-        <span className="flow-ctl-row__label">Arrow</span>
+        <span className="flow-ctl-row__label">Type</span>
         <div className="flow-ctl-row__control">
           <IconToggleGroup
             options={ARROW_TYPES}
