@@ -1,0 +1,47 @@
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { AlignPanel } from "./AlignPanel";
+import type { SelectionStyle } from "./useSelectionStyle";
+
+function mockSel(selectedCount: number): { sel: SelectionStyle; executeAction: ReturnType<typeof vi.fn> } {
+  const executeAction = vi.fn();
+  const sel = { selectedCount, executeAction } as unknown as SelectionStyle;
+  return { sel, executeAction };
+}
+
+describe("AlignPanel", () => {
+  it("dispatches the matching action when an align button is clicked", async () => {
+    const { sel, executeAction } = mockSel(2);
+    render(<AlignPanel sel={sel} />);
+    await userEvent.click(screen.getByRole("button", { name: "Align left" }));
+    expect(executeAction).toHaveBeenCalledWith("alignLeft");
+  });
+
+  it("dispatches distribute actions", async () => {
+    const { sel, executeAction } = mockSel(3);
+    render(<AlignPanel sel={sel} />);
+    await userEvent.click(screen.getByRole("button", { name: "Distribute horizontally" }));
+    expect(executeAction).toHaveBeenCalledWith("distributeHorizontally");
+  });
+
+  it("greys align (<2) and distribute (<3) rows below their thresholds", () => {
+    const { sel } = mockSel(1);
+    render(<AlignPanel sel={sel} />);
+    expect(screen.getByRole("button", { name: "Align left" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Distribute horizontally" })).toBeDisabled();
+  });
+
+  it("enables align at 2 but keeps distribute disabled until 3", () => {
+    const { sel } = mockSel(2);
+    render(<AlignPanel sel={sel} />);
+    expect(screen.getByRole("button", { name: "Align left" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Distribute vertically" })).toBeDisabled();
+  });
+
+  it("enables distribute at 3", () => {
+    const { sel } = mockSel(3);
+    render(<AlignPanel sel={sel} />);
+    expect(screen.getByRole("button", { name: "Distribute vertically" })).toBeEnabled();
+  });
+});

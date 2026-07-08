@@ -7,6 +7,7 @@ import { useSelectionStyle } from "./useSelectionStyle";
 import { StylePanel } from "./StylePanel";
 import { StrokePanel } from "./StrokePanel";
 import { TextPanel } from "./TextPanel";
+import { AlignPanel } from "./AlignPanel";
 
 /** Menu-bar height the dock sits below (matches --flow-menubar-h). */
 const MENUBAR_H = 36;
@@ -34,6 +35,7 @@ export function PanelsRoot({ api, units }: PanelsRootProps) {
     { id: "style", label: "Style", render: () => <StylePanel sel={sel} /> },
     { id: "stroke", label: "Stroke", render: () => <StrokePanel sel={sel} units={units} /> },
     { id: "text", label: "Text", render: () => <TextPanel sel={sel} /> },
+    { id: "align", label: "Align", render: () => <AlignPanel sel={sel} /> },
     { id: "layers", label: "Layers", render: () => <LayersPlaceholder /> },
   ];
 
