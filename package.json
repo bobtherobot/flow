@@ -11,6 +11,7 @@
     "prebuild": "node scripts/copy-excalidraw-fonts.mjs",
     "build": "vite build",
     "preview": "vite preview",
+    "serve": "npm run build && vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:e2e": "playwright test"
