@@ -230,7 +230,12 @@ export default function App() {
         onAbout={() => setAboutOpen(true)}
       />
 
-      <div style={{ position: "fixed", inset: "var(--flow-menubar-h) 0 0 0" }}>
+      <div
+        style={{
+          position: "fixed",
+          inset: "var(--flow-menubar-h) 0 0 var(--flow-panel-reserved, 0px)",
+        }}
+      >
         <Excalidraw
           excalidrawAPI={(instance) => {
             // `executeAction` exists at runtime (fork addition) but not yet in the

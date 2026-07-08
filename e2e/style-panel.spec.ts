@@ -72,3 +72,20 @@ test("text color is disabled without text in the selection", async ({ page }) =>
   await drawRectangle(page); // a rectangle, no text
   await expect(page.getByRole("button", { name: "Text color", exact: true })).toBeDisabled();
 });
+
+test("a color edit is undoable via Excalidraw's history", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await drawRectangle(page);
+
+  const strokeSwatch = page.getByRole("button", { name: "Stroke color", exact: true });
+  await strokeSwatch.click();
+  await page.getByRole("button", { name: "#2f9e44" }).click();
+  await expect(strokeSwatch).toHaveAttribute("title", "#2f9e44");
+  await page.locator(".flow-pnl__title").click(); // close the picker
+
+  // The Undo button is no longer covered by the panel; the rect stays selected so
+  // the swatch reflects the reverted element (proving the write recorded history).
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(strokeSwatch).toHaveAttribute("title", "#1e1e1e");
+});

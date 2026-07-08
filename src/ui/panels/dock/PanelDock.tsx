@@ -3,12 +3,19 @@ import { PanelShell } from "./PanelShell";
 import { LayoutManagerDialog } from "./LayoutManagerDialog";
 import { getPanelLayout, setPanelLayout } from "../../../app/preferences";
 import {
+  DOCK_LIMITS,
   dockReducer,
   normalizeDockState,
   syncPanelDefs,
   type DockState,
 } from "./panel-dock-state";
 import type { PanelDef } from "./panel-types";
+
+/** Left-edge space the docked panel occupies, for the canvas to inset around. */
+function reservedWidth(state: DockState): number {
+  if (state.floating) return 0;
+  return state.collapsed ? DOCK_LIMITS.COLLAPSED_W : state.dockedWidth;
+}
 
 interface PanelDockProps {
   defs: PanelDef[];
@@ -43,6 +50,17 @@ export function PanelDock({ defs, topOffset = 36 }: PanelDockProps) {
   // layout is stored (surviving an immediate reload) with no stale-ref races.
   useEffect(() => {
     setPanelLayout(state);
+  }, [state]);
+
+  // Publish the reserved left space so the canvas can inset around a docked panel
+  // (keeping Excalidraw's bottom-left zoom/undo controls clear of it). A floating
+  // panel reserves nothing and simply overlays the canvas.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--flow-panel-reserved", `${reservedWidth(state)}px`);
+    return () => {
+      root.style.removeProperty("--flow-panel-reserved");
+    };
   }, [state]);
 
   return (
