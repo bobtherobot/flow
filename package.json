@@ -12,6 +12,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "serve": "npm run build && vite preview",
+    "release": "node scripts/release.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:e2e": "playwright test"
