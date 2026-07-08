@@ -24,6 +24,32 @@ export type SelectedElementIds = Record<string, boolean | undefined>;
 /** Anything with a stable id; the minimum this module needs from an element. */
 type Identified = { id: string };
 
+/** The shape needed to resolve text-color targets. */
+type TextResolvable = Identified & {
+  type: string;
+  boundElements?: readonly { id: string; type: string }[] | null;
+};
+
+/**
+ * The ids that a "text color" edit should touch: selected text elements, plus
+ * the bound text of any selected container (e.g. a rectangle with a caption).
+ * Returned as a selection-map so it can drive `applyToSelection`/`readFormValue`.
+ */
+export function resolveTextTargetIds(
+  elements: readonly TextResolvable[],
+  selectedElementIds: SelectedElementIds,
+): SelectedElementIds {
+  const targets: Record<string, true> = {};
+  for (const el of elements) {
+    if (selectedElementIds[el.id] !== true) continue;
+    if (el.type === "text") targets[el.id] = true;
+    for (const bound of el.boundElements ?? []) {
+      if (bound.type === "text") targets[bound.id] = true;
+    }
+  }
+  return targets;
+}
+
 /** The subset of `elements` whose id is marked selected, order preserved. */
 export function getSelectedElements<T extends Identified>(
   elements: readonly T[],
@@ -66,11 +92,22 @@ export function readFormValue<T extends Identified, V>(
   return common === undefined ? fallback : common;
 }
 
+export interface ApplyOptions<T> {
+  /** Restrict the write to elements matching this (e.g. only text elements). */
+  predicate?: (el: T) => boolean;
+  /**
+   * How to produce the updated element. Defaults to a structural spread; the
+   * Excalidraw hook passes `newElementWith` so `version`/`versionNonce` bump and
+   * the change is captured in history.
+   */
+  make?: (el: T, prop: string, value: unknown) => T;
+}
+
 /**
  * Immutably set `prop` to `value` on every selected element, optionally
- * restricted to those matching `predicate` (e.g. only text elements for a text
- * color). Unselected elements, elements failing the predicate, and elements
- * already at `value` pass through by identity to avoid needless churn.
+ * restricted by `options.predicate`. Unselected elements, elements failing the
+ * predicate, and elements already at `value` pass through by identity to avoid
+ * needless churn.
  *
  * `prop`/`value` are dynamic across a heterogeneous element union, so the write
  * is structural; call sites use typed wrappers for their specific property.
@@ -80,12 +117,13 @@ export function applyToSelection<T extends Identified>(
   selectedElementIds: SelectedElementIds,
   prop: string,
   value: unknown,
-  predicate?: (el: T) => boolean,
+  options: ApplyOptions<T> = {},
 ): T[] {
+  const { predicate, make } = options;
   return elements.map((el) => {
     if (selectedElementIds[el.id] !== true) return el;
     if (predicate && !predicate(el)) return el;
     if ((el as Record<string, unknown>)[prop] === value) return el;
-    return { ...el, [prop]: value } as T;
+    return make ? make(el, prop, value) : ({ ...el, [prop]: value } as T);
   });
 }

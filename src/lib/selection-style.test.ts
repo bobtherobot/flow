@@ -5,6 +5,7 @@ import {
   getCommonValue,
   readFormValue,
   applyToSelection,
+  resolveTextTargetIds,
 } from "./selection-style";
 
 type El = { id: string; type: string; strokeColor: string; opacity?: number };
@@ -102,15 +103,19 @@ describe("applyToSelection", () => {
 
   it("restricts writes with a predicate (e.g. text-only)", () => {
     const els = [el("a", { type: "text" }), el("b", { type: "rectangle" })];
-    const next = applyToSelection(
-      els,
-      { a: true, b: true },
-      "strokeColor",
-      "#f00",
-      (e) => e.type === "text",
-    );
+    const next = applyToSelection(els, { a: true, b: true }, "strokeColor", "#f00", {
+      predicate: (e) => e.type === "text",
+    });
     expect(next[0].strokeColor).toBe("#f00");
     expect(next[1]).toBe(els[1]); // rectangle skipped by predicate
+  });
+
+  it("uses a custom make() for changed elements (e.g. version bump)", () => {
+    const els = [el("a")];
+    const next = applyToSelection(els, { a: true }, "strokeColor", "#f00", {
+      make: (e, prop, value) => ({ ...e, [prop]: value, tagged: true } as typeof e & { tagged: boolean }),
+    });
+    expect(next[0]).toMatchObject({ strokeColor: "#f00", tagged: true });
   });
 
   it("leaves everything untouched when the selection is empty", () => {
@@ -118,5 +123,33 @@ describe("applyToSelection", () => {
     const next = applyToSelection(els, {}, "strokeColor", "#f00");
     expect(next[0]).toBe(els[0]);
     expect(next[1]).toBe(els[1]);
+  });
+});
+
+describe("resolveTextTargetIds", () => {
+  const text = (id: string) => ({ id, type: "text" as const });
+  const rect = (id: string, boundTextId?: string) => ({
+    id,
+    type: "rectangle" as const,
+    boundElements: boundTextId ? [{ id: boundTextId, type: "text" }] : null,
+  });
+
+  it("includes selected text elements", () => {
+    const els = [text("t1"), rect("r1")];
+    expect(resolveTextTargetIds(els, { t1: true })).toEqual({ t1: true });
+  });
+
+  it("includes bound text of a selected container", () => {
+    const els = [rect("r1", "t1"), text("t1")];
+    expect(resolveTextTargetIds(els, { r1: true })).toEqual({ t1: true });
+  });
+
+  it("is empty when the selection has no text", () => {
+    expect(resolveTextTargetIds([rect("r1")], { r1: true })).toEqual({});
+  });
+
+  it("ignores unselected elements", () => {
+    const els = [text("t1"), text("t2")];
+    expect(resolveTextTargetIds(els, { t2: true })).toEqual({ t2: true });
   });
 });

@@ -51,6 +51,8 @@ type SceneChangeElements = Parameters<
 
 export default function App() {
   const apiRef = useRef<ExcalidrawAPI | null>(null);
+  // Also mirrored in state so the panels re-render once the API is ready.
+  const [excalidrawApi, setExcalidrawApi] = useState<ExcalidrawAPI | null>(null);
   const provider = useMemo(() => new IndexedDbProvider(), []);
 
   const [currentId, setCurrentId] = useState<string | undefined>(undefined);
@@ -229,8 +231,9 @@ export default function App() {
 
       <div style={{ position: "fixed", inset: "var(--flow-menubar-h) 0 0 0" }}>
         <Excalidraw
-          excalidrawAPI={(api) => {
-            apiRef.current = api;
+          excalidrawAPI={(instance) => {
+            apiRef.current = instance;
+            setExcalidrawApi(instance);
           }}
           theme="light"
           onChange={handleChange}
@@ -241,7 +244,7 @@ export default function App() {
             },
           }}
         />
-        <PanelsRoot />
+        <PanelsRoot api={excalidrawApi} />
       </div>
 
       {saveOpen && (
