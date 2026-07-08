@@ -7,3 +7,6 @@ public/fonts
 working/
 test-results/
 playwright-report/
+.claude/
+.superpowers/
+CLAUDE.md
