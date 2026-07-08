@@ -1,7 +1,7 @@
 {
   "name": "flow",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "description": "Standalone visual workspace built on Excalidraw with local, IndexedDB, and Google Drive storage.",
   "scripts": {
