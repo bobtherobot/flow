@@ -9,6 +9,8 @@ export interface MenuBarProps {
   onExport: (format: ImageFormat) => void;
   onPreferences: () => void;
   onClearCanvas: () => void;
+  /** Dispatch an Excalidraw action by name (z-order, group, align, etc.). */
+  onEditAction: (name: string) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomToFit: () => void;
@@ -17,7 +19,7 @@ export interface MenuBarProps {
   onAbout: () => void;
 }
 
-const contentProps = { align: "start", sideOffset: 4, className: "wimp-menu" } as const;
+const contentProps = { align: "start", sideOffset: 4, className: "flow-menu" } as const;
 
 /**
  * Traditional desktop menu bar (File / View / Help). Radix supplies the
@@ -26,45 +28,45 @@ const contentProps = { align: "start", sideOffset: 4, className: "wimp-menu" } a
  */
 export function MenuBar(props: MenuBarProps) {
   return (
-    <Menubar.Root className="wimp-menubar" aria-label="Application menu">
+    <Menubar.Root className="flow-menubar" aria-label="Application menu">
       <Menubar.Menu>
-        <Menubar.Trigger className="wimp-menubar__trigger">File</Menubar.Trigger>
+        <Menubar.Trigger className="flow-menubar__trigger">File</Menubar.Trigger>
         <Menubar.Portal>
           <Menubar.Content {...contentProps}>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onNew}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onNew}>
               New
             </Menubar.Item>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onOpen}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onOpen}>
               Open…
             </Menubar.Item>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onSave}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onSave}>
               Save…
             </Menubar.Item>
             <Menubar.Sub>
-              <Menubar.SubTrigger className="wimp-menu__item">
+              <Menubar.SubTrigger className="flow-menu__item">
                 Export
-                <span className="wimp-menu__chevron" aria-hidden="true">›</span>
+                <span className="flow-menu__chevron" aria-hidden="true">›</span>
               </Menubar.SubTrigger>
               <Menubar.Portal>
-                <Menubar.SubContent className="wimp-menu">
-                  <Menubar.Item className="wimp-menu__item" onSelect={() => props.onExport("png")}>
+                <Menubar.SubContent className="flow-menu">
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onExport("png")}>
                     PNG
                   </Menubar.Item>
-                  <Menubar.Item className="wimp-menu__item" onSelect={() => props.onExport("svg")}>
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onExport("svg")}>
                     SVG
                   </Menubar.Item>
-                  <Menubar.Item className="wimp-menu__item" onSelect={() => props.onExport("jpg")}>
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onExport("jpg")}>
                     JPG
                   </Menubar.Item>
                 </Menubar.SubContent>
               </Menubar.Portal>
             </Menubar.Sub>
-            <Menubar.Separator className="wimp-menu__sep" />
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onPreferences}>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={props.onPreferences}>
               Preferences…
             </Menubar.Item>
-            <Menubar.Separator className="wimp-menu__sep" />
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onClearCanvas}>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={props.onClearCanvas}>
               Clear Canvas
             </Menubar.Item>
           </Menubar.Content>
@@ -72,23 +74,91 @@ export function MenuBar(props: MenuBarProps) {
       </Menubar.Menu>
 
       <Menubar.Menu>
-        <Menubar.Trigger className="wimp-menubar__trigger">View</Menubar.Trigger>
+        <Menubar.Trigger className="flow-menubar__trigger">Edit</Menubar.Trigger>
         <Menubar.Portal>
           <Menubar.Content {...contentProps}>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onZoomIn}>
+            <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("duplicateSelection")}>
+              Duplicate
+              <span className="flow-menu__shortcut">⌘D</span>
+            </Menubar.Item>
+            <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("deleteSelectedElements")}>
+              Delete
+              <span className="flow-menu__shortcut">⌫</span>
+            </Menubar.Item>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("group")}>
+              Group
+              <span className="flow-menu__shortcut">⌘G</span>
+            </Menubar.Item>
+            <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("ungroup")}>
+              Ungroup
+              <span className="flow-menu__shortcut">⇧⌘G</span>
+            </Menubar.Item>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("bringToFront")}>
+              Bring to Front
+            </Menubar.Item>
+            <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("bringForward")}>
+              Bring Forward
+            </Menubar.Item>
+            <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("sendBackward")}>
+              Send Backward
+            </Menubar.Item>
+            <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("sendToBack")}>
+              Send to Back
+            </Menubar.Item>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Sub>
+              <Menubar.SubTrigger className="flow-menu__item">
+                Align
+                <span className="flow-menu__chevron" aria-hidden="true">›</span>
+              </Menubar.SubTrigger>
+              <Menubar.Portal>
+                <Menubar.SubContent className="flow-menu">
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("alignLeft")}>
+                    Align Left
+                  </Menubar.Item>
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("alignHorizontallyCentered")}>
+                    Align Center
+                  </Menubar.Item>
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("alignRight")}>
+                    Align Right
+                  </Menubar.Item>
+                  <Menubar.Separator className="flow-menu__sep" />
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("alignTop")}>
+                    Align Top
+                  </Menubar.Item>
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("alignVerticallyCentered")}>
+                    Align Middle
+                  </Menubar.Item>
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onEditAction("alignBottom")}>
+                    Align Bottom
+                  </Menubar.Item>
+                </Menubar.SubContent>
+              </Menubar.Portal>
+            </Menubar.Sub>
+          </Menubar.Content>
+        </Menubar.Portal>
+      </Menubar.Menu>
+
+      <Menubar.Menu>
+        <Menubar.Trigger className="flow-menubar__trigger">View</Menubar.Trigger>
+        <Menubar.Portal>
+          <Menubar.Content {...contentProps}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onZoomIn}>
               Zoom In
             </Menubar.Item>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onZoomOut}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onZoomOut}>
               Zoom Out
             </Menubar.Item>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onZoomToFit}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onZoomToFit}>
               Zoom to Fit
             </Menubar.Item>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onResetZoom}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onResetZoom}>
               Reset Zoom
             </Menubar.Item>
-            <Menubar.Separator className="wimp-menu__sep" />
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onToggleGrid}>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={props.onToggleGrid}>
               Toggle Grid
             </Menubar.Item>
           </Menubar.Content>
@@ -96,11 +166,11 @@ export function MenuBar(props: MenuBarProps) {
       </Menubar.Menu>
 
       <Menubar.Menu>
-        <Menubar.Trigger className="wimp-menubar__trigger">Help</Menubar.Trigger>
+        <Menubar.Trigger className="flow-menubar__trigger">Help</Menubar.Trigger>
         <Menubar.Portal>
           <Menubar.Content {...contentProps}>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onAbout}>
-              About wimp…
+            <Menubar.Item className="flow-menu__item" onSelect={props.onAbout}>
+              About flow…
             </Menubar.Item>
           </Menubar.Content>
         </Menubar.Portal>

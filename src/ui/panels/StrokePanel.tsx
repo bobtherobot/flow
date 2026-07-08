@@ -7,8 +7,6 @@ import type { SelectionStyle } from "./useSelectionStyle";
 /** Stroke width bounds, in canvas pixels. */
 const MIN_STROKE_PX = 0.5;
 const MAX_STROKE_PX = 32;
-/** Excalidraw ROUNDNESS.PROPORTIONAL_RADIUS. */
-const ROUNDNESS_PROPORTIONAL = 2;
 
 // ── Icons ───────────────────────────────────────────────────────────────────
 const svg = (children: React.ReactNode) => (
@@ -26,9 +24,10 @@ const STROKE_STYLES: IconOption<"solid" | "dashed" | "dotted">[] = [
   { value: "dotted", label: "Dotted", icon: svg(line("0.5 3")) },
 ];
 
-const ARROW_TYPES: IconOption<"sharp" | "round">[] = [
+const ARROW_TYPES: IconOption<"sharp" | "round" | "elbow">[] = [
   { value: "sharp", label: "Sharp", icon: svg(<path d="M2 11 L10 3 L18 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />) },
   { value: "round", label: "Round", icon: svg(<path d="M2 11 Q10 1 18 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none" />) },
+  { value: "elbow", label: "Elbow", icon: svg(<path d="M2 11 L2 5 L18 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />) },
 ];
 
 /** Arrowhead glyph at the right end of a short line. */
@@ -90,8 +89,8 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
   const arrowType = readFormValue(
     sel.elements,
     linearIds,
-    (el) => (el.roundness ? "round" : "sharp"),
-    a?.currentItemArrowType === "round" ? "round" : "sharp",
+    (el) => ("elbowed" in el && el.elbowed ? "elbow" : el.roundness ? "round" : "sharp"),
+    a?.currentItemArrowType ?? "sharp",
   );
 
   const startArrow = readFormValue(
@@ -107,24 +106,10 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
     ahToValue(a?.currentItemEndArrowhead),
   );
 
-  const setArrowType = (value: "sharp" | "round") =>
-    sel.update(
-      linearIds,
-      (el) => {
-        const roundness = value === "round" ? { type: ROUNDNESS_PROPORTIONAL } : null;
-        if (el.type === "arrow") {
-          const wasElbow = "elbowed" in el && el.elbowed === true;
-          return {
-            roundness,
-            elbowed: false,
-            // Leaving elbow collapses the route back to a straight start→end arrow.
-            points: wasElbow ? [el.points[0], el.points[el.points.length - 1]] : el.points,
-          };
-        }
-        return { roundness };
-      },
-      { currentItemArrowType: value },
-    );
+  // Reuse Excalidraw's own action — it handles round/sharp plus elbow routing and
+  // binding, which can't be reimplemented from element props alone.
+  const setArrowType = (value: "sharp" | "round" | "elbow") =>
+    sel.executeAction("changeArrowType", value);
 
   const setArrowhead = (which: "startArrowhead" | "endArrowhead", currentItemKey: string) =>
     (value: string) =>

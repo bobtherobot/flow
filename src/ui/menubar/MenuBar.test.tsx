@@ -6,13 +6,14 @@ const noop = () => {};
 const props = {
   onNew: noop, onOpen: noop, onSave: noop, onExport: noop, onPreferences: noop,
   onClearCanvas: noop, onZoomIn: noop, onZoomOut: noop, onZoomToFit: noop,
-  onResetZoom: noop, onToggleGrid: noop, onAbout: noop,
+  onResetZoom: noop, onToggleGrid: noop, onAbout: noop, onEditAction: noop,
 };
 
 describe("MenuBar", () => {
-  it("renders File, View, and Help triggers", () => {
+  it("renders File, Edit, View, and Help triggers", () => {
     render(<MenuBar {...props} />);
     expect(screen.getByRole("menuitem", { name: "File" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Edit" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "View" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Help" })).toBeInTheDocument();
   });

@@ -42,6 +42,9 @@ export interface SelectionStyle {
     updater: (el: SceneElement) => ElementUpdate,
     currentItems?: Record<string, unknown>,
   ) => void;
+  /** Dispatch a registered Excalidraw action by name against the selection
+   *  (reuses its correct perform + history — e.g. "changeArrowType"). */
+  executeAction: (name: string, value?: unknown) => void;
 }
 
 /**
@@ -95,6 +98,8 @@ export function useSelectionStyle(api: ExcalidrawAPI | null): SelectionStyle {
       currentItemKey ? { [currentItemKey]: value } : undefined,
     );
 
+  const executeAction = (name: string, value?: unknown) => api?.executeAction(name, value);
+
   return {
     elements,
     appState,
@@ -105,5 +110,6 @@ export function useSelectionStyle(api: ExcalidrawAPI | null): SelectionStyle {
     hasLinear,
     setProp,
     update,
+    executeAction,
   };
 }

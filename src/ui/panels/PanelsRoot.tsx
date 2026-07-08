@@ -11,6 +11,12 @@ import { TextPanel } from "./TextPanel";
 /** Menu-bar height the dock sits below (matches --flow-menubar-h). */
 const MENUBAR_H = 36;
 
+/** Placeholder for the Layers panel — the feature lands in a later phase; the
+ *  slot is reserved so it drops into the accordion when ready. */
+function LayersPlaceholder() {
+  return <p className="flow-pnl-stub">Layers are coming in a later update.</p>;
+}
+
 interface PanelsRootProps {
   api: ExcalidrawAPI | null;
   units: Unit;
@@ -28,6 +34,7 @@ export function PanelsRoot({ api, units }: PanelsRootProps) {
     { id: "style", label: "Style", render: () => <StylePanel sel={sel} /> },
     { id: "stroke", label: "Stroke", render: () => <StrokePanel sel={sel} units={units} /> },
     { id: "text", label: "Text", render: () => <TextPanel sel={sel} /> },
+    { id: "layers", label: "Layers", render: () => <LayersPlaceholder /> },
   ];
 
   return <PanelDock defs={defs} topOffset={MENUBAR_H} />;

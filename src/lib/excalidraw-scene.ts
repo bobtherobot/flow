@@ -11,11 +11,21 @@ import { normalizeRoughness, DEFAULT_SLOPPINESS, type Sloppiness } from "./rough
 export { ARCHITECT_ROUGHNESS, normalizeRoughness } from "./roughness";
 
 /** The imperative handle Excalidraw hands us via the `excalidrawAPI` prop. */
-export type ExcalidrawAPI = NonNullable<
+type ExcalidrawImperativeHandle = NonNullable<
   Parameters<NonNullable<ComponentProps<typeof Excalidraw>["excalidrawAPI"]>>[0]
 >;
 
-/** Raster/vector formats wimp can export the canvas to. */
+/**
+ * The imperative handle plus flow's `executeAction` fork addition — dispatches a
+ * registered Excalidraw action by name (z-order, group, align, arrow type) with
+ * correct history capture. Present at runtime (vendor App.tsx); typed here until
+ * the vendor `.d.ts` is regenerated.
+ */
+export type ExcalidrawAPI = ExcalidrawImperativeHandle & {
+  executeAction: (name: string, value?: unknown) => void;
+};
+
+/** Raster/vector formats flow can export the canvas to. */
 export type ImageFormat = "png" | "svg" | "jpg";
 
 /** Serialize the current canvas to a `.excalidraw` JSON string. */

@@ -221,6 +221,7 @@ export default function App() {
         onExport={handleExport}
         onPreferences={() => setPrefsOpen(true)}
         onClearCanvas={handleClearCanvas}
+        onEditAction={(name) => apiRef.current?.executeAction(name)}
         onZoomIn={withApi(zoomIn)}
         onZoomOut={withApi(zoomOut)}
         onZoomToFit={withApi(zoomToFit)}
@@ -232,8 +233,11 @@ export default function App() {
       <div style={{ position: "fixed", inset: "var(--flow-menubar-h) 0 0 0" }}>
         <Excalidraw
           excalidrawAPI={(instance) => {
-            apiRef.current = instance;
-            setExcalidrawApi(instance);
+            // `executeAction` exists at runtime (fork addition) but not yet in the
+            // vendor .d.ts, so narrow the handle to flow's augmented type here.
+            const api = instance as ExcalidrawAPI;
+            apiRef.current = api;
+            setExcalidrawApi(api);
           }}
           theme="light"
           onChange={handleChange}
