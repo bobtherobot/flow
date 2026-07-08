@@ -10,19 +10,23 @@ function mockSel(selectedCount: number): { sel: SelectionStyle; executeAction: R
   return { sel, executeAction };
 }
 
-describe("AlignPanel", () => {
-  it("dispatches the matching action when an align button is clicked", async () => {
-    const { sel, executeAction } = mockSel(2);
-    render(<AlignPanel sel={sel} />);
-    await userEvent.click(screen.getByRole("button", { name: "Align left" }));
-    expect(executeAction).toHaveBeenCalledWith("alignLeft");
-  });
+const LABEL_TO_ACTION: [label: string, action: string][] = [
+  ["Align left", "alignLeft"],
+  ["Align center", "alignHorizontallyCentered"],
+  ["Align right", "alignRight"],
+  ["Align top", "alignTop"],
+  ["Align middle", "alignVerticallyCentered"],
+  ["Align bottom", "alignBottom"],
+  ["Distribute horizontally", "distributeHorizontally"],
+  ["Distribute vertically", "distributeVertically"],
+];
 
-  it("dispatches distribute actions", async () => {
+describe("AlignPanel", () => {
+  it.each(LABEL_TO_ACTION)("dispatches %s as %s", async (label, action) => {
     const { sel, executeAction } = mockSel(3);
     render(<AlignPanel sel={sel} />);
-    await userEvent.click(screen.getByRole("button", { name: "Distribute horizontally" }));
-    expect(executeAction).toHaveBeenCalledWith("distributeHorizontally");
+    await userEvent.click(screen.getByRole("button", { name: label }));
+    expect(executeAction).toHaveBeenCalledWith(action);
   });
 
   it("greys align (<2) and distribute (<3) rows below their thresholds", () => {

@@ -11,14 +11,9 @@ async function drawRect(page: Page, x1: number, y1: number, x2: number, y2: numb
   await page.mouse.up();
 }
 
-/** Reveal the Align sub-panel body. Panels default to expanded (fresh
- *  localStorage per test), so only click the accordion title if collapsed. */
+/** The Align sub-panel is expanded by default (fresh localStorage per test). */
 async function openAlignPanel(page: Page) {
-  const alignLeft = page.getByRole("button", { name: "Align left" });
-  if (!(await alignLeft.isVisible().catch(() => false))) {
-    await page.getByText("Align", { exact: true }).first().click();
-  }
-  await expect(alignLeft).toBeVisible();
+  await expect(page.getByRole("button", { name: "Align left" })).toBeVisible();
 }
 
 test("align buttons are disabled without a 2+ selection", async ({ page }) => {
