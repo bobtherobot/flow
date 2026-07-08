@@ -29,6 +29,9 @@ export interface SelectionStyle {
   /** Ids a text-color edit targets (selected text + bound container text). */
   textTargetIds: SelectedElementIds;
   hasSelection: boolean;
+  /** Number of selected elements (truthy selectedElementIds). Drives align
+   *  (>=2) and distribute (>=3) enablement. */
+  selectedCount: number;
   hasText: boolean;
   /** Whether the selection contains a linear element (arrow or line). */
   hasLinear: boolean;
@@ -70,6 +73,7 @@ export function useSelectionStyle(api: ExcalidrawAPI | null): SelectionStyle {
   const textTargetIds = resolveTextTargetIds(elements, selectedIds);
 
   const hasSelection = Object.values(selectedIds).some(Boolean);
+  const selectedCount = Object.values(selectedIds).filter(Boolean).length;
   const hasText = Object.keys(textTargetIds).length > 0;
   const hasLinear = elements.some(
     (el) => selectedIds[el.id] === true && (el.type === "arrow" || el.type === "line"),
@@ -106,6 +110,7 @@ export function useSelectionStyle(api: ExcalidrawAPI | null): SelectionStyle {
     selectedIds,
     textTargetIds,
     hasSelection,
+    selectedCount,
     hasText,
     hasLinear,
     setProp,

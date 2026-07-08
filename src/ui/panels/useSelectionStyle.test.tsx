@@ -98,4 +98,13 @@ describe("useSelectionStyle", () => {
     result.current.executeAction("changeArrowType", "elbow");
     expect(api.executeAction).toHaveBeenCalledWith("changeArrowType", "elbow");
   });
+
+  it("selectedCount counts only truthy selectedElementIds", () => {
+    const api = makeApi(
+      [rect("a"), rect("b"), rect("c")],
+      { a: true, b: true, c: false },
+    );
+    const { result } = renderHook(() => useSelectionStyle(api));
+    expect(result.current.selectedCount).toBe(2);
+  });
 });
