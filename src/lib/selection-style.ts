@@ -92,38 +92,27 @@ export function readFormValue<T extends Identified, V>(
   return common === undefined ? fallback : common;
 }
 
-export interface ApplyOptions<T> {
-  /** Restrict the write to elements matching this (e.g. only text elements). */
-  predicate?: (el: T) => boolean;
-  /**
-   * How to produce the updated element. Defaults to a structural spread; the
-   * Excalidraw hook passes `newElementWith` so `version`/`versionNonce` bump and
-   * the change is captured in history.
-   */
-  make?: (el: T, prop: string, value: unknown) => T;
-}
+/** Property changes to apply to one element (a partial), or null to skip it. */
+export type ElementUpdate = Record<string, unknown> | null;
 
 /**
- * Immutably set `prop` to `value` on every selected element, optionally
- * restricted by `options.predicate`. Unselected elements, elements failing the
- * predicate, and elements already at `value` pass through by identity to avoid
- * needless churn.
- *
- * `prop`/`value` are dynamic across a heterogeneous element union, so the write
- * is structural; call sites use typed wrappers for their specific property.
+ * Immutably apply `updater` to every targeted element. The updater returns the
+ * props to change (supporting multi-property edits like arrow type) or null to
+ * leave the element untouched; untargeted and skipped elements pass through by
+ * identity. `make` builds the new element — the Excalidraw hook passes
+ * `newElementWith` so `version`/`versionNonce` bump and the edit is recorded in
+ * history; the default is a structural spread for pure use.
  */
-export function applyToSelection<T extends Identified>(
+export function updateSelected<T extends Identified>(
   elements: readonly T[],
   selectedElementIds: SelectedElementIds,
-  prop: string,
-  value: unknown,
-  options: ApplyOptions<T> = {},
+  updater: (el: T) => ElementUpdate,
+  make?: (el: T, updates: Record<string, unknown>) => T,
 ): T[] {
-  const { predicate, make } = options;
   return elements.map((el) => {
     if (selectedElementIds[el.id] !== true) return el;
-    if (predicate && !predicate(el)) return el;
-    if ((el as Record<string, unknown>)[prop] === value) return el;
-    return make ? make(el, prop, value) : ({ ...el, [prop]: value } as T);
+    const updates = updater(el);
+    if (!updates) return el;
+    return make ? make(el, updates) : ({ ...el, ...updates } as T);
   });
 }

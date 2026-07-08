@@ -244,7 +244,7 @@ export default function App() {
             },
           }}
         />
-        <PanelsRoot api={excalidrawApi} />
+        <PanelsRoot api={excalidrawApi} units={units} />
       </div>
 
       {saveOpen && (

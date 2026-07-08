@@ -2,8 +2,9 @@ import { useEffect, useReducer } from "react";
 import { CaptureUpdateAction, newElementWith } from "@excalidraw/excalidraw";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import {
-  applyToSelection,
+  updateSelected,
   resolveTextTargetIds,
+  type ElementUpdate,
   type SelectedElementIds,
 } from "../../lib/selection-style";
 
@@ -29,9 +30,18 @@ export interface SelectionStyle {
   textTargetIds: SelectedElementIds;
   hasSelection: boolean;
   hasText: boolean;
-  /** Apply a property to the selection (or a custom id set) and set its default,
-   *  recording a single undo step via the imperative scene API. */
+  /** Whether the selection contains a linear element (arrow or line). */
+  hasLinear: boolean;
+  /** Apply a single property to the selection (or a custom id set) and set its
+   *  default, recording one undo step. */
   setProp: (args: SetPropArgs) => void;
+  /** Apply a computed, possibly multi-property update to the given ids (e.g.
+   *  arrow type), optionally setting currentItem* defaults. One undo step. */
+  update: (
+    ids: SelectedElementIds,
+    updater: (el: SceneElement) => ElementUpdate,
+    currentItems?: Record<string, unknown>,
+  ) => void;
 }
 
 /**
@@ -58,26 +68,42 @@ export function useSelectionStyle(api: ExcalidrawAPI | null): SelectionStyle {
 
   const hasSelection = Object.values(selectedIds).some(Boolean);
   const hasText = Object.keys(textTargetIds).length > 0;
+  const hasLinear = elements.some(
+    (el) => selectedIds[el.id] === true && (el.type === "arrow" || el.type === "line"),
+  );
 
-  const setProp = ({ prop, value, currentItemKey, ids }: SetPropArgs) => {
+  const update: SelectionStyle["update"] = (ids, updater, currentItems) => {
     if (!api) return;
-    const targetIds = ids ?? selectedIds;
     // `newElementWith` bumps version/versionNonce so Excalidraw records the edit
-    // in history (raw spreads are read back fine but never captured for undo).
-    const next = applyToSelection(api.getSceneElements(), targetIds, prop, value, {
-      make: (el: SceneElement, p, v) => newElementWith(el, { [p]: v } as Partial<SceneElement>),
-    });
-    // The dynamic currentItem* key can't be statically typed here; the cast is
+    // in history (raw spreads read back fine but are never captured for undo).
+    const next = updateSelected(api.getSceneElements(), ids, updater, (el, updates) =>
+      newElementWith(el, updates as Partial<SceneElement>),
+    );
+    // The dynamic currentItem* keys can't be statically typed here; the cast is
     // localized to this scene-write boundary.
-    const appStatePatch = currentItemKey
-      ? ({ [currentItemKey]: value } as UpdateAppState)
-      : undefined;
     api.updateScene({
       elements: next,
-      appState: appStatePatch,
+      appState: currentItems as UpdateAppState | undefined,
       captureUpdate: CaptureUpdateAction.IMMEDIATELY,
     });
   };
 
-  return { elements, appState, selectedIds, textTargetIds, hasSelection, hasText, setProp };
+  const setProp = ({ prop, value, currentItemKey, ids }: SetPropArgs) =>
+    update(
+      ids ?? selectedIds,
+      (el) => ((el as Record<string, unknown>)[prop] === value ? null : { [prop]: value }),
+      currentItemKey ? { [currentItemKey]: value } : undefined,
+    );
+
+  return {
+    elements,
+    appState,
+    selectedIds,
+    textTargetIds,
+    hasSelection,
+    hasText,
+    hasLinear,
+    setProp,
+    update,
+  };
 }

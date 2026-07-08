@@ -4,7 +4,7 @@ import {
   getSelectedElements,
   getCommonValue,
   readFormValue,
-  applyToSelection,
+  updateSelected,
   resolveTextTargetIds,
 } from "./selection-style";
 
@@ -80,47 +80,52 @@ describe("readFormValue", () => {
   });
 });
 
-describe("applyToSelection", () => {
-  it("updates only selected elements immutably", () => {
+describe("updateSelected", () => {
+  it("applies the updater to only selected elements, immutably", () => {
     const els = [el("a"), el("b")];
-    const next = applyToSelection(els, { a: true }, "strokeColor", "#f00");
+    const next = updateSelected(els, { a: true }, () => ({ strokeColor: "#f00" }));
     expect(next[0]).toEqual({ ...els[0], strokeColor: "#f00" });
-    expect(next[0]).not.toBe(els[0]); // new object
-    expect(next[1]).toBe(els[1]); // untouched, same identity
+    expect(next[0]).not.toBe(els[0]);
+    expect(next[1]).toBe(els[1]);
   });
 
-  it("passes through selected elements already at the value by identity", () => {
+  it("skips an element when the updater returns null", () => {
     const els = [el("a", { strokeColor: "#f00" })];
-    const next = applyToSelection(els, { a: true }, "strokeColor", "#f00");
+    const next = updateSelected(els, { a: true }, (e) =>
+      e.strokeColor === "#f00" ? null : { strokeColor: "#f00" },
+    );
     expect(next[0]).toBe(els[0]);
   });
 
-  it("does not mutate the input array or elements", () => {
-    const els = [el("a")];
-    applyToSelection(els, { a: true }, "strokeColor", "#f00");
-    expect(els[0].strokeColor).toBe("#000000");
+  it("supports multi-property updates computed from the element", () => {
+    const els = [el("a", { opacity: 20 })];
+    const next = updateSelected(els, { a: true }, (e) => ({
+      strokeColor: "#f00",
+      opacity: (e.opacity ?? 0) + 10,
+    }));
+    expect(next[0]).toMatchObject({ strokeColor: "#f00", opacity: 30 });
   });
 
-  it("restricts writes with a predicate (e.g. text-only)", () => {
-    const els = [el("a", { type: "text" }), el("b", { type: "rectangle" })];
-    const next = applyToSelection(els, { a: true, b: true }, "strokeColor", "#f00", {
-      predicate: (e) => e.type === "text",
-    });
-    expect(next[0].strokeColor).toBe("#f00");
-    expect(next[1]).toBe(els[1]); // rectangle skipped by predicate
+  it("does not mutate the input elements", () => {
+    const els = [el("a")];
+    updateSelected(els, { a: true }, () => ({ strokeColor: "#f00" }));
+    expect(els[0].strokeColor).toBe("#000000");
   });
 
   it("uses a custom make() for changed elements (e.g. version bump)", () => {
     const els = [el("a")];
-    const next = applyToSelection(els, { a: true }, "strokeColor", "#f00", {
-      make: (e, prop, value) => ({ ...e, [prop]: value, tagged: true } as typeof e & { tagged: boolean }),
-    });
+    const next = updateSelected(
+      els,
+      { a: true },
+      () => ({ strokeColor: "#f00" }),
+      (e, updates) => ({ ...e, ...updates, tagged: true } as typeof e & { tagged: boolean }),
+    );
     expect(next[0]).toMatchObject({ strokeColor: "#f00", tagged: true });
   });
 
   it("leaves everything untouched when the selection is empty", () => {
     const els = [el("a"), el("b")];
-    const next = applyToSelection(els, {}, "strokeColor", "#f00");
+    const next = updateSelected(els, {}, () => ({ strokeColor: "#f00" }));
     expect(next[0]).toBe(els[0]);
     expect(next[1]).toBe(els[1]);
   });
