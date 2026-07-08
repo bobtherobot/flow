@@ -34,6 +34,7 @@ import {
 } from "./lib/view-actions";
 import { ensureExtension, stripExtension } from "./lib/filename";
 import { MenuBar } from "./ui/menubar/MenuBar";
+import { PanelsRoot } from "./ui/panels/PanelsRoot";
 import { SaveDialog } from "./ui/SaveDialog";
 import { OpenDialog } from "./ui/OpenDialog";
 import { PreferencesDialog } from "./ui/PreferencesDialog";
@@ -58,7 +59,7 @@ export default function App() {
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [internalDocs, setInternalDocs] = useState<DocumentSummary[]>([]);
-  const [appName, setAppName] = useState("Wimp");
+  const [appName, setAppName] = useState("Flow");
 
   // App-wide sloppiness preference. `sloppinessRef` mirrors it so the stable
   // onChange handler and async import paths read the current value without
@@ -218,7 +219,7 @@ export default function App() {
         onAbout={() => setAboutOpen(true)}
       />
 
-      <div style={{ position: "fixed", inset: "var(--wimp-menubar-h) 0 0 0" }}>
+      <div style={{ position: "fixed", inset: "var(--flow-menubar-h) 0 0 0" }}>
         <Excalidraw
           excalidrawAPI={(api) => {
             apiRef.current = api;
@@ -232,6 +233,7 @@ export default function App() {
             },
           }}
         />
+        <PanelsRoot />
       </div>
 
       {saveOpen && (

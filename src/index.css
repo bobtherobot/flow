@@ -16,11 +16,23 @@ body,
 }
 
 /*
- * wimp provides its own File/View/Help menu bar, so Excalidraw's hamburger
+ * flow provides its own File/View/Help menu bar, so Excalidraw's hamburger
  * ("main menu") button is redundant. `.dropdown-menu-button` is the stable
  * trigger class from Excalidraw's source; hiding it degrades gracefully (worst
  * case the button reappears) rather than breaking.
  */
 .excalidraw .dropdown-menu-button {
+  display: none;
+}
+
+/*
+ * flow replaces Excalidraw's context-aware properties island with its own
+ * always-visible, Illustrator-style dockable accordion (Style/Stroke/Text).
+ * `.selected-shape-actions` is the stable wrapper class Excalidraw puts around
+ * that island (see vendor LayerUI.tsx); hiding it suppresses the whole panel
+ * without a fork edit and degrades gracefully. The flow panels drive the same
+ * scene via the imperative updateScene API.
+ */
+.excalidraw .selected-shape-actions {
   display: none;
 }

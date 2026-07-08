@@ -1,0 +1,357 @@
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { SubPanel } from "./SubPanel";
+import { PanelConfigMenu } from "./PanelConfigMenu";
+import { useDrag, type DragMove } from "./useDrag";
+import type { PanelDef } from "./panel-types";
+import {
+  DOCK_LIMITS,
+  dockedPanels,
+  orderedPanels,
+  type DockAction,
+  type DockState,
+} from "./panel-dock-state";
+
+/** Drag a docked sub-panel past this many px beyond the panel edge to tear off. */
+const TEAR_OFF_MARGIN = 48;
+
+interface PanelShellProps {
+  state: DockState;
+  dispatch: React.Dispatch<DockAction>;
+  defs: PanelDef[];
+  /** Height (px) of the app menu bar the panel sits below. */
+  topOffset: number;
+  onManageLayouts: () => void;
+}
+
+export function PanelShell({
+  state,
+  dispatch,
+  defs,
+  topOffset,
+  onManageLayouts,
+}: PanelShellProps) {
+  const shellRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const subRefs = useRef(new Map<string, HTMLDivElement>());
+
+  const [configOpen, setConfigOpen] = useState(false);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+
+  const defById = useCallback((id: string) => defs.find((d) => d.id === id), [defs]);
+
+  // ── Keep a floating panel inside the viewport on window resize ──────────────
+  useEffect(() => {
+    const onResize = () => {
+      dispatch({
+        type: "clampToViewport",
+        vw: window.innerWidth,
+        vh: window.innerHeight,
+        topOffset,
+      });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [dispatch, topOffset]);
+
+  // ── Close the config menu on any outside pointer press ──────────────────────
+  useEffect(() => {
+    if (!configOpen) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest(".flow-pnl-config") || t.closest(".flow-pnl__hamburger")) return;
+      setConfigOpen(false);
+    };
+    window.addEventListener("pointerdown", onDown);
+    return () => window.removeEventListener("pointerdown", onDown);
+  }, [configOpen]);
+
+  const idealFloatHeight = (): number => {
+    const topbarH = shellRef.current?.querySelector(".flow-pnl__topbar")?.clientHeight ?? 34;
+    const subH = dockedPanels(state).reduce(
+      (sum, p) => sum + (subRefs.current.get(p.id)?.offsetHeight ?? 0),
+      0,
+    );
+    const ideal = topbarH + subH + 2;
+    const maxByViewport = window.innerHeight - topOffset - 16;
+    return Math.max(DOCK_LIMITS.MIN_H, Math.min(ideal, DOCK_LIMITS.MAX_H, maxByViewport));
+  };
+
+  // ── Topbar drag: dock ⇄ float, then move while floating ─────────────────────
+  const topbar = useRef({ ox: 0, oy: 0, ow: 0, floating: false });
+  const onTopbarDown = useDrag({
+    threshold: 25,
+    onStart: (e) => {
+      if ((e.target as HTMLElement).closest("button")) return false;
+      const r = shellRef.current!.getBoundingClientRect();
+      topbar.current = { ox: r.left, oy: r.top, ow: r.width, floating: state.floating };
+    },
+    onMove: (m) => {
+      const o = topbar.current;
+      if (!o.floating) {
+        dispatch({ type: "detach", floatX: o.ox, floatY: o.oy, floatW: o.ow, floatH: idealFloatHeight() });
+        o.floating = true;
+      }
+      dispatch({
+        type: "moveDock",
+        floatX: o.ox + m.dx,
+        floatY: Math.max(topOffset, o.oy + m.dy),
+      });
+    },
+  });
+
+  // ── Docked resize (right edge of the left-docked panel) ─────────────────────
+  const dockResize = useRef(0);
+  const onDockResizeDown = useDrag({
+    onStart: () => {
+      if (state.floating || state.collapsed) return false;
+      dockResize.current = state.dockedWidth;
+    },
+    onMove: (m) => dispatch({ type: "resizeDocked", dockedWidth: dockResize.current + m.dx }),
+  });
+
+  // ── Floating resize (right / bottom / SE corner) ────────────────────────────
+  const floatResize = useRef({ w: 0, h: 0 });
+  const beginFloatResize = () => {
+    floatResize.current = { w: state.floatW, h: state.floatH };
+  };
+  const onFloatResizeRight = useDrag({
+    onStart: () => (state.floating ? beginFloatResize() : false),
+    onMove: (m) => dispatch({ type: "resizeFloat", floatW: floatResize.current.w + m.dx }),
+  });
+  const onFloatResizeBottom = useDrag({
+    onStart: () => (state.floating ? beginFloatResize() : false),
+    onMove: (m) => dispatch({ type: "resizeFloat", floatH: floatResize.current.h + m.dy }),
+  });
+  const onFloatResizeCorner = useDrag({
+    onStart: () => (state.floating ? beginFloatResize() : false),
+    onMove: (m) =>
+      dispatch({
+        type: "resizeFloat",
+        floatW: floatResize.current.w + m.dx,
+        floatH: floatResize.current.h + m.dy,
+      }),
+  });
+
+  // ── Sub-panel header drag: tear off / reorder / move-while-floating ─────────
+  const sub = useRef({ id: "", grabDX: 0, grabDY: 0, floating: false });
+
+  const computeDropIndex = (clientY: number, excludeId: string): number => {
+    const list = dockedPanels(state).filter((p) => p.id !== excludeId);
+    for (let i = 0; i < list.length; i += 1) {
+      const r = subRefs.current.get(list[i].id)?.getBoundingClientRect();
+      if (r && clientY < r.top + r.height / 2) return i;
+    }
+    return list.length;
+  };
+
+  const onSubDragStart = (id: string, e: React.PointerEvent) => {
+    const r = subRefs.current.get(id)?.getBoundingClientRect();
+    const p = state.panels.find((sp) => sp.id === id)!;
+    sub.current = {
+      id,
+      grabDX: r ? e.clientX - r.left : 20,
+      grabDY: r ? e.clientY - r.top : 12,
+      floating: p.floating,
+    };
+  };
+
+  const onSubDragMove = (id: string, _m: DragMove, e: PointerEvent) => {
+    const s = sub.current;
+    const place = { floatX: e.clientX - s.grabDX, floatY: Math.max(topOffset, e.clientY - s.grabDY) };
+    if (s.floating) {
+      dispatch({ type: "moveSubFloat", id, ...place });
+      return;
+    }
+    const shellR = shellRef.current!.getBoundingClientRect();
+    if (e.clientX > shellR.right + TEAR_OFF_MARGIN) {
+      setDropIndex(null);
+      const floatW = state.floating ? state.floatW : state.dockedWidth;
+      dispatch({ type: "floatSub", id, ...place, floatW });
+      s.floating = true;
+      return;
+    }
+    setDropIndex(computeDropIndex(e.clientY, id));
+  };
+
+  const onSubDragEnd = (id: string, m: DragMove) => {
+    if (!sub.current.floating && m.moved && dropIndex !== null) {
+      dispatch({ type: "reorderSub", id, targetIndex: dropIndex });
+    }
+    setDropIndex(null);
+  };
+
+  // ── Sub-panel floating resize ───────────────────────────────────────────────
+  const subResize = useRef({ id: "", w: 0 });
+  const onSubResizeStart = (id: string) => {
+    const p = state.panels.find((sp) => sp.id === id);
+    subResize.current = { id, w: p?.floatW ?? DOCK_LIMITS.MIN_W };
+  };
+  const onSubResizeMove = (id: string, m: DragMove) =>
+    dispatch({ type: "resizeSubFloat", id, floatW: subResize.current.w + m.dx });
+
+  const configStyle = (): React.CSSProperties => {
+    const r = hamburgerRef.current?.getBoundingClientRect();
+    return r ? { top: r.bottom + 4, left: r.left } : { top: topOffset, left: 8 };
+  };
+
+  const registerSubRef = (id: string) => (el: HTMLDivElement | null) => {
+    if (el) subRefs.current.set(id, el);
+    else subRefs.current.delete(id);
+  };
+
+  const renderSub = (id: string) => {
+    const def = defById(id);
+    const panel = state.panels.find((p) => p.id === id);
+    if (!def || !panel) return null;
+    return (
+      <SubPanel
+        key={id}
+        def={def}
+        panel={panel}
+        registerRef={registerSubRef(id)}
+        onToggleExpand={() => dispatch({ type: "toggleSubExpanded", id })}
+        onClose={() => dispatch({ type: "closeSub", id })}
+        onDock={() => dispatch({ type: "dockSub", id })}
+        onHeaderDragStart={(e) => onSubDragStart(id, e)}
+        onHeaderDragMove={(m, e) => onSubDragMove(id, m, e)}
+        onHeaderDragEnd={(m) => onSubDragEnd(id, m)}
+        onResizeStart={() => onSubResizeStart(id)}
+        onResizeMove={(m) => onSubResizeMove(id, m)}
+      />
+    );
+  };
+
+  const docked = dockedPanels(state);
+  const floating = orderedPanels(state).filter((p) => p.visible && p.floating);
+  const showBody = !(state.collapsed && !state.floating);
+
+  const shellClass = [
+    "flow-pnl",
+    state.floating ? "flow-pnl--floating" : "flow-pnl--docked",
+    state.collapsed ? "flow-pnl--collapsed" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const shellStyle: React.CSSProperties = state.floating
+    ? {
+        left: state.floatX,
+        top: state.floatY,
+        width: state.floatW,
+        height: state.collapsed ? "auto" : state.floatH,
+      }
+    : {
+        left: 0,
+        top: topOffset,
+        bottom: 0,
+        width: state.collapsed ? DOCK_LIMITS.COLLAPSED_W : state.dockedWidth,
+      };
+
+  return (
+    <>
+      <div ref={shellRef} className={shellClass} style={shellStyle}>
+        <div className="flow-pnl__topbar" onPointerDown={onTopbarDown}>
+          <button
+            type="button"
+            className="flow-pnl__icon-btn"
+            aria-label={state.collapsed ? "Expand panel" : "Collapse panel"}
+            title="Toggle panel"
+            onClick={() => dispatch({ type: "toggleCollapse" })}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path
+                d={state.collapsed ? "M4.5 2 L8.5 6 L4.5 10" : "M2 4.5 L6 8.5 L10 4.5"}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          {showBody && (
+            <>
+              <span className="flow-pnl__title">Controls</span>
+              <button
+                ref={hamburgerRef}
+                type="button"
+                className="flow-pnl__icon-btn flow-pnl__hamburger"
+                aria-label="Panel options"
+                aria-haspopup="menu"
+                aria-expanded={configOpen}
+                onClick={() => setConfigOpen((open) => !open)}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                  <path d="M2 4 H12 M2 7 H12 M2 10 H12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+              </button>
+            </>
+          )}
+        </div>
+
+        {showBody && (
+          <div ref={bodyRef} className="flow-pnl__body">
+            {docked.map((p, i) => (
+              <Fragment key={p.id}>
+                {dropIndex === i && <div className="flow-pnl__drop" />}
+                {renderSub(p.id)}
+              </Fragment>
+            ))}
+            {dropIndex === docked.length && <div className="flow-pnl__drop" />}
+            {docked.length === 0 && (
+              <p className="flow-pnl__empty">All panels are hidden or floating.</p>
+            )}
+          </div>
+        )}
+
+        {/* Resize affordances */}
+        {!state.floating && !state.collapsed && (
+          <span className="flow-pnl__resize flow-pnl__resize--right" onPointerDown={onDockResizeDown} aria-hidden="true" />
+        )}
+        {state.floating && !state.collapsed && (
+          <>
+            <span className="flow-pnl__resize flow-pnl__resize--right" onPointerDown={onFloatResizeRight} aria-hidden="true" />
+            <span className="flow-pnl__resize flow-pnl__resize--bottom" onPointerDown={onFloatResizeBottom} aria-hidden="true" />
+            <span className="flow-pnl__resize flow-pnl__resize--se" onPointerDown={onFloatResizeCorner} aria-hidden="true" />
+          </>
+        )}
+      </div>
+
+      {/* Floating sub-panels live outside the shell so they escape its bounds */}
+      {floating.map((p) => renderSub(p.id))}
+
+      {configOpen && (
+        <PanelConfigMenu
+          state={state}
+          defs={defs}
+          style={configStyle()}
+          onToggleFloating={() => {
+            if (state.floating) {
+              dispatch({ type: "dock" });
+            } else {
+              const r = shellRef.current!.getBoundingClientRect();
+              dispatch({
+                type: "detach",
+                floatX: r.left + 24,
+                floatY: Math.max(topOffset, r.top + 24),
+                floatW: state.dockedWidth,
+                floatH: idealFloatHeight(),
+              });
+            }
+            setConfigOpen(false);
+          }}
+          onSetVisible={(id, visible) => dispatch({ type: "setSubVisible", id, visible })}
+          onManageLayouts={() => {
+            setConfigOpen(false);
+            onManageLayouts();
+          }}
+          onResetDefault={() => {
+            dispatch({ type: "resetDefault" });
+            setConfigOpen(false);
+          }}
+        />
+      )}
+    </>
+  );
+}
