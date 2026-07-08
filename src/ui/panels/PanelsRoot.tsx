@@ -6,14 +6,10 @@ import type { Unit } from "../../lib/units";
 import { useSelectionStyle } from "./useSelectionStyle";
 import { StylePanel } from "./StylePanel";
 import { StrokePanel } from "./StrokePanel";
+import { TextPanel } from "./TextPanel";
 
 /** Menu-bar height the dock sits below (matches --flow-menubar-h). */
 const MENUBAR_H = 36;
-
-/** Placeholder content for panels not yet built (Text → P5). */
-function Placeholder({ note }: { note: string }) {
-  return <p className="flow-pnl-stub">{note}</p>;
-}
 
 interface PanelsRootProps {
   api: ExcalidrawAPI | null;
@@ -31,7 +27,7 @@ export function PanelsRoot({ api, units }: PanelsRootProps) {
   const defs: PanelDef[] = [
     { id: "style", label: "Style", render: () => <StylePanel sel={sel} /> },
     { id: "stroke", label: "Stroke", render: () => <StrokePanel sel={sel} units={units} /> },
-    { id: "text", label: "Text", render: () => <Placeholder note="Font · Size · Align" /> },
+    { id: "text", label: "Text", render: () => <TextPanel sel={sel} /> },
   ];
 
   return <PanelDock defs={defs} topOffset={MENUBAR_H} />;

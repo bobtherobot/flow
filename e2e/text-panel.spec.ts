@@ -1,0 +1,46 @@
+import { test, expect, type Page } from "@playwright/test";
+
+const OUT = "/tmp/claude-1000/-home-bob-projects-flow/5e8db4eb-bcda-424a-aaeb-fe2bb7d655e1/scratchpad";
+
+async function addText(page: Page, text: string) {
+  await page.getByTestId("toolbar-text").click({ force: true });
+  await page.mouse.click(600, 380);
+  await page.keyboard.type(text);
+  await page.keyboard.press("Escape");
+}
+
+test("text controls are disabled without a text selection", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await page.getByTestId("toolbar-rectangle").click({ force: true });
+  await page.mouse.move(560, 320);
+  await page.mouse.down();
+  await page.mouse.move(820, 500, { steps: 6 });
+  await page.mouse.up();
+
+  await expect(page.getByRole("button", { name: "Font family" })).toBeDisabled();
+  await expect(page.getByRole("radio", { name: "Large", exact: true })).toBeDisabled();
+});
+
+test("edits font size, align and family on a text element", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await addText(page, "Flow");
+
+  // Controls become enabled once a text element is selected.
+  const fontTrigger = page.getByRole("button", { name: "Font family" });
+  await expect(fontTrigger).toBeEnabled();
+
+  await page.getByRole("radio", { name: "Extra large" }).click();
+  await expect(page.getByRole("radio", { name: "Extra large" })).toBeChecked();
+
+  await page.getByRole("radio", { name: "Align center" }).click();
+  await expect(page.getByRole("radio", { name: "Align center" })).toBeChecked();
+
+  await fontTrigger.click();
+  await page.getByRole("option", { name: "Comic Shanns" }).click();
+  await expect(fontTrigger).toHaveText(/Comic Shanns/);
+
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${OUT}/text-panel.png` });
+});
