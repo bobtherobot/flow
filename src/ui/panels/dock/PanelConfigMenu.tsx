@@ -1,10 +1,13 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import type { PanelDef } from "./panel-types";
 import { orderedPanels, type DockState } from "./panel-dock-state";
+import { clampMenuPosition, type MenuPoint } from "./menu-position";
 
 interface PanelConfigMenuProps {
   state: DockState;
   defs: PanelDef[];
-  style: React.CSSProperties;
+  /** Ideal top-left (under the hamburger). Clamped to the viewport on mount. */
+  anchor: MenuPoint;
   onToggleFloating: () => void;
   onSetVisible: (id: string, visible: boolean) => void;
   onManageLayouts: () => void;
@@ -14,12 +17,13 @@ interface PanelConfigMenuProps {
 /**
  * The hamburger dropdown: dock/detach the whole panel, toggle each sub-panel's
  * visibility, reset to the default layout, or open the layout manager.
- * Positioned by the shell (fixed, near the hamburger button).
+ * Anchored under the hamburger button, but clamps itself inside the viewport so
+ * it stays fully visible regardless of which edge the panel is docked against.
  */
 export function PanelConfigMenu({
   state,
   defs,
-  style,
+  anchor,
   onToggleFloating,
   onSetVisible,
   onManageLayouts,
@@ -27,8 +31,31 @@ export function PanelConfigMenu({
 }: PanelConfigMenuProps) {
   const labelOf = (id: string) => defs.find((d) => d.id === id)?.label ?? id;
 
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<MenuPoint>(anchor);
+
+  // Measure the rendered menu and pull it fully on-screen before the browser
+  // paints (useLayoutEffect runs pre-paint, so there's no visible jump).
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    setPos(
+      clampMenuPosition(
+        anchor,
+        { width, height },
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
+    );
+  }, [anchor.top, anchor.left]);
+
   return (
-    <div className="flow-pnl-config" style={style} role="menu">
+    <div
+      ref={ref}
+      className="flow-pnl-config"
+      style={{ top: pos.top, left: pos.left }}
+      role="menu"
+    >
       <button type="button" className="flow-pnl-config__action" role="menuitem" onClick={onToggleFloating}>
         {state.floating ? "Dock panel" : "Detach panel"}
       </button>

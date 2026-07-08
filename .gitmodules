@@ -1,4 +1,4 @@
 [submodule "vendor/excalidraw"]
 	path = vendor/excalidraw
 	url = https://github.com/bobtherobot/excalidraw.git
-	branch = wimp
+	branch = flow

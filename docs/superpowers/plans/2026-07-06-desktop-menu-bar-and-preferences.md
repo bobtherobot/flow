@@ -4,17 +4,17 @@
 
 **Goal:** Add a traditional desktop menu bar (File / View / Help) with a Preferences dialog whose first setting is a global, app-wide sloppiness control that restyles the whole canvas at once.
 
-**Architecture:** All wimp-level — no Excalidraw fork edits. A Radix-based menu bar owns a 36px top strip; the Excalidraw canvas shifts down beneath it. Global sloppiness generalizes the existing lock-to-Architect enforcement into a `localStorage`-backed preference applied to all existing + new elements. Business logic lives in small pure modules (`roughness.ts`, `preferences.ts`, `view-actions.ts`); `App.tsx` owns state and wires callbacks to presentational components.
+**Architecture:** All flow-level — no Excalidraw fork edits. A Radix-based menu bar owns a 36px top strip; the Excalidraw canvas shifts down beneath it. Global sloppiness generalizes the existing lock-to-Architect enforcement into a `localStorage`-backed preference applied to all existing + new elements. Business logic lives in small pure modules (`roughness.ts`, `preferences.ts`, `view-actions.ts`); `App.tsx` owns state and wires callbacks to presentational components.
 
 **Tech Stack:** React 19, TypeScript, Vite, Vitest + Testing Library, Playwright, `@excalidraw/excalidraw` (v0.18.1 fork via `file:` dep), `@radix-ui/react-menubar`.
 
 ## Global Constraints
 
-- **No Excalidraw fork edits.** Every change is a new wimp file, a wimp file edit, the public `excalidrawAPI`, or CSS. Nothing under `vendor/excalidraw/`.
+- **No Excalidraw fork edits.** Every change is a new flow file, a flow file edit, the public `excalidrawAPI`, or CSS. Nothing under `vendor/excalidraw/`.
 - **Light theme only** for this pass. No theme toggle.
-- **Sloppiness is app-wide**, persisted in `localStorage` key `wimp.sloppiness`, values `0` Architect / `1` Artist / `2` Cartoonist, default `0`.
+- **Sloppiness is app-wide**, persisted in `localStorage` key `flow.sloppiness`, values `0` Architect / `1` Artist / `2` Cartoonist, default `0`.
 - **Font:** Nunito for the menu bar (already self-hosted).
-- **Menu-bar accent:** Excalidraw indigo `#6965db` for interactive states only; bar recedes (flat white) at rest. Tokens namespaced `--wimp-*`.
+- **Menu-bar accent:** Excalidraw indigo `#6965db` for interactive states only; bar recedes (flat white) at rest. Tokens namespaced `--flow-*`.
 - **Menus for this pass:** File (full), View, Help. **No Edit menu** (deferred — omit entirely).
 - **Accessibility:** Radix supplies the WAI-ARIA menubar pattern; dialogs keep `role="dialog" aria-modal="true"`; external links use `target="_blank" rel="noopener noreferrer"`; WCAG AA contrast.
 - **Excalidraw API facts (verified against the installed v0.18.1 source):**
@@ -24,7 +24,7 @@
   - Zoom lives at `appState.zoom.value` (branded `NormalizedZoomValue`); set via `updateScene({ appState: { zoom: { value } } })`.
   - Grid: `appState.gridModeEnabled: boolean`.
   - Open built-in shortcuts dialog: `updateScene({ appState: { openDialog: { name: "help" } } })`.
-- **About links:** Excalidraw fork `https://github.com/bobtherobot/excalidraw`; wimp repo is a clearly-marked **placeholder** constant `WIMP_REPO_URL = "https://github.com/REPLACE-ME/wimp"`.
+- **About links:** Excalidraw fork `https://github.com/bobtherobot/excalidraw`; flow repo is a clearly-marked **placeholder** constant `FLOW_REPO_URL = "https://github.com/REPLACE-ME/flow"`.
 
 ---
 
@@ -34,7 +34,7 @@
 NEW  src/lib/view-actions.ts          zoom in/out/fit/reset, toggle grid (pure, take API)
 NEW  src/app/preferences.ts           localStorage-backed sloppiness get/set
 NEW  src/ui/menubar/MenuBar.tsx       Radix menubar: File / View / Help
-NEW  src/ui/menubar/menubar.css       --wimp-* tokens + menu styling
+NEW  src/ui/menubar/menubar.css       --flow-* tokens + menu styling
 NEW  src/ui/PreferencesDialog.tsx     General (sloppiness) + Keyboard (show shortcuts)
 NEW  src/ui/AboutDialog.tsx           fork description + two repo links
 EDIT src/lib/roughness.ts             Sloppiness type/labels + target param (additive)
@@ -125,7 +125,7 @@ Expected: FAIL — `isSloppiness is not a function` / target arg not honored.
 /**
  * Sloppiness enforcement, kept free of Excalidraw imports so it can be unit
  * tested in isolation. Excalidraw's roughness scale is 0=Architect, 1=Artist,
- * 2=Cartoonist. wimp controls sloppiness globally (app-wide), not per element.
+ * 2=Cartoonist. flow controls sloppiness globally (app-wide), not per element.
  */
 
 /** Excalidraw roughness values, named. */
@@ -193,12 +193,12 @@ describe("sloppiness preference", () => {
   });
 
   it("falls back to the default on a corrupt stored value", () => {
-    localStorage.setItem("wimp.sloppiness", "banana");
+    localStorage.setItem("flow.sloppiness", "banana");
     expect(getSloppiness()).toBe(0);
   });
 
   it("falls back to the default on an out-of-range stored value", () => {
-    localStorage.setItem("wimp.sloppiness", "7");
+    localStorage.setItem("flow.sloppiness", "7");
     expect(getSloppiness()).toBe(0);
   });
 });
@@ -214,7 +214,7 @@ Expected: FAIL — module `./preferences` not found.
 ```ts
 import { DEFAULT_SLOPPINESS, isSloppiness, type Sloppiness } from "../lib/roughness";
 
-const SLOPPINESS_KEY = "wimp.sloppiness";
+const SLOPPINESS_KEY = "flow.sloppiness";
 
 /** Read the app-wide sloppiness preference, falling back to the default. */
 export function getSloppiness(): Sloppiness {
@@ -437,7 +437,7 @@ Expected: adds `@radix-ui/react-menubar` to `dependencies`. Confirm `node_module
 Add near the top, after the `ExcalidrawAPI` type export:
 
 ```ts
-/** Raster/vector formats wimp can export the canvas to. */
+/** Raster/vector formats flow can export the canvas to. */
 export type ImageFormat = "png" | "svg" | "jpg";
 ```
 
@@ -446,142 +446,142 @@ export type ImageFormat = "png" | "svg" | "jpg";
 ```css
 /* "Quiet system chrome" — a flat desktop menu bar that recedes at rest and
    borrows Excalidraw's indigo for interactive states. Tokens namespaced
-   --wimp-* so they never collide with Excalidraw's --color-*. */
+   --flow-* so they never collide with Excalidraw's --color-*. */
 :root {
-  --wimp-menubar-bg: #ffffff;
-  --wimp-panel-bg: #ffffff;
-  --wimp-ink: #2b2b33;
-  --wimp-ink-muted: #76767f;
-  --wimp-ink-disabled: #c2c2ca;
-  --wimp-accent: #6965db;
-  --wimp-hover: #f1f0fb;
-  --wimp-active: #e8e7fb;
-  --wimp-active-strong: #dcdaf6;
-  --wimp-border: #e9e9ed;
-  --wimp-shadow: 0 4px 16px rgba(43, 43, 51, 0.12), 0 1px 3px rgba(43, 43, 51, 0.08);
-  --wimp-menubar-h: 36px;
-  --wimp-label-h: 28px;
-  --wimp-item-h: 30px;
-  --wimp-panel-minw: 200px;
-  --wimp-radius-sm: 5px;
-  --wimp-radius-md: 8px;
-  --wimp-pad-x: 10px;
-  --wimp-panel-pad: 4px;
-  --wimp-fs-label: 13px;
-  --wimp-fs-item: 13px;
-  --wimp-fs-shortcut: 12px;
-  --wimp-dur-fast: 90ms;
-  --wimp-dur-panel: 120ms;
-  --wimp-ease: cubic-bezier(0.2, 0, 0, 1);
-  --wimp-font: "Nunito", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --flow-menubar-bg: #ffffff;
+  --flow-panel-bg: #ffffff;
+  --flow-ink: #2b2b33;
+  --flow-ink-muted: #76767f;
+  --flow-ink-disabled: #c2c2ca;
+  --flow-accent: #6965db;
+  --flow-hover: #f1f0fb;
+  --flow-active: #e8e7fb;
+  --flow-active-strong: #dcdaf6;
+  --flow-border: #e9e9ed;
+  --flow-shadow: 0 4px 16px rgba(43, 43, 51, 0.12), 0 1px 3px rgba(43, 43, 51, 0.08);
+  --flow-menubar-h: 36px;
+  --flow-label-h: 28px;
+  --flow-item-h: 30px;
+  --flow-panel-minw: 200px;
+  --flow-radius-sm: 5px;
+  --flow-radius-md: 8px;
+  --flow-pad-x: 10px;
+  --flow-panel-pad: 4px;
+  --flow-fs-label: 13px;
+  --flow-fs-item: 13px;
+  --flow-fs-shortcut: 12px;
+  --flow-dur-fast: 90ms;
+  --flow-dur-panel: 120ms;
+  --flow-ease: cubic-bezier(0.2, 0, 0, 1);
+  --flow-font: "Nunito", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-.wimp-menubar {
+.flow-menubar {
   position: fixed;
   inset: 0 0 auto 0;
-  height: var(--wimp-menubar-h);
+  height: var(--flow-menubar-h);
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 0 8px;
-  background: var(--wimp-menubar-bg);
-  border-bottom: 1px solid var(--wimp-border);
-  font-family: var(--wimp-font);
+  background: var(--flow-menubar-bg);
+  border-bottom: 1px solid var(--flow-border);
+  font-family: var(--flow-font);
   z-index: 100;
   user-select: none;
 }
 
-.wimp-menubar__trigger {
-  height: var(--wimp-label-h);
-  padding: 0 var(--wimp-pad-x);
+.flow-menubar__trigger {
+  height: var(--flow-label-h);
+  padding: 0 var(--flow-pad-x);
   display: inline-flex;
   align-items: center;
   border: none;
   background: transparent;
-  border-radius: var(--wimp-radius-sm);
+  border-radius: var(--flow-radius-sm);
   font-family: inherit;
-  font-size: var(--wimp-fs-label);
+  font-size: var(--flow-fs-label);
   font-weight: 600;
-  color: var(--wimp-ink);
+  color: var(--flow-ink);
   cursor: default;
-  transition: background var(--wimp-dur-fast) var(--wimp-ease);
+  transition: background var(--flow-dur-fast) var(--flow-ease);
 }
-.wimp-menubar__trigger:hover {
-  background: var(--wimp-hover);
+.flow-menubar__trigger:hover {
+  background: var(--flow-hover);
 }
-.wimp-menubar__trigger[data-state="open"] {
-  background: var(--wimp-active);
-  color: var(--wimp-accent);
+.flow-menubar__trigger[data-state="open"] {
+  background: var(--flow-active);
+  color: var(--flow-accent);
 }
-.wimp-menubar__trigger:focus-visible {
-  outline: 2px solid var(--wimp-accent);
+.flow-menubar__trigger:focus-visible {
+  outline: 2px solid var(--flow-accent);
   outline-offset: -2px;
 }
 
-.wimp-menu {
-  min-width: var(--wimp-panel-minw);
-  background: var(--wimp-panel-bg);
-  border: 1px solid var(--wimp-border);
-  border-radius: var(--wimp-radius-md);
-  box-shadow: var(--wimp-shadow);
-  padding: var(--wimp-panel-pad);
-  font-family: var(--wimp-font);
+.flow-menu {
+  min-width: var(--flow-panel-minw);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-md);
+  box-shadow: var(--flow-shadow);
+  padding: var(--flow-panel-pad);
+  font-family: var(--flow-font);
   z-index: 100;
-  animation: wimp-menu-in var(--wimp-dur-panel) var(--wimp-ease);
+  animation: flow-menu-in var(--flow-dur-panel) var(--flow-ease);
 }
-@keyframes wimp-menu-in {
+@keyframes flow-menu-in {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .wimp-menu { animation: none; }
+  .flow-menu { animation: none; }
 }
 
-.wimp-menu__item {
-  height: var(--wimp-item-h);
+.flow-menu__item {
+  height: var(--flow-item-h);
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 var(--wimp-pad-x);
-  border-radius: var(--wimp-radius-sm);
-  font-size: var(--wimp-fs-item);
+  padding: 0 var(--flow-pad-x);
+  border-radius: var(--flow-radius-sm);
+  font-size: var(--flow-fs-item);
   font-weight: 500;
-  color: var(--wimp-ink);
+  color: var(--flow-ink);
   cursor: default;
   outline: none;
   user-select: none;
 }
-.wimp-menu__item[data-highlighted] {
-  background: var(--wimp-active);
-  color: var(--wimp-accent);
+.flow-menu__item[data-highlighted] {
+  background: var(--flow-active);
+  color: var(--flow-accent);
 }
-.wimp-menu__item[data-disabled] {
-  color: var(--wimp-ink-disabled);
+.flow-menu__item[data-disabled] {
+  color: var(--flow-ink-disabled);
   pointer-events: none;
 }
 
-.wimp-menu__shortcut {
+.flow-menu__shortcut {
   margin-left: auto;
-  font-size: var(--wimp-fs-shortcut);
-  color: var(--wimp-ink-muted);
+  font-size: var(--flow-fs-shortcut);
+  color: var(--flow-ink-muted);
 }
-.wimp-menu__item[data-highlighted] .wimp-menu__shortcut {
-  color: var(--wimp-accent);
+.flow-menu__item[data-highlighted] .flow-menu__shortcut {
+  color: var(--flow-accent);
   opacity: 0.7;
 }
-.wimp-menu__chevron {
+.flow-menu__chevron {
   margin-left: auto;
-  font-size: var(--wimp-fs-shortcut);
-  color: var(--wimp-ink-muted);
+  font-size: var(--flow-fs-shortcut);
+  color: var(--flow-ink-muted);
 }
-.wimp-menu__item[data-highlighted] .wimp-menu__chevron {
-  color: var(--wimp-accent);
+.flow-menu__item[data-highlighted] .flow-menu__chevron {
+  color: var(--flow-accent);
 }
 
-.wimp-menu__sep {
+.flow-menu__sep {
   height: 1px;
   margin: 4px 8px;
-  background: var(--wimp-border);
+  background: var(--flow-border);
 }
 ```
 
@@ -607,7 +607,7 @@ export interface MenuBarProps {
   onAbout: () => void;
 }
 
-const contentProps = { align: "start", sideOffset: 4, className: "wimp-menu" } as const;
+const contentProps = { align: "start", sideOffset: 4, className: "flow-menu" } as const;
 
 /**
  * Traditional desktop menu bar (File / View / Help). Radix supplies the
@@ -616,45 +616,45 @@ const contentProps = { align: "start", sideOffset: 4, className: "wimp-menu" } a
  */
 export function MenuBar(props: MenuBarProps) {
   return (
-    <Menubar.Root className="wimp-menubar" aria-label="Application menu">
+    <Menubar.Root className="flow-menubar" aria-label="Application menu">
       <Menubar.Menu>
-        <Menubar.Trigger className="wimp-menubar__trigger">File</Menubar.Trigger>
+        <Menubar.Trigger className="flow-menubar__trigger">File</Menubar.Trigger>
         <Menubar.Portal>
           <Menubar.Content {...contentProps}>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onNew}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onNew}>
               New
             </Menubar.Item>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onOpen}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onOpen}>
               Open…
             </Menubar.Item>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onSave}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onSave}>
               Save…
             </Menubar.Item>
             <Menubar.Sub>
-              <Menubar.SubTrigger className="wimp-menu__item">
+              <Menubar.SubTrigger className="flow-menu__item">
                 Export
-                <span className="wimp-menu__chevron" aria-hidden="true">›</span>
+                <span className="flow-menu__chevron" aria-hidden="true">›</span>
               </Menubar.SubTrigger>
               <Menubar.Portal>
-                <Menubar.SubContent className="wimp-menu">
-                  <Menubar.Item className="wimp-menu__item" onSelect={() => props.onExport("png")}>
+                <Menubar.SubContent className="flow-menu">
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onExport("png")}>
                     PNG
                   </Menubar.Item>
-                  <Menubar.Item className="wimp-menu__item" onSelect={() => props.onExport("svg")}>
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onExport("svg")}>
                     SVG
                   </Menubar.Item>
-                  <Menubar.Item className="wimp-menu__item" onSelect={() => props.onExport("jpg")}>
+                  <Menubar.Item className="flow-menu__item" onSelect={() => props.onExport("jpg")}>
                     JPG
                   </Menubar.Item>
                 </Menubar.SubContent>
               </Menubar.Portal>
             </Menubar.Sub>
-            <Menubar.Separator className="wimp-menu__sep" />
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onPreferences}>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={props.onPreferences}>
               Preferences…
             </Menubar.Item>
-            <Menubar.Separator className="wimp-menu__sep" />
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onClearCanvas}>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={props.onClearCanvas}>
               Clear Canvas
             </Menubar.Item>
           </Menubar.Content>
@@ -662,23 +662,23 @@ export function MenuBar(props: MenuBarProps) {
       </Menubar.Menu>
 
       <Menubar.Menu>
-        <Menubar.Trigger className="wimp-menubar__trigger">View</Menubar.Trigger>
+        <Menubar.Trigger className="flow-menubar__trigger">View</Menubar.Trigger>
         <Menubar.Portal>
           <Menubar.Content {...contentProps}>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onZoomIn}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onZoomIn}>
               Zoom In
             </Menubar.Item>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onZoomOut}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onZoomOut}>
               Zoom Out
             </Menubar.Item>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onZoomToFit}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onZoomToFit}>
               Zoom to Fit
             </Menubar.Item>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onResetZoom}>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onResetZoom}>
               Reset Zoom
             </Menubar.Item>
-            <Menubar.Separator className="wimp-menu__sep" />
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onToggleGrid}>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={props.onToggleGrid}>
               Toggle Grid
             </Menubar.Item>
           </Menubar.Content>
@@ -686,11 +686,11 @@ export function MenuBar(props: MenuBarProps) {
       </Menubar.Menu>
 
       <Menubar.Menu>
-        <Menubar.Trigger className="wimp-menubar__trigger">Help</Menubar.Trigger>
+        <Menubar.Trigger className="flow-menubar__trigger">Help</Menubar.Trigger>
         <Menubar.Portal>
           <Menubar.Content {...contentProps}>
-            <Menubar.Item className="wimp-menu__item" onSelect={props.onAbout}>
-              About wimp…
+            <Menubar.Item className="flow-menu__item" onSelect={props.onAbout}>
+              About flow…
             </Menubar.Item>
           </Menubar.Content>
         </Menubar.Portal>
@@ -864,30 +864,30 @@ export function PreferencesDialog({
 
   return (
     <div
-      className="wimp-dialog-backdrop"
+      className="flow-dialog-backdrop"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="wimp-dialog wimp-prefs"
+        className="flow-dialog flow-prefs"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <div className="wimp-dialog__header">
-          <h2 className="wimp-dialog__title" id={titleId}>
+        <div className="flow-dialog__header">
+          <h2 className="flow-dialog__title" id={titleId}>
             Preferences
           </h2>
         </div>
 
-        <div className="wimp-prefs__body">
-          <nav className="wimp-prefs__nav" role="tablist" aria-label="Preferences categories">
+        <div className="flow-prefs__body">
+          <nav className="flow-prefs__nav" role="tablist" aria-label="Preferences categories">
             <button
               type="button"
               role="tab"
               aria-selected={category === "general"}
-              className="wimp-prefs__tab"
+              className="flow-prefs__tab"
               onClick={() => setCategory("general")}
             >
               General
@@ -896,16 +896,16 @@ export function PreferencesDialog({
               type="button"
               role="tab"
               aria-selected={category === "keyboard"}
-              className="wimp-prefs__tab"
+              className="flow-prefs__tab"
               onClick={() => setCategory("keyboard")}
             >
               Keyboard
             </button>
           </nav>
 
-          <div className="wimp-prefs__panel">
+          <div className="flow-prefs__panel">
             {category === "general" && (
-              <fieldset className="wimp-choice" style={{ border: 0, margin: 0, padding: 0 }}>
+              <fieldset className="flow-choice" style={{ border: 0, margin: 0, padding: 0 }}>
                 <legend
                   style={{
                     fontSize: "0.8125rem",
@@ -917,28 +917,28 @@ export function PreferencesDialog({
                   Sloppiness
                 </legend>
                 {SLOPPINESS_ORDER.map((value) => (
-                  <label className="wimp-option" key={value}>
+                  <label className="flow-option" key={value}>
                     <input
                       type="radio"
                       name="sloppiness"
                       checked={sloppiness === value}
                       onChange={() => onChangeSloppiness(value)}
                     />
-                    <span className="wimp-option__label">{SLOPPINESS_LABELS[value]}</span>
+                    <span className="flow-option__label">{SLOPPINESS_LABELS[value]}</span>
                   </label>
                 ))}
               </fieldset>
             )}
 
             {category === "keyboard" && (
-              <div className="wimp-prefs__keyboard">
-                <p className="wimp-prefs__hint">
+              <div className="flow-prefs__keyboard">
+                <p className="flow-prefs__hint">
                   View the current keyboard shortcuts. Editing shortcuts is coming
                   in a future update.
                 </p>
                 <button
                   type="button"
-                  className="wimp-btn wimp-btn--ghost"
+                  className="flow-btn flow-btn--ghost"
                   onClick={onShowShortcuts}
                 >
                   Show keyboard shortcuts
@@ -948,8 +948,8 @@ export function PreferencesDialog({
           </div>
         </div>
 
-        <div className="wimp-dialog__footer">
-          <button type="button" className="wimp-btn wimp-btn--primary" onClick={onClose}>
+        <div className="flow-dialog__footer">
+          <button type="button" className="flow-btn flow-btn--primary" onClick={onClose}>
             Done
           </button>
         </div>
@@ -963,15 +963,15 @@ export function PreferencesDialog({
 
 ```css
 /* Preferences gets a wider dialog with a left category rail. */
-.wimp-prefs {
+.flow-prefs {
   width: min(560px, 100%);
 }
-.wimp-prefs__body {
+.flow-prefs__body {
   display: grid;
   grid-template-columns: 140px 1fr;
   min-height: 220px;
 }
-.wimp-prefs__nav {
+.flow-prefs__nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -979,7 +979,7 @@ export function PreferencesDialog({
   border-right: 1px solid #eef0f5;
   background: #fbfcfe;
 }
-.wimp-prefs__tab {
+.flow-prefs__tab {
   text-align: left;
   font: inherit;
   font-size: 0.875rem;
@@ -991,23 +991,23 @@ export function PreferencesDialog({
   background: transparent;
   cursor: pointer;
 }
-.wimp-prefs__tab:hover {
+.flow-prefs__tab:hover {
   background: #eef0f5;
 }
-.wimp-prefs__tab[aria-selected="true"] {
+.flow-prefs__tab[aria-selected="true"] {
   background: color-mix(in oklab, #6366f1 10%, #ffffff);
   color: #4338ca;
 }
-.wimp-prefs__panel {
+.flow-prefs__panel {
   padding: 1rem 1.25rem;
 }
-.wimp-prefs__keyboard {
+.flow-prefs__keyboard {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   align-items: flex-start;
 }
-.wimp-prefs__hint {
+.flow-prefs__hint {
   margin: 0;
   font-size: 0.8125rem;
   color: #6b7280;
@@ -1026,22 +1026,22 @@ Expected: PASS.
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AboutDialog, WIMP_REPO_URL, EXCALIDRAW_FORK_URL } from "./AboutDialog";
+import { AboutDialog, FLOW_REPO_URL, EXCALIDRAW_FORK_URL } from "./AboutDialog";
 
 describe("AboutDialog", () => {
   it("names the app and explains the fork", () => {
-    render(<AboutDialog appName="Wimp" onClose={() => {}} />);
-    expect(screen.getByRole("heading", { name: /about wimp/i })).toBeInTheDocument();
+    render(<AboutDialog appName="Flow" onClose={() => {}} />);
+    expect(screen.getByRole("heading", { name: /about flow/i })).toBeInTheDocument();
     expect(screen.getByText(/forked/i)).toBeInTheDocument();
   });
 
   it("links to both repos safely", () => {
-    render(<AboutDialog appName="Wimp" onClose={() => {}} />);
-    const wimpLink = screen.getByRole("link", { name: /wimp repository/i });
+    render(<AboutDialog appName="Flow" onClose={() => {}} />);
+    const flowLink = screen.getByRole("link", { name: /flow repository/i });
     const forkLink = screen.getByRole("link", { name: /excalidraw fork/i });
-    expect(wimpLink).toHaveAttribute("href", WIMP_REPO_URL);
+    expect(flowLink).toHaveAttribute("href", FLOW_REPO_URL);
     expect(forkLink).toHaveAttribute("href", EXCALIDRAW_FORK_URL);
-    for (const link of [wimpLink, forkLink]) {
+    for (const link of [flowLink, forkLink]) {
       expect(link).toHaveAttribute("rel", "noopener noreferrer");
       expect(link).toHaveAttribute("target", "_blank");
     }
@@ -1049,7 +1049,7 @@ describe("AboutDialog", () => {
 
   it("closes on the Close button", async () => {
     const onClose = vi.fn();
-    render(<AboutDialog appName="Wimp" onClose={onClose} />);
+    render(<AboutDialog appName="Flow" onClose={onClose} />);
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalled();
   });
@@ -1067,8 +1067,8 @@ Expected: FAIL — module not found.
 import { useId } from "react";
 import "./dialogs.css";
 
-/** Placeholder — replace with the real wimp repository URL once it is public. */
-export const WIMP_REPO_URL = "https://github.com/REPLACE-ME/wimp";
+/** Placeholder — replace with the real flow repository URL once it is public. */
+export const FLOW_REPO_URL = "https://github.com/REPLACE-ME/flow";
 export const EXCALIDRAW_FORK_URL = "https://github.com/bobtherobot/excalidraw";
 
 export interface AboutDialogProps {
@@ -1080,33 +1080,33 @@ export function AboutDialog({ appName, onClose }: AboutDialogProps) {
   const titleId = useId();
   return (
     <div
-      className="wimp-dialog-backdrop"
+      className="flow-dialog-backdrop"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="wimp-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <div className="wimp-dialog__header">
-          <h2 className="wimp-dialog__title" id={titleId}>
+      <div className="flow-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="flow-dialog__header">
+          <h2 className="flow-dialog__title" id={titleId}>
             About {appName}
           </h2>
         </div>
-        <div className="wimp-dialog__body">
+        <div className="flow-dialog__body">
           <p style={{ margin: 0, fontSize: "0.9375rem", lineHeight: 1.5 }}>
             {appName} is a standalone drawing app built on a <strong>forked</strong>{" "}
             build of Excalidraw.
           </p>
           <p style={{ margin: 0, display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-            <a href={WIMP_REPO_URL} target="_blank" rel="noopener noreferrer">
-              wimp repository
+            <a href={FLOW_REPO_URL} target="_blank" rel="noopener noreferrer">
+              flow repository
             </a>
             <a href={EXCALIDRAW_FORK_URL} target="_blank" rel="noopener noreferrer">
               Excalidraw fork
             </a>
           </p>
         </div>
-        <div className="wimp-dialog__footer">
-          <button type="button" className="wimp-btn wimp-btn--primary" onClick={onClose}>
+        <div className="flow-dialog__footer">
+          <button type="button" className="flow-btn flow-btn--primary" onClick={onClose}>
             Close
           </button>
         </div>
@@ -1180,7 +1180,7 @@ export async function applyContentsToScene(
 
 - [ ] **Step 2: Rewrite `src/App.tsx`**
 
-Full file (replaces the current one). Key changes: sloppiness state + ref, MenuBar mount, `--wimp-menubar-h` top inset on the Excalidraw wrapper, Preferences/About dialogs, view-action wiring, New/Clear handlers, and passing the sloppiness target into normalization.
+Full file (replaces the current one). Key changes: sloppiness state + ref, MenuBar mount, `--flow-menubar-h` top inset on the Excalidraw wrapper, Preferences/About dialogs, view-action wiring, New/Clear handlers, and passing the sloppiness target into normalization.
 
 ```tsx
 import {
@@ -1243,7 +1243,7 @@ export default function App() {
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [internalDocs, setInternalDocs] = useState<DocumentSummary[]>([]);
-  const [appName, setAppName] = useState("Wimp");
+  const [appName, setAppName] = useState("Flow");
 
   // App-wide sloppiness preference. `sloppinessRef` mirrors it so the stable
   // onChange handler and async import paths read the current value without
@@ -1403,7 +1403,7 @@ export default function App() {
         onAbout={() => setAboutOpen(true)}
       />
 
-      <div style={{ position: "fixed", inset: "var(--wimp-menubar-h) 0 0 0" }}>
+      <div style={{ position: "fixed", inset: "var(--flow-menubar-h) 0 0 0" }}>
         <Excalidraw
           excalidrawAPI={(api) => {
             apiRef.current = api;
@@ -1462,7 +1462,7 @@ Append below the existing sloppiness rule:
 
 ```css
 /*
- * wimp provides its own File/View/Help menu bar, so Excalidraw's hamburger
+ * flow provides its own File/View/Help menu bar, so Excalidraw's hamburger
  * ("main menu") button is redundant. `.dropdown-menu-button` is the stable
  * trigger class from Excalidraw's source; hiding it degrades gracefully (worst
  * case the button reappears) rather than breaking.
@@ -1577,8 +1577,8 @@ test.describe("desktop menu bar + preferences", () => {
   test("Help ▸ About shows both repo links", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("menuitem", { name: "Help" }).click();
-    await page.getByRole("menuitem", { name: "About wimp…" }).click();
-    await expect(page.getByRole("link", { name: /wimp repository/i })).toBeVisible();
+    await page.getByRole("menuitem", { name: "About flow…" }).click();
+    await expect(page.getByRole("link", { name: /flow repository/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /excalidraw fork/i })).toBeVisible();
   });
 });
@@ -1602,7 +1602,7 @@ git commit -m "test: e2e for desktop menu bar, sloppiness persistence, About dia
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-07-06-desktop-menu-bar-and-preferences-design.md` (status → Implemented)
-- Update the wimp memory notes (outside the repo) so the sloppiness-global task is marked done and the menu-bar architecture is recorded.
+- Update the flow memory notes (outside the repo) so the sloppiness-global task is marked done and the menu-bar architecture is recorded.
 
 - [ ] **Step 1: Flip the spec status**
 
@@ -1617,7 +1617,7 @@ git commit -m "docs: mark menu-bar + preferences spec implemented"
 
 - [ ] **Step 3: Update memory (agent action, not a repo commit)**
 
-Update `wimp-sloppiness-global` memory: the deferred sloppiness rework is DONE — now an app-wide preference in `File ▸ Preferences ▸ General`, `localStorage` key `wimp.sloppiness`, enforced via `normalizeRoughness(elements, target)`. Note the new desktop menu-bar architecture (`src/ui/menubar/`, Radix, wimp-level, no fork edits) under the fork-strategy memory.
+Update `flow-sloppiness-global` memory: the deferred sloppiness rework is DONE — now an app-wide preference in `File ▸ Preferences ▸ General`, `localStorage` key `flow.sloppiness`, enforced via `normalizeRoughness(elements, target)`. Note the new desktop menu-bar architecture (`src/ui/menubar/`, Radix, flow-level, no fork edits) under the fork-strategy memory.
 
 ---
 
@@ -1629,7 +1629,7 @@ Update `wimp-sloppiness-global` memory: the deferred sloppiness rework is DONE �
 - Preferences dialog, left-nav categories → Task 4. ✓
 - Global sloppiness: type/labels, localStorage, live apply to all + new, normalize on import/paste, hidden per-object radio → Tasks 1, 4, 5. ✓
 - View menu zoom/grid via public API → Task 2, wired Task 5. ✓
-- Help ▸ About with two links (wimp placeholder + fork) → Task 4. ✓
+- Help ▸ About with two links (flow placeholder + fork) → Task 4. ✓
 - Keyboard shortcuts in Preferences via `openDialog: { name: "help" }` → Tasks 4, 5. ✓
 - Design tokens / quiet-chrome styling → Task 3 (`menubar.css`). ✓
 - No fork edits, light theme only, app-wide persistence → Global Constraints, honored throughout. ✓
@@ -1638,4 +1638,4 @@ Update `wimp-sloppiness-global` memory: the deferred sloppiness rework is DONE �
 
 **Type consistency:** `Sloppiness`, `normalizeRoughness(elements, target?)`, `applyContentsToScene(api, contents, target?)`, `ImageFormat`, `MenuBarProps`, `PreferencesDialogProps`, `AboutDialogProps`, and the `getSloppiness/setSloppiness` names are used identically across tasks. `ImageFormat` moves from `CustomMenu.tsx` (deleted) to `excalidraw-scene.ts`; App and MenuBar both import it from there.
 
-**Placeholder scan:** The only intentional placeholder is `WIMP_REPO_URL` (approved by the user) — clearly commented as such. No TBD/TODO steps; every code step contains complete code.
+**Placeholder scan:** The only intentional placeholder is `FLOW_REPO_URL` (approved by the user) — clearly commented as such. No TBD/TODO steps; every code step contains complete code.

@@ -1,6 +1,6 @@
-# Deploying Wimp
+# Deploying Flow
 
-Wimp builds to a fully static, self-contained bundle. There is no server, no
+Flow builds to a fully static, self-contained bundle. There is no server, no
 database, and no external CDN dependency at runtime.
 
 ## Run & test locally
@@ -35,7 +35,7 @@ npm run preview    # serve the production build (http://localhost:4173)
 
 ## First-time setup (building from source)
 
-Wimp is built on a **fork of Excalidraw**, vendored as a git submodule at
+Flow is built on a **fork of Excalidraw**, vendored as a git submodule at
 `vendor/excalidraw` and compiled locally (not the prebuilt npm package). This
 lets us customize Excalidraw's internals while keeping a single self-hosted
 bundle. First-time setup, or after cloning fresh:
@@ -49,7 +49,7 @@ npm install                          # links the built fork via a file: dependen
 
 > **Node version matters.** The Excalidraw fork builds only under **node 20–22**
 > (upstream rejects newer node). `.nvmrc` pins node 22 for the whole project.
-> wimp's own tooling tolerates newer node, but standardize on 22 to avoid surprises.
+> flow's own tooling tolerates newer node, but standardize on 22 to avoid surprises.
 
 The fork's built `dist/` is git-ignored, so it must be rebuilt after a fresh
 clone and whenever you change files under `vendor/excalidraw/` — re-run
@@ -85,7 +85,7 @@ dist/
 ## Upload to cPanel
 
 1. Upload the **contents of `dist/`** into your target folder (e.g. `public_html`
-   or `public_html/wimp`). Paths are relative, so any subfolder works.
+   or `public_html/flow`). Paths are relative, so any subfolder works.
 2. Ensure `.htaccess` uploaded (it may be hidden — enable "Show Hidden Files" in
    File Manager). It keeps browsers from serving a stale `app.js` after updates.
 
@@ -97,7 +97,7 @@ Edit `config.json` directly on the server:
 
 ```json
 {
-  "appName": "Wimp",
+  "appName": "Flow",
   "googleClientId": "<your-google-oauth-client-id>",
   "driveFolderName": "My Drawings"
 }

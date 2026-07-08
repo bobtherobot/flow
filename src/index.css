@@ -36,3 +36,34 @@ body,
 .excalidraw .selected-shape-actions {
   display: none;
 }
+
+/*
+ * flow does not use Excalidraw's shape library. Hide the Library trigger button
+ * (top-right) and the docked library panel it opens. `.default-sidebar-trigger`
+ * and `.default-sidebar` are the stable classes from vendor DefaultSidebar.tsx;
+ * hiding the trigger removes the entry point, and hiding the panel covers a
+ * previously-docked state persisted in localStorage. Degrades gracefully.
+ */
+.excalidraw .default-sidebar-trigger,
+.excalidraw .default-sidebar {
+  display: none;
+}
+
+/*
+ * flow surfaces help under its own Help menu, so Excalidraw's footer help icon
+ * (bottom-right) is redundant. `.help-icon` is the stable class from vendor
+ * HelpButton.tsx.
+ */
+.excalidraw .help-icon {
+  display: none;
+}
+
+/*
+ * The Keyboard Shortcuts menu item reuses Excalidraw's built-in shortcuts
+ * dialog, but its documentation/blog/issue/youtube link row now lives in flow's
+ * Help menu instead. `.HelpDialog__header` is the stable wrapper for that link
+ * row (vendor HelpDialog.tsx); hiding it leaves a shortcuts-only reference.
+ */
+.excalidraw .HelpDialog__header {
+  display: none;
+}

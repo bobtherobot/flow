@@ -1,7 +1,7 @@
 /**
  * Sloppiness enforcement, kept free of Excalidraw imports so it can be unit
  * tested in isolation. Excalidraw's roughness scale is 0=Architect, 1=Artist,
- * 2=Cartoonist. wimp controls sloppiness globally (app-wide), not per element.
+ * 2=Cartoonist. flow controls sloppiness globally (app-wide), not per element.
  */
 
 /** Excalidraw roughness values, named. */

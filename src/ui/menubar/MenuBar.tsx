@@ -17,6 +17,9 @@ export interface MenuBarProps {
   onResetZoom: () => void;
   onToggleGrid: () => void;
   onAbout: () => void;
+  onDocumentation: () => void;
+  onSubmitIssue: () => void;
+  onShowShortcuts: () => void;
 }
 
 const contentProps = { align: "start", sideOffset: 4, className: "flow-menu" } as const;
@@ -171,6 +174,17 @@ export function MenuBar(props: MenuBarProps) {
           <Menubar.Content {...contentProps}>
             <Menubar.Item className="flow-menu__item" onSelect={props.onAbout}>
               About flow…
+            </Menubar.Item>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={props.onDocumentation}>
+              Documentation
+            </Menubar.Item>
+            <Menubar.Item className="flow-menu__item" onSelect={props.onSubmitIssue}>
+              Submit an issue
+            </Menubar.Item>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={props.onShowShortcuts}>
+              Keyboard Shortcuts
             </Menubar.Item>
           </Menubar.Content>
         </Menubar.Portal>

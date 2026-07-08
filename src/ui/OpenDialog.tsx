@@ -41,20 +41,20 @@ export function OpenDialog({
 
   return (
     <div
-      className="wimp-dialog-backdrop"
+      className="flow-dialog-backdrop"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div className="wimp-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <div className="wimp-dialog__header">
-          <h2 className="wimp-dialog__title" id={titleId}>
+      <div className="flow-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="flow-dialog__header">
+          <h2 className="flow-dialog__title" id={titleId}>
             Open drawing
           </h2>
         </div>
 
-        <div className="wimp-dialog__body">
-          <fieldset className="wimp-choice" style={{ border: 0, margin: 0, padding: 0 }}>
+        <div className="flow-dialog__body">
+          <fieldset className="flow-choice" style={{ border: 0, margin: 0, padding: 0 }}>
             <legend
               style={{
                 fontSize: "0.8125rem",
@@ -66,46 +66,46 @@ export function OpenDialog({
               Source
             </legend>
 
-            <label className="wimp-option">
+            <label className="flow-option">
               <input
                 type="radio"
                 name="source"
                 checked={source === "google"}
                 onChange={() => setSource("google")}
               />
-              <span className="wimp-option__label">Google Drive</span>
+              <span className="flow-option__label">Google Drive</span>
               {!isGoogleConnected && (
-                <button type="button" className="wimp-connect" onClick={onConnectGoogle}>
+                <button type="button" className="flow-connect" onClick={onConnectGoogle}>
                   Connect
                 </button>
               )}
             </label>
 
-            <label className="wimp-option">
+            <label className="flow-option">
               <input
                 type="radio"
                 name="source"
                 checked={source === "local"}
                 onChange={() => setSource("local")}
               />
-              <span className="wimp-option__label">Local system</span>
+              <span className="flow-option__label">Local system</span>
             </label>
 
-            <label className="wimp-option">
+            <label className="flow-option">
               <input
                 type="radio"
                 name="source"
                 checked={source === "internal"}
                 onChange={() => setSource("internal")}
               />
-              <span className="wimp-option__label">Internally stored</span>
+              <span className="flow-option__label">Internally stored</span>
             </label>
           </fieldset>
 
           {source === "internal" && (
-            <div className="wimp-internal-list" role="listbox" aria-label="Internally stored drawings">
+            <div className="flow-internal-list" role="listbox" aria-label="Internally stored drawings">
               {internalDocs.length === 0 ? (
-                <p className="wimp-internal-empty">No internally-stored drawings yet.</p>
+                <p className="flow-internal-empty">No internally-stored drawings yet.</p>
               ) : (
                 internalDocs.map((doc) => (
                   <button
@@ -113,11 +113,11 @@ export function OpenDialog({
                     type="button"
                     role="option"
                     aria-selected="false"
-                    className="wimp-internal-item"
+                    className="flow-internal-item"
                     onClick={() => onOpenInternal(doc.id)}
                   >
-                    <span className="wimp-internal-item__name">{doc.name}</span>
-                    <span className="wimp-internal-item__date">{formatDate(doc.updatedAt)}</span>
+                    <span className="flow-internal-item__name">{doc.name}</span>
+                    <span className="flow-internal-item__date">{formatDate(doc.updatedAt)}</span>
                   </button>
                 ))
               )}
@@ -125,12 +125,12 @@ export function OpenDialog({
           )}
         </div>
 
-        <div className="wimp-dialog__footer">
-          <button type="button" className="wimp-btn wimp-btn--ghost" onClick={onCancel}>
+        <div className="flow-dialog__footer">
+          <button type="button" className="flow-btn flow-btn--ghost" onClick={onCancel}>
             Cancel
           </button>
           {source !== "internal" && (
-            <button type="button" className="wimp-btn wimp-btn--primary" onClick={handleOpen}>
+            <button type="button" className="flow-btn flow-btn--primary" onClick={handleOpen}>
               Open
             </button>
           )}

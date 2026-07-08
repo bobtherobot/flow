@@ -100,14 +100,16 @@ export function PanelShell({
     },
   });
 
-  // ── Docked resize (right edge of the left-docked panel) ─────────────────────
+  // ── Docked resize (left edge of the right-docked panel) ─────────────────────
+  // The panel is pinned to the right, so dragging the inner (left) edge leftward
+  // grows it — the width delta is the negative of the horizontal drag.
   const dockResize = useRef(0);
   const onDockResizeDown = useDrag({
     onStart: () => {
       if (state.floating || state.collapsed) return false;
       dockResize.current = state.dockedWidth;
     },
-    onMove: (m) => dispatch({ type: "resizeDocked", dockedWidth: dockResize.current + m.dx }),
+    onMove: (m) => dispatch({ type: "resizeDocked", dockedWidth: dockResize.current - m.dx }),
   });
 
   // ── Floating resize (right / bottom / SE corner) ────────────────────────────
@@ -164,7 +166,7 @@ export function PanelShell({
       return;
     }
     const shellR = shellRef.current!.getBoundingClientRect();
-    if (e.clientX > shellR.right + TEAR_OFF_MARGIN) {
+    if (e.clientX < shellR.left - TEAR_OFF_MARGIN) {
       setDropIndex(null);
       const floatW = state.floating ? state.floatW : state.dockedWidth;
       dispatch({ type: "floatSub", id, ...place, floatW });
@@ -190,7 +192,7 @@ export function PanelShell({
   const onSubResizeMove = (id: string, m: DragMove) =>
     dispatch({ type: "resizeSubFloat", id, floatW: subResize.current.w + m.dx });
 
-  const configStyle = (): React.CSSProperties => {
+  const configAnchor = (): { top: number; left: number } => {
     const r = hamburgerRef.current?.getBoundingClientRect();
     return r ? { top: r.bottom + 4, left: r.left } : { top: topOffset, left: 8 };
   };
@@ -242,7 +244,7 @@ export function PanelShell({
         height: state.collapsed ? "auto" : state.floatH,
       }
     : {
-        left: 0,
+        right: 0,
         top: topOffset,
         bottom: 0,
         width: state.collapsed ? DOCK_LIMITS.COLLAPSED_W : state.dockedWidth,
@@ -307,7 +309,7 @@ export function PanelShell({
 
         {/* Resize affordances */}
         {!state.floating && !state.collapsed && (
-          <span className="flow-pnl__resize flow-pnl__resize--right" onPointerDown={onDockResizeDown} aria-hidden="true" />
+          <span className="flow-pnl__resize flow-pnl__resize--left" onPointerDown={onDockResizeDown} aria-hidden="true" />
         )}
         {state.floating && !state.collapsed && (
           <>
@@ -325,7 +327,7 @@ export function PanelShell({
         <PanelConfigMenu
           state={state}
           defs={defs}
-          style={configStyle()}
+          anchor={configAnchor()}
           onToggleFloating={() => {
             if (state.floating) {
               dispatch({ type: "dock" });

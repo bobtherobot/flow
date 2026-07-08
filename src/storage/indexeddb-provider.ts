@@ -7,7 +7,7 @@ import type {
 } from "./types";
 
 const STORE = "documents";
-const DEFAULT_DB_NAME = "wimp";
+const DEFAULT_DB_NAME = "flow";
 
 export interface IndexedDbProviderOptions {
   dbName?: string;

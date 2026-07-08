@@ -11,7 +11,7 @@ describe("IndexedDbProvider", () => {
 
   it("creates a document with a generated id and timestamps", async () => {
     const provider = new IndexedDbProvider({
-      dbName: "wimp-test",
+      dbName: "flow-test",
       now: () => 1000,
       genId: () => "id-1",
     });
@@ -31,7 +31,7 @@ describe("IndexedDbProvider", () => {
   it("updates an existing document in place, preserving createdAt", async () => {
     let clock = 1000;
     const provider = new IndexedDbProvider({
-      dbName: "wimp-test",
+      dbName: "flow-test",
       now: () => clock,
       genId: () => "id-1",
     });
@@ -49,7 +49,7 @@ describe("IndexedDbProvider", () => {
   });
 
   it("loads a stored document and returns undefined for a missing id", async () => {
-    const provider = new IndexedDbProvider({ dbName: "wimp-test", now: () => 1, genId: () => "id-1" });
+    const provider = new IndexedDbProvider({ dbName: "flow-test", now: () => 1, genId: () => "id-1" });
     const created = await provider.save({ name: "d", contents: "c" });
 
     expect(await provider.load(created.id)).toEqual(created);
@@ -57,7 +57,7 @@ describe("IndexedDbProvider", () => {
   });
 
   it("deletes a document", async () => {
-    const provider = new IndexedDbProvider({ dbName: "wimp-test", now: () => 1, genId: () => "id-1" });
+    const provider = new IndexedDbProvider({ dbName: "flow-test", now: () => 1, genId: () => "id-1" });
     const created = await provider.save({ name: "d", contents: "c" });
 
     await provider.delete(created.id);
@@ -70,7 +70,7 @@ describe("IndexedDbProvider", () => {
     let clock = 1000;
     let n = 0;
     const provider = new IndexedDbProvider({
-      dbName: "wimp-test",
+      dbName: "flow-test",
       now: () => clock,
       genId: () => `id-${++n}`,
     });

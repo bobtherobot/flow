@@ -1,7 +1,7 @@
 /*
  * Dockable accordion panel — Illustrator-style. Built on flow's --flow-* tokens
  * (defined in menubar.css) so it shares the app's quiet-chrome visual language:
- * white surfaces, indigo accent, hairline borders. Docks on the left edge below
+ * white surfaces, indigo accent, hairline borders. Docks on the right edge below
  * the menu bar; floats, tears off, reorders, and resizes.
  */
 
@@ -16,7 +16,7 @@
   color: var(--flow-ink);
 }
 .flow-pnl--docked {
-  border-right: 1px solid var(--flow-border);
+  border-left: 1px solid var(--flow-border);
 }
 .flow-pnl--floating {
   border: 1px solid var(--flow-border);
@@ -110,6 +110,14 @@
   height: 100%;
   cursor: ew-resize;
 }
+/* Inner edge of the right-docked panel. */
+.flow-pnl__resize--left {
+  top: 0;
+  left: -3px;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+}
 .flow-pnl__resize--bottom {
   left: 0;
   bottom: -3px;
@@ -130,6 +138,11 @@
   display: flex;
   flex-direction: column;
   border-bottom: 1px solid var(--flow-border);
+  /* Self-sufficient typography: a torn-off (floating) sub-panel renders outside
+   * the .flow-pnl shell, so it can't inherit the shell's font — set it here so
+   * the header/content look identical whether docked or floating. */
+  font-family: var(--flow-font);
+  color: var(--flow-ink);
 }
 .flow-pnl-sub--floating {
   position: fixed;

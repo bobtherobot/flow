@@ -1,139 +1,139 @@
 /* "Quiet system chrome" — a flat desktop menu bar that recedes at rest and
    borrows Excalidraw's indigo for interactive states. Tokens namespaced
-   --wimp-* so they never collide with Excalidraw's --color-*. */
+   --flow-* so they never collide with Excalidraw's --color-*. */
 :root {
-  --wimp-menubar-bg: #ffffff;
-  --wimp-panel-bg: #ffffff;
-  --wimp-ink: #2b2b33;
-  --wimp-ink-muted: #76767f;
-  --wimp-ink-disabled: #c2c2ca;
-  --wimp-accent: #6965db;
-  --wimp-hover: #f1f0fb;
-  --wimp-active: #e8e7fb;
-  --wimp-active-strong: #dcdaf6;
-  --wimp-border: #e9e9ed;
-  --wimp-shadow: 0 4px 16px rgba(43, 43, 51, 0.12), 0 1px 3px rgba(43, 43, 51, 0.08);
-  --wimp-menubar-h: 36px;
-  --wimp-label-h: 28px;
-  --wimp-item-h: 30px;
-  --wimp-panel-minw: 200px;
-  --wimp-radius-sm: 5px;
-  --wimp-radius-md: 8px;
-  --wimp-pad-x: 10px;
-  --wimp-panel-pad: 4px;
-  --wimp-fs-label: 13px;
-  --wimp-fs-item: 13px;
-  --wimp-fs-shortcut: 12px;
-  --wimp-dur-fast: 90ms;
-  --wimp-dur-panel: 120ms;
-  --wimp-ease: cubic-bezier(0.2, 0, 0, 1);
-  --wimp-font: "Nunito", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --flow-menubar-bg: #ffffff;
+  --flow-panel-bg: #ffffff;
+  --flow-ink: #2b2b33;
+  --flow-ink-muted: #76767f;
+  --flow-ink-disabled: #c2c2ca;
+  --flow-accent: #6965db;
+  --flow-hover: #f1f0fb;
+  --flow-active: #e8e7fb;
+  --flow-active-strong: #dcdaf6;
+  --flow-border: #e9e9ed;
+  --flow-shadow: 0 4px 16px rgba(43, 43, 51, 0.12), 0 1px 3px rgba(43, 43, 51, 0.08);
+  --flow-menubar-h: 36px;
+  --flow-label-h: 28px;
+  --flow-item-h: 30px;
+  --flow-panel-minw: 200px;
+  --flow-radius-sm: 5px;
+  --flow-radius-md: 8px;
+  --flow-pad-x: 10px;
+  --flow-panel-pad: 4px;
+  --flow-fs-label: 13px;
+  --flow-fs-item: 13px;
+  --flow-fs-shortcut: 12px;
+  --flow-dur-fast: 90ms;
+  --flow-dur-panel: 120ms;
+  --flow-ease: cubic-bezier(0.2, 0, 0, 1);
+  --flow-font: "Nunito", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-.wimp-menubar {
+.flow-menubar {
   position: fixed;
   inset: 0 0 auto 0;
-  height: var(--wimp-menubar-h);
+  height: var(--flow-menubar-h);
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 0 8px;
-  background: var(--wimp-menubar-bg);
-  border-bottom: 1px solid var(--wimp-border);
-  font-family: var(--wimp-font);
+  background: var(--flow-menubar-bg);
+  border-bottom: 1px solid var(--flow-border);
+  font-family: var(--flow-font);
   z-index: 100;
   user-select: none;
 }
 
-.wimp-menubar__trigger {
-  height: var(--wimp-label-h);
-  padding: 0 var(--wimp-pad-x);
+.flow-menubar__trigger {
+  height: var(--flow-label-h);
+  padding: 0 var(--flow-pad-x);
   display: inline-flex;
   align-items: center;
   border: none;
   background: transparent;
-  border-radius: var(--wimp-radius-sm);
+  border-radius: var(--flow-radius-sm);
   font-family: inherit;
-  font-size: var(--wimp-fs-label);
+  font-size: var(--flow-fs-label);
   font-weight: 600;
-  color: var(--wimp-ink);
+  color: var(--flow-ink);
   cursor: default;
-  transition: background var(--wimp-dur-fast) var(--wimp-ease);
+  transition: background var(--flow-dur-fast) var(--flow-ease);
 }
-.wimp-menubar__trigger:hover {
-  background: var(--wimp-hover);
+.flow-menubar__trigger:hover {
+  background: var(--flow-hover);
 }
-.wimp-menubar__trigger[data-state="open"] {
-  background: var(--wimp-active);
-  color: var(--wimp-accent);
+.flow-menubar__trigger[data-state="open"] {
+  background: var(--flow-active);
+  color: var(--flow-accent);
 }
-.wimp-menubar__trigger:focus-visible {
-  outline: 2px solid var(--wimp-accent);
+.flow-menubar__trigger:focus-visible {
+  outline: 2px solid var(--flow-accent);
   outline-offset: -2px;
 }
 
-.wimp-menu {
-  min-width: var(--wimp-panel-minw);
-  background: var(--wimp-panel-bg);
-  border: 1px solid var(--wimp-border);
-  border-radius: var(--wimp-radius-md);
-  box-shadow: var(--wimp-shadow);
-  padding: var(--wimp-panel-pad);
-  font-family: var(--wimp-font);
+.flow-menu {
+  min-width: var(--flow-panel-minw);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-md);
+  box-shadow: var(--flow-shadow);
+  padding: var(--flow-panel-pad);
+  font-family: var(--flow-font);
   z-index: 100;
-  animation: wimp-menu-in var(--wimp-dur-panel) var(--wimp-ease);
+  animation: flow-menu-in var(--flow-dur-panel) var(--flow-ease);
 }
-@keyframes wimp-menu-in {
+@keyframes flow-menu-in {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .wimp-menu { animation: none; }
+  .flow-menu { animation: none; }
 }
 
-.wimp-menu__item {
-  height: var(--wimp-item-h);
+.flow-menu__item {
+  height: var(--flow-item-h);
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 var(--wimp-pad-x);
-  border-radius: var(--wimp-radius-sm);
-  font-size: var(--wimp-fs-item);
+  padding: 0 var(--flow-pad-x);
+  border-radius: var(--flow-radius-sm);
+  font-size: var(--flow-fs-item);
   font-weight: 500;
-  color: var(--wimp-ink);
+  color: var(--flow-ink);
   cursor: default;
   outline: none;
   user-select: none;
 }
-.wimp-menu__item[data-highlighted] {
-  background: var(--wimp-active);
-  color: var(--wimp-accent);
+.flow-menu__item[data-highlighted] {
+  background: var(--flow-active);
+  color: var(--flow-accent);
 }
-.wimp-menu__item[data-disabled] {
-  color: var(--wimp-ink-disabled);
+.flow-menu__item[data-disabled] {
+  color: var(--flow-ink-disabled);
   pointer-events: none;
 }
 
-.wimp-menu__shortcut {
+.flow-menu__shortcut {
   margin-left: auto;
-  font-size: var(--wimp-fs-shortcut);
-  color: var(--wimp-ink-muted);
+  font-size: var(--flow-fs-shortcut);
+  color: var(--flow-ink-muted);
 }
-.wimp-menu__item[data-highlighted] .wimp-menu__shortcut {
-  color: var(--wimp-accent);
+.flow-menu__item[data-highlighted] .flow-menu__shortcut {
+  color: var(--flow-accent);
   opacity: 0.7;
 }
-.wimp-menu__chevron {
+.flow-menu__chevron {
   margin-left: auto;
-  font-size: var(--wimp-fs-shortcut);
-  color: var(--wimp-ink-muted);
+  font-size: var(--flow-fs-shortcut);
+  color: var(--flow-ink-muted);
 }
-.wimp-menu__item[data-highlighted] .wimp-menu__chevron {
-  color: var(--wimp-accent);
+.flow-menu__item[data-highlighted] .flow-menu__chevron {
+  color: var(--flow-accent);
 }
 
-.wimp-menu__sep {
+.flow-menu__sep {
   height: 1px;
   margin: 4px 8px;
-  background: var(--wimp-border);
+  background: var(--flow-border);
 }

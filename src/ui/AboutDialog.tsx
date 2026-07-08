@@ -1,9 +1,6 @@
 import { useId } from "react";
+import { FLOW_REPO_URL, EXCALIDRAW_FORK_URL } from "../lib/links";
 import "./dialogs.css";
-
-/** Placeholder — replace with the real wimp repository URL once it is public. */
-export const WIMP_REPO_URL = "https://github.com/REPLACE-ME/wimp";
-export const EXCALIDRAW_FORK_URL = "https://github.com/bobtherobot/excalidraw";
 
 export interface AboutDialogProps {
   appName: string;
@@ -14,33 +11,33 @@ export function AboutDialog({ appName, onClose }: AboutDialogProps) {
   const titleId = useId();
   return (
     <div
-      className="wimp-dialog-backdrop"
+      className="flow-dialog-backdrop"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="wimp-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <div className="wimp-dialog__header">
-          <h2 className="wimp-dialog__title" id={titleId}>
+      <div className="flow-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="flow-dialog__header">
+          <h2 className="flow-dialog__title" id={titleId}>
             About {appName}
           </h2>
         </div>
-        <div className="wimp-dialog__body">
+        <div className="flow-dialog__body">
           <p style={{ margin: 0, fontSize: "0.9375rem", lineHeight: 1.5 }}>
             {appName} is a standalone drawing app built on a <strong>forked</strong>{" "}
             build of Excalidraw.
           </p>
           <p style={{ margin: 0, display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-            <a href={WIMP_REPO_URL} target="_blank" rel="noopener noreferrer">
-              wimp repository
+            <a href={FLOW_REPO_URL} target="_blank" rel="noopener noreferrer">
+              flow repository
             </a>
             <a href={EXCALIDRAW_FORK_URL} target="_blank" rel="noopener noreferrer">
               Excalidraw fork
             </a>
           </p>
         </div>
-        <div className="wimp-dialog__footer">
-          <button type="button" className="wimp-btn wimp-btn--primary" onClick={onClose}>
+        <div className="flow-dialog__footer">
+          <button type="button" className="flow-btn flow-btn--primary" onClick={onClose}>
             Close
           </button>
         </div>

@@ -5,7 +5,7 @@ export interface AppConfig {
 }
 
 const FALLBACK: AppConfig = {
-  appName: "Wimp",
+  appName: "Flow",
   googleClientId: "",
   driveFolderName: "My Drawings",
 };

@@ -41,8 +41,32 @@ test.describe("desktop menu bar + preferences", () => {
   test("Help ▸ About shows both repo links", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("menuitem", { name: "Help" }).click();
-    await page.getByRole("menuitem", { name: "About wimp…" }).click();
-    await expect(page.getByRole("link", { name: /wimp repository/i })).toBeVisible();
+    await page.getByRole("menuitem", { name: "About flow…" }).click();
+    await expect(page.getByRole("link", { name: /flow repository/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /excalidraw fork/i })).toBeVisible();
+  });
+
+  test("library trigger and footer help icon are hidden", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator(".excalidraw .default-sidebar-trigger")).toBeHidden();
+    await expect(page.locator(".excalidraw .help-icon")).toBeHidden();
+  });
+
+  test("Help menu exposes Documentation, Submit an issue, and Keyboard Shortcuts", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("menuitem", { name: "Help" }).click();
+    await expect(page.getByRole("menuitem", { name: "Documentation" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Submit an issue" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Keyboard Shortcuts" })).toBeVisible();
+  });
+
+  test("Keyboard Shortcuts opens the shortcuts dialog with the link row hidden", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("menuitem", { name: "Help" }).click();
+    await page.getByRole("menuitem", { name: "Keyboard Shortcuts" }).click();
+    // The built-in help/shortcuts dialog opens…
+    await expect(page.locator(".excalidraw .HelpDialog")).toBeVisible();
+    // …but its documentation/blog/issue/youtube link row is suppressed.
+    await expect(page.locator(".excalidraw .HelpDialog__header")).toBeHidden();
   });
 });

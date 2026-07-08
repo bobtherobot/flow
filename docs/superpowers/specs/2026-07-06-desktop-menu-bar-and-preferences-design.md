@@ -6,15 +6,15 @@
 
 ## 1. Summary
 
-Add a traditional desktop-application **menu bar** (File / View / Help) to wimp,
+Add a traditional desktop-application **menu bar** (File / View / Help) to flow,
 replacing Excalidraw's hamburger dropdown, and introduce a **Preferences** dialog
 under File. Preferences' first setting is a **global, app-wide sloppiness** control
 that supersedes the current lock-to-Architect hack: one setting restyles every
 element on the canvas at once and becomes the default for new elements.
 
-Everything here is **wimp-level** — new components, the public Excalidraw API, and
+Everything here is **flow-level** — new components, the public Excalidraw API, and
 CSS. **No Excalidraw fork edits are required**, consistent with the fork strategy
-(public API / additive changes stay in wimp; ride upstream).
+(public API / additive changes stay in flow; ride upstream).
 
 ## 2. Goals
 
@@ -24,7 +24,7 @@ CSS. **No Excalidraw fork edits are required**, consistent with the fork strateg
 - Replace the hidden lock-to-Architect sloppiness hack with a real **global
   sloppiness** preference (Architect / Artist / Cartoonist), applied to all
   existing + new elements and persisted app-wide.
-- Keep the fork diff untouched; all work lands in wimp.
+- Keep the fork diff untouched; all work lands in flow.
 
 ## 3. Non-goals (deferred)
 
@@ -39,26 +39,26 @@ CSS. **No Excalidraw fork edits are required**, consistent with the fork strateg
 
 | Decision | Choice |
 |---|---|
-| Menu-bar location | Custom wimp top bar (not Excalidraw's hamburger, not left panel) |
+| Menu-bar location | Custom flow top bar (not Excalidraw's hamburger, not left panel) |
 | Menu completeness (pass 1) | File (full) + View + Help; Edit deferred |
 | Menu-bar implementation | **Radix UI `@radix-ui/react-menubar`** (headless) + custom styling |
 | Sloppiness persistence | **App-wide** preference (localStorage) |
-| Help menu | Single **About wimp…** item → dialog |
+| Help menu | Single **About flow…** item → dialog |
 | Keyboard shortcuts | Lives in **Preferences ▸ Keyboard** as a "show shortcuts" button |
-| About links | Two: wimp repo (**placeholder URL** for now) + Excalidraw fork (`https://github.com/bobtherobot/excalidraw`) |
+| About links | Two: flow repo (**placeholder URL** for now) + Excalidraw fork (`https://github.com/bobtherobot/excalidraw`) |
 
 ## 5. Architecture
 
 ### 5.1 Chrome / layout
 
 - The Excalidraw mount wrapper changes from `position: fixed; inset: 0` to
-  `inset: var(--wimp-menubar-h) 0 0 0` (36px top inset). The menu bar owns the
+  `inset: var(--flow-menubar-h) 0 0 0` (36px top inset). The menu bar owns the
   full-width top strip; the canvas **and** Excalidraw's own floating islands
   (top-left toolbar, top-right controls) shift down beneath it — no overlap, no
   z-index contention.
 - Excalidraw's hamburger menu button is hidden via CSS using its stable selector
   (same technique already used to hide the sloppiness fieldset). Its useful items
-  (Clear Canvas, theme, export) migrate into the wimp bar or are dropped for pass 1.
+  (Clear Canvas, theme, export) migrate into the flow bar or are dropped for pass 1.
 - The `CustomMenu` component (Excalidraw `MainMenu` wrapper) is **removed**.
 
 ### 5.2 Menu bar (Radix)
@@ -70,7 +70,7 @@ New `src/ui/menubar/`:
   `onPreferences`, `onClearCanvas`, `onZoomIn`, `onZoomOut`, `onZoomToFit`,
   `onResetZoom`, `onToggleGrid`, `onAbout`). No business logic inside — pure
   presentational wiring to callbacks owned by `App`.
-- `menubar.css` — the `--wimp-*` design tokens (see §7) plus styling for
+- `menubar.css` — the `--flow-*` design tokens (see §7) plus styling for
   `Menubar.Trigger`, `Menubar.Content`, `Menubar.Item`, `Menubar.Sub`,
   `Menubar.Separator`. Radix handles ARIA roles, roving focus, arrow-key
   navigation, typeahead, and the Export submenu flyout; CSS supplies the look.
@@ -83,11 +83,11 @@ New `src/ui/menubar/`:
     `appState.zoom`, `scrollToContent()` for fit, `gridModeEnabled` toggle) are
     confirmed against the installed API version in the implementation plan; any
     that lack a clean public hook are dropped rather than reaching into internals.
-- **Help**: About wimp…
+- **Help**: About flow…
 
 ### 5.3 Preferences dialog
 
-New `src/ui/PreferencesDialog.tsx`, reusing the existing `wimp-dialog` styling
+New `src/ui/PreferencesDialog.tsx`, reusing the existing `flow-dialog` styling
 (`src/ui/dialogs.css`). Left-nav category layout (traditional desktop Preferences):
 
 - **General** → Sloppiness: a 3-way choice (Architect / Artist / Cartoonist),
@@ -102,9 +102,9 @@ Structured so additional categories/settings slot in without restructuring.
 
 ### 5.4 About dialog
 
-New small `src/ui/AboutDialog.tsx` (reuses `wimp-dialog` styling): app name (from
-config), one-line description that wimp is built on a **forked Excalidraw**, and
-two links — the wimp app repo (**placeholder URL** constant, clearly marked) and
+New small `src/ui/AboutDialog.tsx` (reuses `flow-dialog` styling): app name (from
+config), one-line description that flow is built on a **forked Excalidraw**, and
+two links — the flow app repo (**placeholder URL** constant, clearly marked) and
 the Excalidraw fork (`https://github.com/bobtherobot/excalidraw`). Links use
 `target="_blank" rel="noopener noreferrer"`.
 
@@ -116,7 +116,7 @@ the Excalidraw fork (`https://github.com/bobtherobot/excalidraw`). Links use
   (was hardcoded to `ARCHITECT_ROUGHNESS`); returns new objects only where a
   change is needed (unchanged identity otherwise, as today). `DEFAULT_SLOPPINESS = 0`.
 - **Storage** (`src/app/preferences.ts`, new): `localStorage`-backed get/set for
-  the sloppiness preference under key `wimp.sloppiness`. Synchronous read at
+  the sloppiness preference under key `flow.sloppiness`. Synchronous read at
   startup (no async flash of the wrong roughness). Validates the stored value is
   0/1/2, falling back to `DEFAULT_SLOPPINESS` on missing/corrupt data.
 - **App wiring** (`src/App.tsx`):
@@ -138,7 +138,7 @@ the Excalidraw fork (`https://github.com/bobtherobot/excalidraw`). Links use
 ## 6. Data flow
 
 ```
-localStorage(wimp.sloppiness)
+localStorage(flow.sloppiness)
         │  read at startup
         ▼
    App state (sloppiness) ──seed──▶ initialData.currentItemRoughness
@@ -162,49 +162,49 @@ right-aligned shortcut hints, `Export ▸` flyout. WCAG AA contrast;
 ```css
 :root {
   /* Surfaces */
-  --wimp-menubar-bg:    #ffffff;
-  --wimp-panel-bg:      #ffffff;
+  --flow-menubar-bg:    #ffffff;
+  --flow-panel-bg:      #ffffff;
   /* Ink */
-  --wimp-ink:           #2b2b33;  /* labels, item text */
-  --wimp-ink-muted:     #76767f;  /* shortcut hints, captions (AA @12px) */
-  --wimp-ink-disabled:  #c2c2ca;  /* disabled items */
+  --flow-ink:           #2b2b33;  /* labels, item text */
+  --flow-ink-muted:     #76767f;  /* shortcut hints, captions (AA @12px) */
+  --flow-ink-disabled:  #c2c2ca;  /* disabled items */
   /* Accent — Excalidraw primary, states only */
-  --wimp-accent:        #6965db;  /* open label + highlighted item text */
+  --flow-accent:        #6965db;  /* open label + highlighted item text */
   /* Interactive fills */
-  --wimp-hover:         #f1f0fb;  /* label hover */
-  --wimp-active:        #e8e7fb;  /* open label / item highlight */
-  --wimp-active-strong: #dcdaf6;  /* pressed */
+  --flow-hover:         #f1f0fb;  /* label hover */
+  --flow-active:        #e8e7fb;  /* open label / item highlight */
+  --flow-active-strong: #dcdaf6;  /* pressed */
   /* Lines & shadow */
-  --wimp-border:        #e9e9ed;  /* bar hairline, panel border, separators */
-  --wimp-shadow:        0 4px 16px rgba(43,43,51,.12), 0 1px 3px rgba(43,43,51,.08);
+  --flow-border:        #e9e9ed;  /* bar hairline, panel border, separators */
+  --flow-shadow:        0 4px 16px rgba(43,43,51,.12), 0 1px 3px rgba(43,43,51,.08);
   /* Geometry */
-  --wimp-menubar-h:     36px;
-  --wimp-label-h:       28px;
-  --wimp-item-h:        30px;
-  --wimp-panel-minw:    200px;
-  --wimp-radius-sm:     5px;   /* labels, item chips */
-  --wimp-radius-md:     8px;   /* dropdown panels */
-  --wimp-pad-x:         10px;  /* label + item horizontal padding */
-  --wimp-panel-pad:     4px;   /* panel inset frame */
-  --wimp-gutter:        24px;  /* icon/check leading column */
+  --flow-menubar-h:     36px;
+  --flow-label-h:       28px;
+  --flow-item-h:        30px;
+  --flow-panel-minw:    200px;
+  --flow-radius-sm:     5px;   /* labels, item chips */
+  --flow-radius-md:     8px;   /* dropdown panels */
+  --flow-pad-x:         10px;  /* label + item horizontal padding */
+  --flow-panel-pad:     4px;   /* panel inset frame */
+  --flow-gutter:        24px;  /* icon/check leading column */
   /* Type (Nunito) */
-  --wimp-fs-label:      13px;  --wimp-fw-label:    600;
-  --wimp-fs-item:       13px;  --wimp-fw-item:     500;
-  --wimp-fs-shortcut:   12px;  --wimp-fw-shortcut: 500;
-  --wimp-fs-group:      11px;  --wimp-fw-group:    700;
+  --flow-fs-label:      13px;  --flow-fw-label:    600;
+  --flow-fs-item:       13px;  --flow-fw-item:     500;
+  --flow-fs-shortcut:   12px;  --flow-fw-shortcut: 500;
+  --flow-fs-group:      11px;  --flow-fw-group:    700;
   /* Motion */
-  --wimp-dur-fast:      90ms;
-  --wimp-dur-panel:     120ms;
-  --wimp-ease:          cubic-bezier(.2, 0, 0, 1);
+  --flow-dur-fast:      90ms;
+  --flow-dur-panel:     120ms;
+  --flow-ease:          cubic-bezier(.2, 0, 0, 1);
 }
 ```
 
-Label states: rest transparent → hover `--wimp-hover` → open `--wimp-active` +
+Label states: rest transparent → hover `--flow-hover` → open `--flow-active` +
 accent text → keyboard focus inset `2px` accent ring (`:focus-visible`).
-Item states: rest → hover/highlight `--wimp-active` + accent text (mouse and
-arrow-key highlight identical) → pressed `--wimp-active-strong` → disabled
-`--wimp-ink-disabled`, no hover, `aria-disabled`. Separator: `1px --wimp-border`,
-`margin: 4px 8px`. Namespaced `--wimp-*` so they never collide with Excalidraw's
+Item states: rest → hover/highlight `--flow-active` + accent text (mouse and
+arrow-key highlight identical) → pressed `--flow-active-strong` → disabled
+`--flow-ink-disabled`, no hover, `aria-disabled`. Separator: `1px --flow-border`,
+`margin: 4px 8px`. Namespaced `--flow-*` so they never collide with Excalidraw's
 `--color-*`; the only shared literal is the accent hex.
 
 ## 8. Testing
@@ -229,8 +229,8 @@ arrow-key highlight identical) → pressed `--wimp-active-strong` → disabled
 ## 9. File plan
 
 ```
-NEW  src/ui/menubar/MenuBar.tsx        Radix menubar + wimp menu tree
-NEW  src/ui/menubar/menubar.css        --wimp-* tokens + menu styling
+NEW  src/ui/menubar/MenuBar.tsx        Radix menubar + flow menu tree
+NEW  src/ui/menubar/menubar.css        --flow-* tokens + menu styling
 NEW  src/ui/PreferencesDialog.tsx      General (sloppiness) + Keyboard sections
 NEW  src/ui/AboutDialog.tsx            fork description + two repo links
 NEW  src/app/preferences.ts            localStorage-backed sloppiness pref

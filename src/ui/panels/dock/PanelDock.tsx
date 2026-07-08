@@ -11,7 +11,7 @@ import {
 } from "./panel-dock-state";
 import type { PanelDef } from "./panel-types";
 
-/** Left-edge space the docked panel occupies, for the canvas to inset around. */
+/** Right-edge space the docked panel occupies, for the canvas to inset around. */
 function reservedWidth(state: DockState): number {
   if (state.floating) return 0;
   return state.collapsed ? DOCK_LIMITS.COLLAPSED_W : state.dockedWidth;
@@ -52,7 +52,7 @@ export function PanelDock({ defs, topOffset = 36 }: PanelDockProps) {
     setPanelLayout(state);
   }, [state]);
 
-  // Publish the reserved left space so the canvas can inset around a docked panel
+  // Publish the reserved right space so the canvas can inset around a docked panel
   // (keeping Excalidraw's bottom-left zoom/undo controls clear of it). A floating
   // panel reserves nothing and simply overlays the canvas.
   useEffect(() => {

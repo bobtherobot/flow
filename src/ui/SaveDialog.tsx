@@ -25,24 +25,24 @@ export function SaveDialog({
 
   return (
     <div
-      className="wimp-dialog-backdrop"
+      className="flow-dialog-backdrop"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div className="wimp-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <div className="wimp-dialog__header">
-          <h2 className="wimp-dialog__title" id={titleId}>
+      <div className="flow-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="flow-dialog__header">
+          <h2 className="flow-dialog__title" id={titleId}>
             Save drawing
           </h2>
         </div>
 
-        <div className="wimp-dialog__body">
-          <div className="wimp-field">
+        <div className="flow-dialog__body">
+          <div className="flow-field">
             <label htmlFor={`${titleId}-name`}>Name</label>
             <input
               id={`${titleId}-name`}
-              className="wimp-input"
+              className="flow-input"
               value={name}
               autoFocus
               onChange={(e) => setName(e.target.value)}
@@ -52,7 +52,7 @@ export function SaveDialog({
             />
           </div>
 
-          <fieldset className="wimp-choice" style={{ border: 0, margin: 0, padding: 0 }}>
+          <fieldset className="flow-choice" style={{ border: 0, margin: 0, padding: 0 }}>
             <legend
               style={{
                 fontSize: "0.8125rem",
@@ -64,18 +64,18 @@ export function SaveDialog({
               Destination
             </legend>
 
-            <label className="wimp-option">
+            <label className="flow-option">
               <input
                 type="radio"
                 name="destination"
                 checked={destination === "google"}
                 onChange={() => setDestination("google")}
               />
-              <span className="wimp-option__label">Google Drive</span>
+              <span className="flow-option__label">Google Drive</span>
               {!isGoogleConnected && (
                 <button
                   type="button"
-                  className="wimp-connect"
+                  className="flow-connect"
                   onClick={onConnectGoogle}
                 >
                   Connect
@@ -83,27 +83,27 @@ export function SaveDialog({
               )}
             </label>
 
-            <label className="wimp-option">
+            <label className="flow-option">
               <input
                 type="radio"
                 name="destination"
                 checked={destination === "download"}
                 onChange={() => setDestination("download")}
               />
-              <span className="wimp-option__label">Download (.excalidraw)</span>
+              <span className="flow-option__label">Download (.excalidraw)</span>
             </label>
 
-            <label className="wimp-option">
+            <label className="flow-option">
               <input
                 type="radio"
                 name="destination"
                 checked={destination === "internal"}
                 onChange={() => setDestination("internal")}
               />
-              <span className="wimp-option__label">
+              <span className="flow-option__label">
                 Store internally
                 {destination === "internal" && (
-                  <span className="wimp-option__hint">
+                  <span className="flow-option__hint">
                     Clearing your browser data can delete internally-stored drawings.
                   </span>
                 )}
@@ -112,13 +112,13 @@ export function SaveDialog({
           </fieldset>
         </div>
 
-        <div className="wimp-dialog__footer">
-          <button type="button" className="wimp-btn wimp-btn--ghost" onClick={onCancel}>
+        <div className="flow-dialog__footer">
+          <button type="button" className="flow-btn flow-btn--ghost" onClick={onCancel}>
             Cancel
           </button>
           <button
             type="button"
-            className="wimp-btn wimp-btn--primary"
+            className="flow-btn flow-btn--primary"
             disabled={!canSave}
             onClick={() => onSave({ name, destination })}
           >

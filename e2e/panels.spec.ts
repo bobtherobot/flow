@@ -46,3 +46,18 @@ test("detach floats the whole panel", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Detach panel" }).click();
   await expect(panel).toHaveClass(/flow-pnl--floating/);
 });
+
+test("config menu stays fully on-screen when the panel is docked right", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Panel options" }).click();
+  const menu = page.locator(".flow-pnl-config");
+  await expect(menu).toBeVisible();
+
+  const box = (await menu.boundingBox())!;
+  const vp = page.viewportSize()!;
+  // The whole menu is inside the viewport on every edge.
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(vp.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(vp.height);
+});

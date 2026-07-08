@@ -34,6 +34,7 @@ import {
   zoomToFit,
 } from "./lib/view-actions";
 import { ensureExtension, stripExtension } from "./lib/filename";
+import { FLOW_DOCS_URL, FLOW_ISSUES_URL } from "./lib/links";
 import { MenuBar } from "./ui/menubar/MenuBar";
 import { PanelsRoot } from "./ui/panels/PanelsRoot";
 import { SaveDialog } from "./ui/SaveDialog";
@@ -207,6 +208,9 @@ export default function App() {
     apiRef.current?.updateScene({ appState: { openDialog: { name: "help" } } });
   }, []);
 
+  const openExternal = (url: string) =>
+    window.open(url, "_blank", "noopener,noreferrer");
+
   const withApi = (fn: (api: ExcalidrawAPI) => void) => () => {
     const api = apiRef.current;
     if (api) fn(api);
@@ -228,12 +232,15 @@ export default function App() {
         onResetZoom={withApi(resetZoom)}
         onToggleGrid={withApi(toggleGrid)}
         onAbout={() => setAboutOpen(true)}
+        onDocumentation={() => openExternal(FLOW_DOCS_URL)}
+        onSubmitIssue={() => openExternal(FLOW_ISSUES_URL)}
+        onShowShortcuts={handleShowShortcuts}
       />
 
       <div
         style={{
           position: "fixed",
-          inset: "var(--flow-menubar-h) 0 0 var(--flow-panel-reserved, 0px)",
+          inset: "var(--flow-menubar-h) var(--flow-panel-reserved, 0px) 0 0",
         }}
       >
         <Excalidraw

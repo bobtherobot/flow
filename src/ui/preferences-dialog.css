@@ -1,13 +1,13 @@
 /* Preferences gets a wider dialog with a left category rail. */
-.wimp-prefs {
+.flow-prefs {
   width: min(560px, 100%);
 }
-.wimp-prefs__body {
+.flow-prefs__body {
   display: grid;
   grid-template-columns: 140px 1fr;
   min-height: 220px;
 }
-.wimp-prefs__nav {
+.flow-prefs__nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -15,7 +15,7 @@
   border-right: 1px solid #eef0f5;
   background: #fbfcfe;
 }
-.wimp-prefs__tab {
+.flow-prefs__tab {
   text-align: left;
   font: inherit;
   font-size: 0.875rem;
@@ -27,23 +27,23 @@
   background: transparent;
   cursor: pointer;
 }
-.wimp-prefs__tab:hover {
+.flow-prefs__tab:hover {
   background: #eef0f5;
 }
-.wimp-prefs__tab[aria-selected="true"] {
+.flow-prefs__tab[aria-selected="true"] {
   background: color-mix(in oklab, #6366f1 10%, #ffffff);
   color: #4338ca;
 }
-.wimp-prefs__panel {
+.flow-prefs__panel {
   padding: 1rem 1.25rem;
 }
-.wimp-prefs__keyboard {
+.flow-prefs__keyboard {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   align-items: flex-start;
 }
-.wimp-prefs__hint {
+.flow-prefs__hint {
   margin: 0;
   font-size: 0.8125rem;
   color: #6b7280;
