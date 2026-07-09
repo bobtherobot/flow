@@ -17,13 +17,28 @@
   background: var(--flow-panel-bg);
   border: 1px solid var(--flow-border);
   border-radius: var(--flow-radius-md);
-  box-shadow: var(--flow-shadow);
   max-width: calc(100vw - 16px);
   /* Must NOT clip: the ColorSwatch popover is absolutely positioned inside the
      bar. `overflow-x: auto` would force overflow-y to clip too (a CSS gotcha)
      and swallow the popover, so keep the bar a non-clipping container. The bar
      hugs its compact, curated content, so horizontal scroll isn't needed. */
   overflow: visible;
+}
+
+/* Docked: tucked flush into the lower-left corner — sits on the viewport's
+   bottom edge and against the tool rail. Part of the chrome, so no drop shadow
+   and no rounding/border on the two attached (bottom + left) edges. */
+.flow-bottombar--docked {
+  border-bottom: none;
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Detached: a free-floating strip — its own elevated surface with a shadow. */
+.flow-bottombar--floating {
+  box-shadow: var(--flow-shadow);
 }
 
 /* Leading drag handle: hamburger + close + grip. */
@@ -40,7 +55,7 @@
 }
 .flow-bottombar__grip {
   color: var(--flow-ink-disabled);
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1;
   letter-spacing: -2px;
   padding: 0 2px;

@@ -46,14 +46,35 @@ Bar. Spec: `docs/superpowers/specs/2026-07-08-bottom-bar-design.md`. Shipped
 - **Library TAB (in the search sidebar's tab strip) hidden** via the stable Radix
   suffix selector `.sidebar-tab-trigger[aria-controls$="-content-library"]` (the
   id prefix is auto-generated). Only the search tab remains.
-- **Dock-left clears the tool rail** by reading `--flow-toolbar-reserved`
-  (published by ToolBar on documentElement); re-measured on resize + visibility.
-- Redock fires when a dropped floating bar's bottom edge is within 48px of the
-  viewport bottom (opposite edge vs quickbar's top-edge redock).
+- **Docked = flush lower-left corner, no chrome-float look** (2026-07-09):
+  docked `shellStyle` is `{ bottom: 0, left: dockLeft }` (was `bottom: 12`);
+  `box-shadow` moved off the base rule onto `.flow-bottombar--floating` only, so
+  the drop shadow shows ONLY when detached. `.flow-bottombar--docked` squares the
+  two attached (bottom + left) corners and drops their borders so it tucks into
+  the corner. Detached stays a rounded, shadowed pill.
+- **Dock-left clears the tool rail via a prop, not a CSS-var read** (2026-07-09):
+  `BottomBar` takes `toolbarReserved` (App computes
+  `toolbar.visible && !toolbar.floating ? RAIL_WIDTH : 0`; `RAIL_WIDTH` now
+  exported from `ToolBar.tsx`). Docked x = `toolbarReserved + 1` (1px hairline
+  `RAIL_GAP` off the rail; 0 flush when the rail floats/hides). Replaced the old `getComputedStyle(--flow-toolbar-reserved)`
+  measurement, which had a mount-order bug: BottomBar's `useLayoutEffect` ran
+  before ToolBar's `useEffect` published the var, so it read 0 and the bar
+  overlapped the rail (the reported bug). Prop is render-time → deterministic,
+  no flicker, reactive to rail show/hide/float. `--flow-toolbar-reserved` still
+  drives the canvas inset in App; only the bottombar stopped reading it in JS.
+- Redock fires when a dropped floating bar's bottom edge is within `REDOCK_MARGIN`
+  of the viewport bottom (opposite edge vs quickbar's top-edge redock). Tightened
+  48→**10px** 2026-07-09 (all three bars) so only a near-flush drop snaps back.
+- **Handle = grip THEN hamburger; no close (✕) icon** (2026-07-09): leading
+  handle is `⠿` grip first, then `☰`. Removed the ✕ close button; hiding is now a
+  **"Hide bottom bar"** action at the top of the hamburger menu (below
+  Detach/Dock) via a new `onHide` prop on `BottombarConfigMenu`. Mirrored on
+  [[quick-actions-bar]].
 - Native footer `.App-menu_bottom` fully hidden — its exit-zen button is covered
   by the bar's zen toggle (stays visible in zen; flow chrome is outside `.excalidraw`).
 
 ## Tests
 17 e2e-relevant + unit: `bottombar-state.test.ts`, `useBottomActions.test.tsx`,
-`controls.test.tsx`, `src/lib/search-bridge.test.ts`, `e2e/bottombar.spec.ts` (10).
+`controls.test.tsx`, `src/lib/search-bridge.test.ts`, `e2e/bottombar.spec.ts` (11 —
+incl. docked-flush/floating-shadow regression).
 Full suite after: 280 unit + 51 e2e green.

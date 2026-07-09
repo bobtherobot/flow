@@ -54,6 +54,11 @@ Branch `feat/quick-actions-bar` (built 2026-07-08). Mirrors
   specs were scoped (tool draws → `toolbar[name=Tools]`; align asserts →
   `.flow-align-panel`). New tests scope tool checks to the Quick actions toolbar.
 - Config-menu default: tools hidden (opt-in); everything else shown.
+- **Handle = grip THEN hamburger; no close (✕) icon** (2026-07-09): the leading
+  drag handle is `⠿` grip first, then `☰`. The old ✕ close button was removed;
+  hiding the bar is now a **"Hide quick actions"** action button at the top of the
+  hamburger menu (below Detach/Dock), via a new `onHide` prop on
+  `QuickbarConfigMenu`. Same change mirrored on the [[bottom-bar]].
 
 ## Tests
 248 unit/component (vitest) + `e2e/quickbar.spec.ts` (8). Binding lock proven by

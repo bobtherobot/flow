@@ -115,4 +115,41 @@ test.describe("bottom bar", () => {
     const after = await bar.boundingBox();
     expect(after!.y).toBeLessThan(before!.y - 100); // lifted up — now floating
   });
+
+  test("docked sits flush in the corner (no offset/shadow); floating gains a shadow", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const bar = page.getByRole("toolbar", { name: "Bottom bar" });
+    const vp = page.viewportSize()!;
+    const rail = await page.evaluate(
+      () =>
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue("--flow-toolbar-reserved"),
+        ) || 0,
+    );
+    expect(rail).toBeGreaterThan(0);
+
+    // Docked: flush to the bottom edge; a 1px hairline gap off the rail's edge.
+    const box = (await bar.boundingBox())!;
+    expect(Math.round(box.y + box.height)).toBe(vp.height);
+    expect(Math.round(box.x)).toBe(Math.round(rail) + 1);
+
+    // Docked: no drop shadow — part of the chrome, not a floating strip.
+    const dockedShadow = await bar.evaluate((el) => getComputedStyle(el).boxShadow);
+    expect(dockedShadow === "none" || dockedShadow === "").toBe(true);
+
+    // Tear off → floating regains the shadow.
+    const handle = page.locator(".flow-bottombar__grip");
+    const h = (await handle.boundingBox())!;
+    await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(h.x + 40, h.y - 200, { steps: 8 });
+    await page.mouse.up();
+
+    await expect(bar).toHaveClass(/flow-bottombar--floating/);
+    const floatShadow = await bar.evaluate((el) => getComputedStyle(el).boxShadow);
+    expect(floatShadow).not.toBe("none");
+    expect(floatShadow.length).toBeGreaterThan(0);
+  });
 });

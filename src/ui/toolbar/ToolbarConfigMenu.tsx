@@ -9,6 +9,8 @@ interface ToolbarConfigMenuProps {
   anchor: MenuPoint;
   onToggleFloating: () => void;
   onToggleTool: (id: string) => void;
+  /** Hide the whole rail (mirrors View ▸ Show Toolbar). */
+  onHide: () => void;
 }
 
 /**
@@ -22,6 +24,7 @@ export function ToolbarConfigMenu({
   anchor,
   onToggleFloating,
   onToggleTool,
+  onHide,
 }: ToolbarConfigMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<MenuPoint>(anchor);
@@ -56,6 +59,14 @@ export function ToolbarConfigMenu({
         onClick={onToggleFloating}
       >
         {floating ? "Dock toolbar" : "Detach toolbar"}
+      </button>
+      <button
+        type="button"
+        className="flow-pnl-config__action"
+        role="menuitem"
+        onClick={onHide}
+      >
+        Hide toolbar
       </button>
       <div className="flow-pnl-config__sep" />
       {rows.map((r) => (

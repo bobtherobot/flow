@@ -68,11 +68,12 @@ describe("QuickBar", () => {
     expect(onSetBindingMode).toHaveBeenCalledWith("off");
   });
 
-  it("closes the bar via onChange when the close button is clicked", async () => {
+  it("hides the bar via the hamburger's Hide quick actions item", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<QuickBar api={fakeApi()} state={DEFAULT_QUICKBAR_STATE} onChange={onChange} {...base} />);
-    await user.click(screen.getByRole("button", { name: "Close quick actions" }));
+    await user.click(screen.getByRole("button", { name: "Quick actions options" }));
+    await user.click(screen.getByRole("menuitem", { name: "Hide quick actions" }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ visible: false }));
   });
 

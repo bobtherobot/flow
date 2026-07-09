@@ -61,9 +61,11 @@ describe("withHiddenToggled", () => {
 });
 
 describe("shouldRedock", () => {
-  it("redocks when dropped near the bottom edge", () => {
-    // viewport 800 tall, bar 40 tall dropped with top at 780 → bottom-gap 0-ish
-    expect(shouldRedock(770, 40, 800)).toBe(true);
+  it("redocks only within the tight 10px margin of the bottom edge", () => {
+    // viewport 800, bar 40 tall. bottom-gap = 800 - (top + 40).
+    expect(shouldRedock(770, 40, 800)).toBe(true); // gap -10 (past the edge)
+    expect(shouldRedock(755, 40, 800)).toBe(true); // gap 5 → within 10px
+    expect(shouldRedock(745, 40, 800)).toBe(false); // gap 15 → just outside
   });
 
   it("stays floating when dropped in the middle", () => {

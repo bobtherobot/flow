@@ -45,7 +45,7 @@ import { ensureExtension, stripExtension } from "./lib/filename";
 import { FLOW_DOCS_URL, FLOW_ISSUES_URL } from "./lib/links";
 import { MenuBar } from "./ui/menubar/MenuBar";
 import { PanelsRoot } from "./ui/panels/PanelsRoot";
-import { ToolBar } from "./ui/toolbar/ToolBar";
+import { ToolBar, RAIL_WIDTH } from "./ui/toolbar/ToolBar";
 import { type ToolbarState } from "./ui/toolbar/toolbar-state";
 import { QuickBar } from "./ui/quickbar/QuickBar";
 import { type QuickbarState } from "./ui/quickbar/quickbar-state";
@@ -377,7 +377,13 @@ export default function App() {
         onSetBindingMode={handleSetBindingMode}
       />
 
-      <BottomBar api={excalidrawApi} state={bottombar} onChange={setBottombar} onSearch={runSearch} />
+      <BottomBar
+        api={excalidrawApi}
+        state={bottombar}
+        onChange={setBottombar}
+        onSearch={runSearch}
+        toolbarReserved={toolbar.visible && !toolbar.floating ? RAIL_WIDTH : 0}
+      />
 
       {saveOpen && (
         <SaveDialog

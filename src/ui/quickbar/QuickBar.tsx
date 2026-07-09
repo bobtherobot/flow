@@ -108,6 +108,7 @@ export function QuickBar({ api, state, onChange, bindingMode, onSetBindingMode }
       aria-orientation="horizontal"
     >
       <div className="flow-quickbar__handle" onPointerDown={onHandlePointerDown}>
+        <span className="flow-quickbar__grip" aria-hidden="true">⠿</span>
         <button
           type="button"
           className="flow-quickbar__iconbtn flow-quickbar__hamburger"
@@ -117,15 +118,6 @@ export function QuickBar({ api, state, onChange, bindingMode, onSetBindingMode }
         >
           ☰
         </button>
-        <button
-          type="button"
-          className="flow-quickbar__iconbtn"
-          aria-label="Close quick actions"
-          onClick={() => onChange({ ...state, visible: false })}
-        >
-          ✕
-        </button>
-        <span className="flow-quickbar__grip" aria-hidden="true">⠿</span>
       </div>
 
       <div className="flow-quickbar__items">
@@ -157,6 +149,10 @@ export function QuickBar({ api, state, onChange, bindingMode, onSetBindingMode }
             setMenuOpen(false);
           }}
           onToggleItem={(id) => onChange(withHiddenToggled(state, id))}
+          onHide={() => {
+            onChange({ ...state, visible: false });
+            setMenuOpen(false);
+          }}
         />
       )}
     </div>

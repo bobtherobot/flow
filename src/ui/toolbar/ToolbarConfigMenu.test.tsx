@@ -9,6 +9,7 @@ const base = {
   anchor: { top: 40, left: 60 },
   onToggleFloating: () => {},
   onToggleTool: () => {},
+  onHide: () => {},
 };
 
 describe("ToolbarConfigMenu", () => {
@@ -44,5 +45,13 @@ describe("ToolbarConfigMenu", () => {
     render(<ToolbarConfigMenu {...base} onToggleFloating={onToggleFloating} />);
     await user.click(screen.getByRole("menuitem", { name: "Detach toolbar" }));
     expect(onToggleFloating).toHaveBeenCalledOnce();
+  });
+
+  it("calls onHide when the Hide toolbar action is clicked", async () => {
+    const user = userEvent.setup();
+    const onHide = vi.fn();
+    render(<ToolbarConfigMenu {...base} onHide={onHide} />);
+    await user.click(screen.getByRole("menuitem", { name: "Hide toolbar" }));
+    expect(onHide).toHaveBeenCalledOnce();
   });
 });

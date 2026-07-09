@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import "./bottombar.css";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { MenuPoint } from "../panels/dock/menu-position";
@@ -13,12 +13,10 @@ import { BottombarConfigMenu } from "./BottombarConfigMenu";
 import { useBottomActions } from "./useBottomActions";
 import { shouldRedock, withHiddenToggled, type BottombarState } from "./bottombar-state";
 
-/** Gap (px) from the viewport edges when docked bottom-left. */
-const DOCK_MARGIN = 12;
-/** Extra gap between the left tool rail and the docked bar. */
-const RAIL_GAP = 8;
 /** Fallback bar height before the shell is measured (for redock math). */
 const APPROX_H = 44;
+/** Hairline breathing gap between the docked bar and the tool rail's edge. */
+const RAIL_GAP = 1;
 
 interface BottomBarProps {
   api: ExcalidrawAPI | null;
@@ -26,13 +24,12 @@ interface BottomBarProps {
   onChange: (next: BottombarState) => void;
   /** Run a search — routed to the Search sub-panel in the controls dock. */
   onSearch: (query: string) => void;
-}
-
-/** Measure the left tool rail's reserved width so the docked bar clears it. */
-function measureDockLeft(): number {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue("--flow-toolbar-reserved");
-  const rail = parseFloat(raw) || 0;
-  return Math.round((rail > 0 ? rail + RAIL_GAP : DOCK_MARGIN));
+  /**
+   * Width (px) reserved on the left by the docked tool rail. The docked bar
+   * tucks flush against its right edge so it never overlaps the rail; 0 when the
+   * rail is floating/hidden (bar sits flush to the viewport's left edge).
+   */
+  toolbarReserved: number;
 }
 
 /**
@@ -41,22 +38,12 @@ function measureDockLeft(): number {
  * rail); tears off into a floating strip (drag the leading handle); items
  * shown/hidden from the hamburger menu. Sibling of the quick-actions bar.
  */
-export function BottomBar({ api, state, onChange, onSearch }: BottomBarProps) {
+export function BottomBar({ api, state, onChange, onSearch, toolbarReserved }: BottomBarProps) {
   const actions = useBottomActions(api);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dockLeft, setDockLeft] = useState(DOCK_MARGIN);
+  const dockLeft = toolbarReserved > 0 ? toolbarReserved + RAIL_GAP : 0;
   const shellRef = useRef<HTMLDivElement>(null);
   const origin = useRef({ x: 0, y: 0 });
-
-  // Keep the docked left edge in step with the tool rail (re-measure on resize
-  // and whenever visibility toggles, which is when the rail width can change).
-  useLayoutEffect(() => {
-    if (state.floating) return;
-    const update = () => setDockLeft(measureDockLeft());
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, [state.floating, state.visible]);
 
   // Close the config menu on any outside pointer press (mirrors QuickBar).
   useEffect(() => {
@@ -92,7 +79,7 @@ export function BottomBar({ api, state, onChange, onSearch }: BottomBarProps) {
 
   const shellStyle: CSSProperties = state.floating
     ? { top: state.y, left: state.x }
-    : { bottom: DOCK_MARGIN, left: dockLeft };
+    : { bottom: 0, left: dockLeft };
 
   const configAnchor: MenuPoint = (() => {
     const r = shellRef.current?.getBoundingClientRect();
@@ -111,6 +98,7 @@ export function BottomBar({ api, state, onChange, onSearch }: BottomBarProps) {
       aria-orientation="horizontal"
     >
       <div className="flow-bottombar__handle" onPointerDown={onHandlePointerDown}>
+        <span className="flow-bottombar__grip" aria-hidden="true">⠿</span>
         <button
           type="button"
           className="flow-bottombar__iconbtn flow-bottombar__hamburger"
@@ -120,15 +108,6 @@ export function BottomBar({ api, state, onChange, onSearch }: BottomBarProps) {
         >
           ☰
         </button>
-        <button
-          type="button"
-          className="flow-bottombar__iconbtn"
-          aria-label="Close bottom bar"
-          onClick={() => onChange({ ...state, visible: false })}
-        >
-          ✕
-        </button>
-        <span className="flow-bottombar__grip" aria-hidden="true">⠿</span>
       </div>
 
       <div className="flow-bottombar__items">
@@ -174,6 +153,10 @@ export function BottomBar({ api, state, onChange, onSearch }: BottomBarProps) {
             setMenuOpen(false);
           }}
           onToggleItem={(id) => onChange(withHiddenToggled(state, id))}
+          onHide={() => {
+            onChange({ ...state, visible: false });
+            setMenuOpen(false);
+          }}
         />
       )}
     </div>

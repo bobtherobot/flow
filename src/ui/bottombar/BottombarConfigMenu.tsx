@@ -9,6 +9,8 @@ interface BottombarConfigMenuProps {
   anchor: MenuPoint;
   onToggleFloating: () => void;
   onToggleItem: (id: string) => void;
+  /** Hide the whole bar (mirrors View ▸ Show Bottom Bar). */
+  onHide: () => void;
 }
 
 /** Section headers, in display order. */
@@ -31,6 +33,7 @@ export function BottombarConfigMenu({
   anchor,
   onToggleFloating,
   onToggleItem,
+  onHide,
 }: BottombarConfigMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<MenuPoint>(anchor);
@@ -65,6 +68,14 @@ export function BottombarConfigMenu({
         onClick={onToggleFloating}
       >
         {floating ? "Dock bottom bar" : "Detach bottom bar"}
+      </button>
+      <button
+        type="button"
+        className="flow-pnl-config__action"
+        role="menuitem"
+        onClick={onHide}
+      >
+        Hide bottom bar
       </button>
       {GROUP_ORDER.map((group) => {
         const items = BOTTOM_ITEMS.filter((i) => i.group === group);

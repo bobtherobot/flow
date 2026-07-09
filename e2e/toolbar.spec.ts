@@ -84,12 +84,12 @@ test.describe("vertical tool bar", () => {
     const rail = page.getByRole("toolbar", { name: "Tools" });
     const before = await rail.boundingBox();
 
-    // Drag the top bar (avoid the hamburger/close buttons: grab its right-ish gap).
-    const topbar = page.locator(".flow-toolbar__topbar");
-    const tb = await topbar.boundingBox();
-    await page.mouse.move(tb!.x + tb!.width / 2, tb!.y + tb!.height / 2);
+    // Drag from the grip at the top of the header (above the hamburger button).
+    const grip = page.locator(".flow-toolbar__grip");
+    const g = await grip.boundingBox();
+    await page.mouse.move(g!.x + g!.width / 2, g!.y + g!.height / 2);
     await page.mouse.down();
-    await page.mouse.move(tb!.x + 220, tb!.y + 160, { steps: 8 });
+    await page.mouse.move(g!.x + 220, g!.y + 160, { steps: 8 });
     await page.mouse.up();
 
     const after = await rail.boundingBox();

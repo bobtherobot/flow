@@ -48,3 +48,15 @@ Spec/plan: `docs/superpowers/specs|plans/2026-07-08-vertical-toolbar*.md`.
   same split as the panel dock. Unit/component tests cover the rest.
 - Config menu: dock/undock + per-tool show/hide (incl. lock), persisted in
   `hiddenTools`.
+- **Header = grip THEN hamburger (stacked vertically); no close (✕)** (2026-07-09):
+  `.flow-toolbar__topbar` is now a `flex-direction: column` — `⠿` grip on top
+  (`pointer-events:none` so drags fall through to the topbar drag surface),
+  hamburger `☰` below. Removed the ✕ close button; hiding is a **"Hide toolbar"**
+  action at the top of the hamburger menu (below Detach/Dock) via a new `onHide`
+  prop on `ToolbarConfigMenu`. Mirrors [[quick-actions-bar]]/[[bottom-bar]].
+- **Detach clears the menu bar** (2026-07-09): `onToggleFloating` (docked→floating)
+  seeds `{x: rail.left, y: max(rail.top, MENUBAR_H + DETACH_GAP)}` (DETACH_GAP=12)
+  instead of reusing a possibly-`0` `state.y` — otherwise the floating rail (and
+  its top grip) lands under the 36px main menu and is unreachable. e2e tear-off
+  test now drags `.flow-toolbar__grip` (was topbar center, which the vertical
+  stack put over the hamburger).

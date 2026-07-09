@@ -94,11 +94,12 @@ describe("ToolBar", () => {
     expect(screen.getByRole("button", { name: "Laser pointer" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("hides the rail via onChange when the close button is clicked", async () => {
+  it("hides the rail via the hamburger's Hide toolbar item", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={onChange} />);
-    await user.click(screen.getByRole("button", { name: "Close toolbar" }));
+    await user.click(screen.getByRole("button", { name: "Toolbar options" }));
+    await user.click(screen.getByRole("menuitem", { name: "Hide toolbar" }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ visible: false }));
   });
 
@@ -107,5 +108,18 @@ describe("ToolBar", () => {
     render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
     await user.click(screen.getByRole("button", { name: "Toolbar options" }));
     expect(screen.getByRole("menuitem", { name: "Detach toolbar" })).toBeInTheDocument();
+  });
+
+  it("detaches below the main menu so the drag grip stays reachable", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    // Docked default has y:0; detaching from (0,0) must not leave the rail (and
+    // its grip) under the 36px menu bar.
+    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: "Toolbar options" }));
+    await user.click(screen.getByRole("menuitem", { name: "Detach toolbar" }));
+    const next = onChange.mock.calls[0][0];
+    expect(next.floating).toBe(true);
+    expect(next.y).toBeGreaterThanOrEqual(36);
   });
 });

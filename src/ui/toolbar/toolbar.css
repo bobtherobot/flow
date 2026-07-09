@@ -24,19 +24,33 @@
   bottom: auto;
 }
 
-/* Top bar = drag handle (hamburger + close). */
+/* Top bar = drag handle: grip on top, hamburger below (vertical rail header). */
 .flow-toolbar__topbar {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  gap: 3px;
   width: 100%;
-  height: 28px;
   flex-shrink: 0;
-  padding: 0 4px;
+  padding: 4px 0 5px;
   border-bottom: 1px solid var(--flow-border);
   cursor: grab;
   user-select: none;
   touch-action: none;
+}
+.flow-toolbar__grip {
+  display: inline-block;
+  color: var(--flow-ink-disabled);
+  font-size: 16px;
+  line-height: 1;
+  /* Single glyph: no inter-letter gap to tighten, and a trailing letter-spacing
+     advance would shift the glyph off the box centre — which rotation then turns
+     into a vertical misalignment. Keep it normal so rotate() spins in place. */
+  letter-spacing: normal;
+  /* Vertical rail: stand the grip dots up. Rotates about the box centre
+     (default transform-origin), so it stays centred in the flex column. */
+  transform: rotate(90deg);
+  pointer-events: none;
 }
 .flow-toolbar__iconbtn {
   display: inline-flex;

@@ -9,6 +9,8 @@ interface QuickbarConfigMenuProps {
   anchor: MenuPoint;
   onToggleFloating: () => void;
   onToggleItem: (id: string) => void;
+  /** Hide the whole bar (mirrors View ▸ Show Quick Actions). */
+  onHide: () => void;
 }
 
 /** Section headers, in display order. */
@@ -33,6 +35,7 @@ export function QuickbarConfigMenu({
   anchor,
   onToggleFloating,
   onToggleItem,
+  onHide,
 }: QuickbarConfigMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<MenuPoint>(anchor);
@@ -64,6 +67,14 @@ export function QuickbarConfigMenu({
         onClick={onToggleFloating}
       >
         {floating ? "Dock quick actions" : "Detach quick actions"}
+      </button>
+      <button
+        type="button"
+        className="flow-pnl-config__action"
+        role="menuitem"
+        onClick={onHide}
+      >
+        Hide quick actions
       </button>
       {GROUP_ORDER.map((group) => {
         const items = QUICK_ITEMS.filter((i) => i.group === group);

@@ -24,8 +24,8 @@ export const DEFAULT_QUICKBAR_STATE: QuickbarState = {
 };
 
 /** Distance (px) from the top edge within which a dropped floating bar
- *  re-docks. Mirrors the tool rail's REDOCK_MARGIN. */
-const REDOCK_MARGIN = 48;
+ *  re-docks. Tight on purpose — only a near-flush drop should snap back. */
+const REDOCK_MARGIN = 10;
 
 /** Coerce an unknown persisted blob into a valid QuickbarState, filling any
  *  missing/invalid field from the default. Never throws. */

@@ -40,8 +40,9 @@ describe("withHiddenToggled", () => {
 });
 
 describe("shouldRedock", () => {
-  it("re-docks when the left edge is within the margin", () => {
-    expect(shouldRedock(20)).toBe(true);
+  it("re-docks only when the left edge is within the tight 10px margin", () => {
+    expect(shouldRedock(5)).toBe(true);
+    expect(shouldRedock(20)).toBe(false);
     expect(shouldRedock(200)).toBe(false);
   });
 });

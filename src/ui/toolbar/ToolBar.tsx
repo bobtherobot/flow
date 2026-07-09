@@ -10,8 +10,12 @@ import { ToolbarConfigMenu } from "./ToolbarConfigMenu";
 import { useActiveTool } from "./useActiveTool";
 import { shouldRedock, withHiddenToggled, type ToolbarState } from "./toolbar-state";
 
-const RAIL_WIDTH = 48;
+/** Docked rail width; also the horizontal gutter reserved on the left. */
+export const RAIL_WIDTH = 48;
 const MENUBAR_H = 36;
+/** On first detach, drop the rail this far below the menu bar so its drag grip
+ *  clears the top main menu and stays reachable. */
+const DETACH_GAP = 12;
 
 interface ToolBarProps {
   api: ExcalidrawAPI | null;
@@ -62,7 +66,7 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
 
   const onTopbarPointerDown = useDrag({
     onStart: (e) => {
-      // Don't start a drag from the hamburger/close buttons.
+      // Don't start a drag from the hamburger button.
       if ((e.target as HTMLElement).closest("button")) return false;
       const r = shellRef.current?.getBoundingClientRect();
       origin.current = { x: r?.left ?? 0, y: r?.top ?? MENUBAR_H };
@@ -92,6 +96,7 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
       aria-orientation="vertical"
     >
       <div className="flow-toolbar__topbar" onPointerDown={onTopbarPointerDown}>
+        <span className="flow-toolbar__grip" aria-hidden="true">⠿</span>
         <button
           type="button"
           className="flow-toolbar__iconbtn flow-toolbar__hamburger"
@@ -100,14 +105,6 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
           onClick={() => setMenuOpen((o) => !o)}
         >
           ☰
-        </button>
-        <button
-          type="button"
-          className="flow-toolbar__iconbtn"
-          aria-label="Close toolbar"
-          onClick={() => onChange({ ...state, visible: false })}
-        >
-          ✕
         </button>
       </div>
 
@@ -147,10 +144,23 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
           hiddenTools={state.hiddenTools}
           anchor={configAnchor(shellRef.current)}
           onToggleFloating={() => {
-            onChange({ ...state, floating: !state.floating });
+            if (state.floating) {
+              onChange({ ...state, floating: false });
+            } else {
+              // Detach in place, but keep the top (and its drag grip) clear of
+              // the main menu bar so the rail stays reachable/movable.
+              const r = shellRef.current?.getBoundingClientRect();
+              const x = Math.round(r?.left ?? 0);
+              const y = Math.max(Math.round(r?.top ?? MENUBAR_H), MENUBAR_H + DETACH_GAP);
+              onChange({ ...state, floating: true, x, y });
+            }
             setMenuOpen(false);
           }}
           onToggleTool={(id) => onChange(withHiddenToggled(state, id))}
+          onHide={() => {
+            onChange({ ...state, visible: false });
+            setMenuOpen(false);
+          }}
         />
       )}
     </div>

@@ -22,9 +22,8 @@ export const DEFAULT_BOTTOMBAR_STATE: BottombarState = {
 };
 
 /** Distance (px) from the bottom edge within which a dropped floating bar
- *  re-docks. Mirrors the quickbar's REDOCK_MARGIN (measured from the opposite
- *  edge). */
-const REDOCK_MARGIN = 48;
+ *  re-docks. Tight on purpose — only a near-flush drop should snap back. */
+const REDOCK_MARGIN = 10;
 
 /** Coerce an unknown persisted blob into a valid BottombarState, filling any
  *  missing/invalid field from the default. Never throws. */
