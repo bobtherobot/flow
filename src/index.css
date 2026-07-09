@@ -67,3 +67,16 @@ body,
 .excalidraw .HelpDialog__header {
   display: none;
 }
+
+/*
+ * flow replaces Excalidraw's horizontal tool island (top-center) with its own
+ * vertical tool rail (src/ui/toolbar). `.App-toolbar-container` is the stable
+ * wrapper Excalidraw puts around the shapes toolbar (see vendor LayerUI.tsx);
+ * it is separate from the hamburger/menu, so hiding it suppresses only the tool
+ * island and degrades gracefully (worst case the island reappears). This also
+ * removes the in-island HintViewer text and pen/lock buttons — flow surfaces
+ * lock in its own rail.
+ */
+.excalidraw .App-toolbar-container {
+  display: none;
+}
