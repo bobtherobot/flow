@@ -14,3 +14,4 @@ Repo-local memory index. One line per memory; see `CLAUDE.md` for the read-at-st
 - [Search sub-panel](search-panel.md) — flow-native canvas search in the controls dock (fork export #2 `getSearchMatches`); native sidebar retired; bottom bar + Ctrl/F auto-open it; shipped 2026-07-09
 - [Arrowhead size](arrowhead-size.md) — per-end arrow head size slider (Stroke panel), size = strokeWidth × factor; fork SCHEMA edit (start/endArrowheadSize on linear elements); shipped 2026-07-09
 - [Transform panel](transform-panel.md) — top-of-dock sub-panel for numeric W/H/X/Y/rotation/corner-radius/padding; all 3 phases shipped 2026-07-09; reuses Excalidraw resize (additive export) + per-element cornerRadius (rect/diamond/elbow) + per-container text padding
+- [Laser color](laser-color.md) — global laser-pointer trail color+opacity in the Color panel (always-global, `ColorRow` `onWrite` hatch, `ids={{}}`); 2nd appState fork field (mirrors bindingMode); shipped 2026-07-09
