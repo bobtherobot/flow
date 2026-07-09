@@ -65,3 +65,42 @@ test("font-size field reflects a preset, and a custom value deselects presets", 
   await expect(xl).not.toBeChecked();
   await expect(page.getByRole("radio", { name: "Medium", exact: true })).not.toBeChecked();
 });
+
+test("changing size recenters text bound to a container (no resize needed)", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+
+  // A rectangle with bound (container) text.
+  await page.getByRole("button", { name: "Rectangle" }).click();
+  await page.mouse.move(560, 300);
+  await page.mouse.down();
+  await page.mouse.move(820, 460, { steps: 8 });
+  await page.mouse.up();
+  await page.mouse.dblclick(690, 380);
+  await page.keyboard.type("Hi");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Selection" }).click();
+  await page.mouse.click(690, 380);
+
+  const read = () =>
+    page.evaluate(() => {
+      const t = window.h.elements.find((e: any) => e.type === "text" && e.containerId);
+      const c = window.h.elements.find((e: any) => e.type === "rectangle");
+      return {
+        h: Math.round(t.height),
+        textMid: Math.round(t.y + t.height / 2),
+        boxMid: Math.round(c.y + c.height / 2),
+      };
+    });
+
+  const before = await read();
+  expect(before.textMid).toBe(before.boxMid); // centered to start
+
+  await page.getByRole("spinbutton", { name: "Font size value" }).fill("36");
+  await page.getByRole("spinbutton", { name: "Font size value" }).blur();
+  await page.waitForTimeout(200);
+
+  const after = await read();
+  expect(after.h).toBeGreaterThan(before.h); // bounding box recomputed for the bigger font
+  expect(after.textMid).toBe(after.boxMid); // still centered — the bug was it drifting off-center
+});

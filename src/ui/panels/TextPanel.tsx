@@ -102,9 +102,7 @@ export function TextPanel({ sel }: { sel: SelectionStyle }) {
             value={fontSizeValue}
             ariaLabel="Font size"
             disabled={disabled}
-            onChange={(v) =>
-              sel.setProp({ prop: "fontSize", value: Number(v), currentItemKey: "currentItemFontSize", ids })
-            }
+            onChange={(v) => sel.executeAction("changeFontSize", Number(v))}
           />
           {/* Manual size. Reflects the current value (incl. a preset click); a
               custom value simply won't match any S/M/L/XL, so none stays lit. */}
@@ -115,9 +113,7 @@ export function TextPanel({ sel }: { sel: SelectionStyle }) {
             unit="px"
             ariaLabel="Font size value"
             disabled={disabled}
-            onChange={(n) =>
-              sel.setProp({ prop: "fontSize", value: n, currentItemKey: "currentItemFontSize", ids })
-            }
+            onChange={(n) => sel.executeAction("changeFontSize", n)}
           />
         </div>
       </div>
@@ -130,9 +126,7 @@ export function TextPanel({ sel }: { sel: SelectionStyle }) {
             value={textAlign}
             ariaLabel="Text align"
             disabled={disabled}
-            onChange={(v) =>
-              sel.setProp({ prop: "textAlign", value: v, currentItemKey: "currentItemTextAlign", ids })
-            }
+            onChange={(v) => sel.executeAction("changeTextAlign", v)}
           />
         </div>
       </div>
