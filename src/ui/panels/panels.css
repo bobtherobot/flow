@@ -258,6 +258,14 @@
 .flow-ctl-row[aria-disabled="true"] {
   opacity: 0.45;
 }
+/* Axis-prefixed numeric field (W/H, X/Y) in the Transform panel. */
+.flow-ctl-axis {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--flow-ink-muted);
+}
 
 /* Standalone numeric field (no slider) */
 .flow-ctl-num {

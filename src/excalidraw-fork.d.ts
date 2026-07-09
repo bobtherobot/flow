@@ -38,4 +38,26 @@ declare module "@excalidraw/excalidraw" {
     query: string,
     elements: readonly unknown[],
   ): SearchResult[];
+
+  /**
+   * Resize a single element to an exact width/height in place, mutating
+   * `latestElement` (and its bound text within `elementsMap`). `handleDirection`
+   * picks the anchored corner ("e"/"s" keep the top-left fixed). Reused by the
+   * Transform sub-panel. Runtime source:
+   * `vendor/excalidraw/packages/excalidraw/element/resizeElements.ts`.
+   */
+  export function resizeSingleElement<T>(
+    nextWidth: number,
+    nextHeight: number,
+    latestElement: T,
+    origElement: T,
+    elementsMap: Map<string, T>,
+    originalElementsMap: Map<string, T>,
+    handleDirection: "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw",
+    options?: {
+      shouldMaintainAspectRatio?: boolean;
+      shouldResizeFromCenter?: boolean;
+      shouldInformMutation?: boolean;
+    },
+  ): void;
 }
