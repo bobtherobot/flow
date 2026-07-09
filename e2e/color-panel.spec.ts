@@ -89,3 +89,40 @@ test("a color edit is undoable via Excalidraw's history", async ({ page }) => {
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(strokeSwatch).toHaveAttribute("title", "#1e1e1e");
 });
+
+test("laser color round-trips through the global swatch", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+
+  const laserSwatch = page.getByRole("button", { name: "Laser color", exact: true });
+  await expect(laserSwatch).toHaveAttribute("title", "#ff0000"); // default
+
+  await laserSwatch.click();
+  await page.getByRole("button", { name: "#e03131" }).click();
+  await page.locator(".flow-pnl__title").click(); // close the picker
+  await expect(laserSwatch).toHaveAttribute("title", "#e03131");
+});
+
+test("the laser trail renders in the chosen color", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+
+  // Pick a laser color.
+  await page.getByRole("button", { name: "Laser color", exact: true }).click();
+  await page.getByRole("button", { name: "#2f9e44" }).click();
+  await page.locator(".flow-pnl__title").click();
+
+  // Activate the laser tool and drag (right of the docked panel).
+  await page.getByRole("button", { name: "Laser pointer" }).click();
+  await page.mouse.move(560, 320);
+  await page.mouse.down();
+  await page.mouse.move(820, 500, { steps: 12 });
+
+  // While the trail is live, its SVG path fill is the chosen color.
+  await page.waitForFunction(() => {
+    const p = document.querySelector(".SVGLayer svg path");
+    return p?.getAttribute("fill") === "#2f9e44";
+  }, { timeout: 2000 });
+
+  await page.mouse.up();
+});
