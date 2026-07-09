@@ -11,6 +11,9 @@ interface SliderInputProps {
   onChange: (value: number) => void;
   ariaLabel: string;
   disabled?: boolean;
+  /** Hide the numeric field, showing only the range slider (for relative
+   *  values where the exact number is meaningless, e.g. arrowhead size). */
+  hideValue?: boolean;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -31,6 +34,7 @@ export function SliderInput({
   onChange,
   ariaLabel,
   disabled = false,
+  hideValue = false,
 }: SliderInputProps) {
   const [text, setText] = useState(value === null ? "" : String(value));
   const focused = useRef(false);
@@ -63,6 +67,7 @@ export function SliderInput({
           onChange(n);
         }}
       />
+      {!hideValue && (
       <div className="flow-ctl-slider__field">
         <input
           type="number"
@@ -84,6 +89,7 @@ export function SliderInput({
         />
         {unit && <span className="flow-ctl-slider__unit">{unit}</span>}
       </div>
+      )}
     </div>
   );
 }

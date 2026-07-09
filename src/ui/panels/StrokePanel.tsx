@@ -8,6 +8,14 @@ import type { SelectionStyle } from "./useSelectionStyle";
 const MIN_STROKE_PX = 0.5;
 const MAX_STROKE_PX = 32;
 
+/** Arrowhead size is a multiple of stroke width (a relative factor, no absolute
+ *  value shown). Bounds keep it from getting silly; the default MUST match the
+ *  fork's DEFAULT_ARROWHEAD_SIZE_FACTOR so unset heads and the slider agree. */
+const ARROWHEAD_SIZE_MIN = 2;
+const ARROWHEAD_SIZE_MAX = 12;
+const ARROWHEAD_SIZE_DEFAULT = 6;
+const ARROWHEAD_SIZE_STEP = 0.5;
+
 // ── Icons ───────────────────────────────────────────────────────────────────
 const svg = (children: React.ReactNode) => (
   <svg width="20" height="14" viewBox="0 0 20 14" fill="none" aria-hidden="true">
@@ -150,6 +158,18 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
     ahToValue(a?.currentItemEndArrowhead),
   );
 
+  // Per-end arrowhead size factor (× stroke width). Field isn't in the vendor's
+  // built .d.ts yet, so read it through a small cast; MIXED → null (empty slider).
+  const sizeOf = (which: "startArrowheadSize" | "endArrowheadSize") =>
+    readFormValue(
+      sel.elements,
+      linearIds,
+      (el) => (el as Partial<Record<typeof which, number>>)[which] ?? ARROWHEAD_SIZE_DEFAULT,
+      ARROWHEAD_SIZE_DEFAULT,
+    );
+  const startSize = sizeOf("startArrowheadSize");
+  const endSize = sizeOf("endArrowheadSize");
+
   // Reuse Excalidraw's own action — it handles round/sharp plus elbow routing and
   // binding, which can't be reimplemented from element props alone.
   const setArrowType = (value: "sharp" | "round" | "elbow") =>
@@ -158,6 +178,10 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
   const setArrowhead = (which: "startArrowhead" | "endArrowhead", currentItemKey: string) =>
     (value: string) =>
       sel.setProp({ prop: which, value: valueToAh(value), currentItemKey, ids: linearIds });
+
+  const setArrowheadSize = (which: "startArrowheadSize" | "endArrowheadSize") =>
+    (value: number) =>
+      sel.setProp({ prop: which, value, ids: linearIds });
 
   return (
     <div className="flow-stroke-panel">
@@ -207,7 +231,7 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
 
       <div className="flow-ctl-row" aria-disabled={arrowsDisabled || undefined}>
         <span className="flow-ctl-row__label">Start</span>
-        <div className="flow-ctl-row__control">
+        <div className="flow-ctl-row__control flow-ctl-row__control--stack">
           <IconToggleGroup
             options={ARROWHEADS}
             value={startArrow}
@@ -215,18 +239,38 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
             disabled={arrowsDisabled}
             onChange={setArrowhead("startArrowhead", "currentItemStartArrowhead")}
           />
+          <SliderInput
+            value={startSize === MIXED ? null : startSize}
+            min={ARROWHEAD_SIZE_MIN}
+            max={ARROWHEAD_SIZE_MAX}
+            step={ARROWHEAD_SIZE_STEP}
+            hideValue
+            ariaLabel="Start arrowhead size"
+            disabled={arrowsDisabled || startArrow === "none"}
+            onChange={setArrowheadSize("startArrowheadSize")}
+          />
         </div>
       </div>
 
       <div className="flow-ctl-row" aria-disabled={arrowsDisabled || undefined}>
         <span className="flow-ctl-row__label">End</span>
-        <div className="flow-ctl-row__control">
+        <div className="flow-ctl-row__control flow-ctl-row__control--stack">
           <IconToggleGroup
             options={ARROWHEADS}
             value={endArrow}
             ariaLabel="End arrowhead"
             disabled={arrowsDisabled}
             onChange={setArrowhead("endArrowhead", "currentItemEndArrowhead")}
+          />
+          <SliderInput
+            value={endSize === MIXED ? null : endSize}
+            min={ARROWHEAD_SIZE_MIN}
+            max={ARROWHEAD_SIZE_MAX}
+            step={ARROWHEAD_SIZE_STEP}
+            hideValue
+            ariaLabel="End arrowhead size"
+            disabled={arrowsDisabled || endArrow === "none"}
+            onChange={setArrowheadSize("endArrowheadSize")}
           />
         </div>
       </div>

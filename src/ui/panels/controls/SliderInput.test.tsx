@@ -37,4 +37,10 @@ describe("SliderInput", () => {
     expect(screen.getByLabelText("Stroke width")).toBeDisabled();
     expect(screen.getByLabelText("Stroke width value")).toBeDisabled();
   });
+
+  it("hideValue renders only the range slider (no numeric field)", () => {
+    render(<SliderInput value={6} min={2} max={12} hideValue onChange={() => {}} ariaLabel="Start arrowhead size" />);
+    expect(screen.getByRole("slider", { name: "Start arrowhead size" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Start arrowhead size value")).not.toBeInTheDocument();
+  });
 });

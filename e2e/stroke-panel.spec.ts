@@ -53,3 +53,30 @@ test("arrowhead controls apply to an arrow", async ({ page }) => {
 
   await page.screenshot({ path: `${OUT}/arrow-triangle.png` });
 });
+
+test("arrowhead size sliders track the arrowhead state", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await drawWith(page, "Arrow", 860, 320);
+
+  const startSize = page.getByRole("slider", { name: "Start arrowhead size" });
+  const endSize = page.getByRole("slider", { name: "End arrowhead size" });
+
+  // A fresh arrow has an end head but no start head.
+  await expect(endSize).toBeEnabled();
+  await expect(startSize).toBeDisabled();
+
+  // Resizing the end head commits the new factor.
+  await endSize.fill("12");
+  await expect(endSize).toHaveValue("12");
+
+  // Removing the end head disables its size slider…
+  const endGroup = page.getByRole("radiogroup", { name: "End arrowhead" });
+  await endGroup.getByRole("radio", { name: "None" }).click();
+  await expect(endSize).toBeDisabled();
+
+  // …and adding a start head enables that one.
+  const startGroup = page.getByRole("radiogroup", { name: "Start arrowhead" });
+  await startGroup.getByRole("radio", { name: "Triangle" }).click();
+  await expect(startSize).toBeEnabled();
+});
