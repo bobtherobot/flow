@@ -10,9 +10,9 @@ test("dockable accordion replaces the Excalidraw island", async ({ page }) => {
   const panel = page.locator(".flow-pnl");
   await expect(panel).toBeVisible();
 
-  // Style / Stroke / Text / Align / Search / Layers sub-panels present, in order.
+  // Color / Stroke / Text / Align / Search / Layers sub-panels present, in order.
   const titles = page.locator(".flow-pnl-sub__title");
-  await expect(titles).toHaveText(["Style", "Stroke", "Text", "Align", "Search", "Layers"]);
+  await expect(titles).toHaveText(["Color", "Stroke", "Text", "Align", "Search", "Layers"]);
 
   // Excalidraw's context-aware properties island is suppressed.
   await expect(page.locator(".excalidraw .selected-shape-actions")).toHaveCount(0);
@@ -32,11 +32,11 @@ test("collapse persists across reload", async ({ page }) => {
 
 test("a sub-panel collapses its content", async ({ page }) => {
   await page.goto("/");
-  const styleSection = page.locator('.flow-pnl-sub[data-pid="style"]');
-  await expect(styleSection.locator(".flow-pnl-sub__content")).toBeVisible();
+  const colorSection = page.locator('.flow-pnl-sub[data-pid="color"]');
+  await expect(colorSection.locator(".flow-pnl-sub__content")).toBeVisible();
 
-  await styleSection.getByRole("button", { name: "Collapse" }).click();
-  await expect(styleSection.locator(".flow-pnl-sub__content")).toHaveCount(0);
+  await colorSection.getByRole("button", { name: "Collapse" }).click();
+  await expect(colorSection.locator(".flow-pnl-sub__content")).toHaveCount(0);
 });
 
 test("detach floats the whole panel", async ({ page }) => {

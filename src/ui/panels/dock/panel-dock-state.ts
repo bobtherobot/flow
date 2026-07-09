@@ -55,6 +55,17 @@ export const DEFAULT_DOCK_STATE: DockState = {
   panels: [],
 };
 
+/** Renames of persisted panel ids, so an existing layout keeps a panel's
+ *  position/visibility after it's renamed in code. `style` → `color` (the Style
+ *  panel became the Color panel). */
+const LEGACY_PANEL_ID_RENAMES: Record<string, string> = {
+  style: "color",
+};
+
+function renamePanelId(id: string): string {
+  return LEGACY_PANEL_ID_RENAMES[id] ?? id;
+}
+
 function makeSubPanel(id: string, order: number): SubPanelState {
   return {
     id,
@@ -116,7 +127,7 @@ export function normalizeDockState(raw: unknown): DockState {
       .filter((p): p is Record<string, unknown> => !!p && typeof p === "object")
       .filter((p) => typeof p.id === "string")
       .map((p, i) => {
-        const seed = makeSubPanel(p.id as string, i);
+        const seed = makeSubPanel(renamePanelId(p.id as string), i);
         return {
           ...seed,
           visible: typeof p.visible === "boolean" ? p.visible : seed.visible,

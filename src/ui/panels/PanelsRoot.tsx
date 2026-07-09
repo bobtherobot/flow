@@ -4,7 +4,7 @@ import type { PanelDef } from "./dock/panel-types";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { Unit } from "../../lib/units";
 import { useSelectionStyle } from "./useSelectionStyle";
-import { StylePanel } from "./StylePanel";
+import { ColorPanel } from "./ColorPanel";
 import { StrokePanel } from "./StrokePanel";
 import { TextPanel } from "./TextPanel";
 import { AlignPanel } from "./AlignPanel";
@@ -35,7 +35,7 @@ export function PanelsRoot({ api, units, search }: PanelsRootProps) {
   const sel = useSelectionStyle(api);
 
   const defs: PanelDef[] = [
-    { id: "style", label: "Style", render: () => <StylePanel sel={sel} /> },
+    { id: "color", label: "Color", render: () => <ColorPanel sel={sel} /> },
     { id: "stroke", label: "Stroke", render: () => <StrokePanel sel={sel} units={units} /> },
     { id: "text", label: "Text", render: () => <TextPanel sel={sel} /> },
     { id: "align", label: "Align", render: () => <AlignPanel sel={sel} /> },

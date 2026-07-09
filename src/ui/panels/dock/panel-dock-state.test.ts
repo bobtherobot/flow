@@ -64,6 +64,15 @@ describe("normalizeDockState", () => {
     expect(s.panels[0].visible).toBe(false);
     expect(s.panels[1].floatW).toBe(DOCK_LIMITS.MAX_W);
   });
+
+  it("migrates the legacy 'style' panel id to 'color', preserving position/state", () => {
+    const s = normalizeDockState({
+      panels: [{ id: "style", visible: false, order: 0 }, { id: "stroke", order: 1 }],
+    });
+    expect(s.panels.map((p) => p.id)).toEqual(["color", "stroke"]);
+    // Position (order) and per-panel state carry over to the renamed panel.
+    expect(s.panels[0]).toMatchObject({ id: "color", visible: false, order: 0 });
+  });
 });
 
 describe("dockReducer — main panel", () => {
