@@ -67,8 +67,8 @@ test("arrowhead size sliders track the arrowhead state", async ({ page }) => {
   await expect(startSize).toBeDisabled();
 
   // Resizing the end head commits the new factor.
-  await endSize.fill("12");
-  await expect(endSize).toHaveValue("12");
+  await endSize.fill("10");
+  await expect(endSize).toHaveValue("10");
 
   // Removing the end head disables its size slider…
   const endGroup = page.getByRole("radiogroup", { name: "End arrowhead" });
@@ -79,4 +79,19 @@ test("arrowhead size sliders track the arrowhead state", async ({ page }) => {
   const startGroup = page.getByRole("radiogroup", { name: "Start arrowhead" });
   await startGroup.getByRole("radio", { name: "Triangle" }).click();
   await expect(startSize).toBeEnabled();
+});
+
+test("arrowhead size is a new-arrow tool default", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+
+  // With nothing selected, the End size slider edits the tool default.
+  await page.keyboard.press("Escape");
+  const endSize = page.getByRole("slider", { name: "End arrowhead size" });
+  await expect(endSize).toBeEnabled();
+  await endSize.fill("10");
+
+  // A freshly drawn arrow inherits that default.
+  await drawWith(page, "Arrow", 860, 320);
+  await expect(page.getByRole("slider", { name: "End arrowhead size" })).toHaveValue("10");
 });

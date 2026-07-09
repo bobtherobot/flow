@@ -31,11 +31,27 @@ per-type constant. Added a per-element factor:
   selected linear elements; disabled when no linear selection or that head is
   "none"). Field not in the vendor .d.ts → read via a small cast.
 
-## Behavior note
-No appState `currentItem*ArrowheadSize`, so NEW arrows use the default factor (6);
-per-arrow sizing is set by selecting the arrow. Existing arrows re-size to the new
-stroke-relative model on load (undefined factor → default 6), a deliberate
-consequence of "proportional to stroke width".
+## New-arrow tool default (added 2026-07-09)
+Arrowhead size (and head TYPE) are now editable as tool defaults with an EMPTY
+selection, so new arrows inherit them:
+- Fork: added AppState `currentItemStartArrowheadSize`/`currentItemEndArrowheadSize`
+  (types.ts + appState.ts default 6 + APP_STATE_STORAGE_CONF browser:true). New
+  arrows pick them up — `newArrowElement` gained `start/endArrowheadSize` opts
+  (element/newElement.ts), passed from `this.state.currentItem*` in App.tsx's
+  linear-element creation (~L7715). Head TYPES already flowed via
+  currentItem*Arrowhead — only the UI was gated.
+- flow: `arrowDefaultsDisabled = hasSelection && !hasLinear` (disabled ONLY for a
+  non-linear selection; enabled on empty or linear). Head-type groups + size
+  sliders use it; the arrow TYPE row (sharp/round/elbow) still uses
+  `arrowsDisabled` (needs a selection — dispatches via executeAction). Size
+  slider reads/writes `currentItem*ArrowheadSize` (fallback) + the element.
+- Existing arrows still re-size to the stroke-relative model on load (undefined →
+  default 6).
+
+## Labels (cosmetic, 2026-07-09)
+Stroke panel visible labels: "Start"→**Tail**, "End"→**Head**. Text only — the
+aria-labels stay "Start/End arrowhead[ size]" and prop names unchanged (tests +
+a11y identifiers rely on them).
 
 ## Tests
 `SliderInput.test` hideValue case; `e2e/stroke-panel.spec.ts` "arrowhead size
