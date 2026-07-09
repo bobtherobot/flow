@@ -73,4 +73,15 @@ describe("MenuBar", () => {
     await user.click(item);
     expect(onToggleToolbar).toHaveBeenCalledOnce();
   });
+
+  it("toggles the bottom bar from the View menu", async () => {
+    const user = userEvent.setup();
+    const onToggleBottombar = vi.fn();
+    render(<MenuBar {...props} isBottombarVisible onToggleBottombar={onToggleBottombar} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    const item = await screen.findByRole("menuitemcheckbox", { name: "Show Bottom Bar" });
+    expect(item).toBeInTheDocument();
+    await user.click(item);
+    expect(onToggleBottombar).toHaveBeenCalledOnce();
+  });
 });
