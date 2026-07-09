@@ -10,7 +10,10 @@ import { Excalidraw, FONT_FAMILY } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 
 import { loadConfig } from "./app/config";
-import { getSloppiness, setSloppiness, getUnits, setUnits } from "./app/preferences";
+import {
+  getSloppiness, setSloppiness, getUnits, setUnits,
+  getToolbarState, setToolbarState,
+} from "./app/preferences";
 import { type Unit } from "./lib/units";
 import { IndexedDbProvider } from "./storage/indexeddb-provider";
 import type { DocumentSummary } from "./storage/types";
@@ -37,6 +40,8 @@ import { ensureExtension, stripExtension } from "./lib/filename";
 import { FLOW_DOCS_URL, FLOW_ISSUES_URL } from "./lib/links";
 import { MenuBar } from "./ui/menubar/MenuBar";
 import { PanelsRoot } from "./ui/panels/PanelsRoot";
+import { ToolBar } from "./ui/toolbar/ToolBar";
+import { type ToolbarState } from "./ui/toolbar/toolbar-state";
 import { SaveDialog } from "./ui/SaveDialog";
 import { OpenDialog } from "./ui/OpenDialog";
 import { PreferencesDialog } from "./ui/PreferencesDialog";
@@ -78,6 +83,13 @@ export default function App() {
     setUnitsState(next);
     setUnits(next);
   }, []);
+
+  // Tool-rail layout/config. App owns it so the View menu can read visibility;
+  // ToolBar mutates it via onChange. Persisted to flow.toolbar.
+  const [toolbar, setToolbar] = useState<ToolbarState>(() => getToolbarState());
+  useEffect(() => {
+    setToolbarState(toolbar);
+  }, [toolbar]);
 
   // Google Drive is wired in a later phase; sign-in is not available yet.
   const isGoogleConnected = false;
@@ -231,6 +243,8 @@ export default function App() {
         onZoomToFit={withApi(zoomToFit)}
         onResetZoom={withApi(resetZoom)}
         onToggleGrid={withApi(toggleGrid)}
+        isToolbarVisible={toolbar.visible}
+        onToggleToolbar={() => setToolbar((s) => ({ ...s, visible: !s.visible }))}
         onAbout={() => setAboutOpen(true)}
         onDocumentation={() => openExternal(FLOW_DOCS_URL)}
         onSubmitIssue={() => openExternal(FLOW_ISSUES_URL)}
@@ -240,7 +254,8 @@ export default function App() {
       <div
         style={{
           position: "fixed",
-          inset: "var(--flow-menubar-h) var(--flow-panel-reserved, 0px) 0 0",
+          inset:
+            "var(--flow-menubar-h) var(--flow-panel-reserved, 0px) 0 var(--flow-toolbar-reserved, 0px)",
         }}
       >
         <Excalidraw
@@ -262,6 +277,8 @@ export default function App() {
         />
         <PanelsRoot api={excalidrawApi} units={units} />
       </div>
+
+      <ToolBar api={excalidrawApi} state={toolbar} onChange={setToolbar} />
 
       {saveOpen && (
         <SaveDialog

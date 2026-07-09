@@ -16,6 +16,11 @@ export interface MenuBarProps {
   onZoomToFit: () => void;
   onResetZoom: () => void;
   onToggleGrid: () => void;
+  /** Whether the tool rail is currently shown (drives the View checkbox).
+   *  Optional so the tree builds before App wires it (Task 11); App always sets it. */
+  isToolbarVisible?: boolean;
+  /** Toggle the tool rail's visibility. */
+  onToggleToolbar?: () => void;
   onAbout: () => void;
   onDocumentation: () => void;
   onSubmitIssue: () => void;
@@ -164,6 +169,16 @@ export function MenuBar(props: MenuBarProps) {
             <Menubar.Item className="flow-menu__item" onSelect={props.onToggleGrid}>
               Toggle Grid
             </Menubar.Item>
+            <Menubar.CheckboxItem
+              className="flow-menu__item flow-menu__item--check"
+              checked={props.isToolbarVisible ?? true}
+              onCheckedChange={() => props.onToggleToolbar?.()}
+            >
+              <Menubar.ItemIndicator className="flow-menu__check" aria-hidden="true">
+                ✓
+              </Menubar.ItemIndicator>
+              Show Toolbar
+            </Menubar.CheckboxItem>
           </Menubar.Content>
         </Menubar.Portal>
       </Menubar.Menu>

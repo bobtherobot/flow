@@ -4,7 +4,7 @@ const OUT = "/tmp/claude-1000/-home-bob-projects-flow/97196cc9-5c01-4299-a65a-c3
 
 /** Draw a rectangle by dragging between two viewport points; leaves it selected. */
 async function drawRect(page: Page, x1: number, y1: number, x2: number, y2: number) {
-  await page.getByTestId("toolbar-rectangle").click({ force: true });
+  await page.getByRole("button", { name: "Rectangle" }).click();
   await page.mouse.move(x1, y1);
   await page.mouse.down();
   await page.mouse.move(x2, y2, { steps: 6 });
