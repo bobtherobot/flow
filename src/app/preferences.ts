@@ -4,6 +4,7 @@ import { normalizeToolbarState, type ToolbarState } from "../ui/toolbar/toolbar-
 import { normalizeQuickbarState, type QuickbarState } from "../ui/quickbar/quickbar-state";
 import { normalizeBottombarState, type BottombarState } from "../ui/bottombar/bottombar-state";
 import { DEFAULT_BINDING_MODE, isBindingMode, type BindingMode } from "../lib/binding-mode";
+import { DEFAULT_LASER_HEX, isLaserColor } from "../lib/laser-color";
 
 const SLOPPINESS_KEY = "flow.sloppiness";
 const UNITS_KEY = "flow.units";
@@ -125,6 +126,27 @@ export function getBindingMode(): BindingMode {
 export function setBindingMode(value: BindingMode): void {
   try {
     localStorage.setItem(BINDING_MODE_KEY, value);
+  } catch {
+    // Quota / disabled storage: preference simply won't persist this session.
+  }
+}
+
+const LASER_COLOR_KEY = "flow.laserColor";
+
+/** Read the global laser-pointer color (default opaque red on miss/corrupt). */
+export function getLaserColor(): string {
+  try {
+    const raw = localStorage.getItem(LASER_COLOR_KEY);
+    return isLaserColor(raw) ? raw : DEFAULT_LASER_HEX;
+  } catch {
+    return DEFAULT_LASER_HEX;
+  }
+}
+
+/** Persist the global laser-pointer color. */
+export function setLaserColor(color: string): void {
+  try {
+    localStorage.setItem(LASER_COLOR_KEY, color);
   } catch {
     // Quota / disabled storage: preference simply won't persist this session.
   }

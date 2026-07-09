@@ -4,9 +4,11 @@ import {
   getToolbarState, setToolbarState,
   getQuickbarState, setQuickbarState,
   getBindingMode, setBindingMode,
+  getLaserColor, setLaserColor,
 } from "./preferences";
 import { DEFAULT_TOOLBAR_STATE } from "../ui/toolbar/toolbar-state";
 import { DEFAULT_QUICKBAR_STATE } from "../ui/quickbar/quickbar-state";
+import { DEFAULT_LASER_HEX } from "../lib/laser-color";
 
 // Mock localStorage with a simple in-memory implementation
 const mockStorage: Record<string, string> = {};
@@ -133,5 +135,23 @@ describe("binding mode persistence", () => {
   it("falls back to on for a corrupt stored value", () => {
     localStorage.setItem("flow.bindingMode", "banana");
     expect(getBindingMode()).toBe("on");
+  });
+});
+
+describe("laser color preference", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("returns the default when unset", () => {
+    expect(getLaserColor()).toBe(DEFAULT_LASER_HEX);
+  });
+
+  it("round-trips a persisted color", () => {
+    setLaserColor("#3d5afe");
+    expect(getLaserColor()).toBe("#3d5afe");
+  });
+
+  it("falls back to the default on a corrupt value", () => {
+    localStorage.setItem("flow.laserColor", "not-a-color");
+    expect(getLaserColor()).toBe(DEFAULT_LASER_HEX);
   });
 });
