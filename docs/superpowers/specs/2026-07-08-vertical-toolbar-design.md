@@ -12,6 +12,11 @@ right. Like the controls panel, the tool bar must be **detachable** — the user
 tear it off and drag it around as a free-floating strip — and **closeable**, with
 visibility controlled from **Main menu ▸ View ▸ Show Toolbar**.
 
+It must also be **configurable** like the controls panel: a hamburger (≡) button
+on the rail opens a dropdown menu that lets the user **dock/undock** the rail and
+**show/hide individual tools** via a checkbox list. This mirrors the controls
+panel's `PanelConfigMenu` (dock/detach + per-sub-panel visibility).
+
 ## Approach
 
 A **flow-native vertical tool rail**, not a repositioning of Excalidraw's own DOM.
@@ -19,8 +24,9 @@ This mirrors exactly how flow already replaced the context-aware *properties*
 island (see `.claude/memory/left-panel-accordion.md`): hide the native widget with
 a CSS rule, and drive the same scene through the public imperative API.
 
-- The tool bar lives in flow's React tree, so tear-off/drag/close reuse flow's
-  existing panel infrastructure (`useDrag`) and render on-brand.
+- The tool bar lives in flow's React tree, so tear-off/drag/close and the config
+  menu reuse flow's existing panel infrastructure (`useDrag`, `clampMenuPosition`)
+  and render on-brand.
 - **Zero fork edits.** `setActiveTool` and `appState.activeTool` are already on the
   public `ExcalidrawImperativeAPI` (`vendor/excalidraw/.../types.ts:686`). No new
   export is needed — consistent with the flow fork strategy (rule #1: public API +
@@ -50,7 +56,8 @@ Rejected alternatives:
 - Docked: the rail is `position: fixed`, flush to the left edge, top-aligned below
   the menu bar. Symmetric with the right-docked controls panel.
 - Floating: the rail is absolutely positioned at a persisted `(x, y)`, dragged by
-  its grab handle; it re-docks when the handle is dropped near the left edge.
+  its top bar; it re-docks when the top bar is dropped near the left edge (or via
+  the config menu's Float/Dock toggle).
 
 ## Components
 
@@ -59,11 +66,12 @@ All under `src/ui/toolbar/` (feature-organized, small focused files):
 | File | Responsibility |
 |------|----------------|
 | `tools.ts` | Pure data. Ordered `TOOLS` list mirroring the native toolbar: selection, hand, rectangle, diamond, ellipse, arrow, line, freedraw, text, image, eraser, frame — each `{ type, label, shortcut }`. Plus the `lock` toggle descriptor. No React. |
-| `toolbar-state.ts` | Pure `getToolbarState()` / `setToolbarState(next)` over the `flow.toolbar` localStorage key `{ visible, floating, x, y }`. Follows the existing `getUnits`/`setUnits` pattern. Defaults: `{ visible: true, floating: false, x: 0, y: 0 }`. |
+| `toolbar-state.ts` | Pure `getToolbarState()` / `setToolbarState(next)` over the `flow.toolbar` localStorage key `{ visible, floating, x, y, hiddenTools }`. Follows the existing `getUnits`/`setUnits` pattern. Defaults: `{ visible: true, floating: false, x: 0, y: 0, hiddenTools: [] }`. `hiddenTools` is the list of tool `type`s the user has hidden from the rail. |
 | `useActiveTool.ts` | Hook subscribing to `api.onChange` (same shape as `useSelectionStyle`). Exposes `{ activeType, locked, setTool(type), toggleLock() }`, backed by `api.setActiveTool`. Re-renders the rail as the active tool changes (including via keyboard). |
 | `ToolButton.tsx` | One icon button. Active/pressed state from `activeType` / `locked`. Hand-rolled inline SVG icons (the AlignPanel/TextPanel convention — keeps icons fork-independent). |
-| `ToolBar.tsx` | The rail. Grab handle + close (✕) + the tool button column, with `lock` pinned at the bottom. Docked vs floating driven by `toolbar-state`. Reuses `useDrag` (`src/ui/panels/dock/useDrag.ts`) for tear-off; dropping the handle near the left edge re-docks (mirrors PanelShell's tear-off threshold, minus resize). |
-| `toolbar.css` | `--flow-*` tokens, matching `panels.css`. |
+| `ToolbarConfigMenu.tsx` | The hamburger dropdown. A **Float / Dock** toggle, a divider, then a checkbox list of every tool (including `lock`) driving `hiddenTools`. Anchored under the ≡ button and self-clamps into the viewport via the shared `clampMenuPosition` (`src/ui/panels/dock/menu-position.ts`) measured in a `useLayoutEffect` — the exact pattern `PanelConfigMenu` uses. |
+| `ToolBar.tsx` | The rail. A top bar (hamburger ≡ + close ✕) that doubles as the drag surface, then the tool button column with `lock` pinned at the bottom. Renders only tools whose `type` is not in `hiddenTools`. Docked vs floating driven by `toolbar-state`. Reuses `useDrag` (`src/ui/panels/dock/useDrag.ts`) for tear-off; dropping the top bar near the left edge re-docks (mirrors PanelShell's tear-off threshold, minus resize). |
+| `toolbar.css` | `--flow-*` tokens, matching `panels.css`; reuses the `.flow-pnl__menu*` dropdown aesthetic for the config menu. |
 
 ### Tool order & orientation
 
@@ -107,30 +115,41 @@ The `lock` toggle is pinned at the bottom of the rail, visually separated.
 - **Keyboard shortcuts** — continue to work natively at the canvas level (r, o, a,
   …). The rail reflects the resulting tool change through the subscription; flow
   does not re-implement shortcut handling.
-- **Detach / drag** — dragging the grab handle tears the rail off into a
-  free-floating strip that follows the cursor and drops anywhere. Dragging the
-  handle back near the left edge re-docks it. Orientation stays vertical in both
-  states.
+- **Detach / drag** — dragging the top bar tears the rail off into a
+  free-floating strip that follows the cursor and drops anywhere. Dragging it back
+  near the left edge re-docks it. Orientation stays vertical in both states.
+- **Config menu (hamburger ≡)** — opens `ToolbarConfigMenu`:
+  - **Float / Dock** — toggles `floating` (same effect as drag tear-off / re-dock),
+    so docking is reachable without dragging.
+  - **Per-tool checkboxes** — one row per tool (and `lock`); unchecking adds the
+    tool `type` to `hiddenTools` and removes its button from the rail, checking
+    restores it. Changes are immediate and persisted.
 - **Close** — the ✕ button hides the rail. Reopen via View ▸ Show Toolbar.
-- **Persistence** — visibility and float position (`{ visible, floating, x, y }`)
-  persist to `flow.toolbar` and restore across reload.
+- **Persistence** — visibility, float position, and the hidden-tool set
+  (`{ visible, floating, x, y, hiddenTools }`) persist to `flow.toolbar` and
+  restore across reload.
 
 ## Testing
 
 - **Unit**
   - `tools.ts` — tool list integrity (expected types, order, lock present).
-  - `toolbar-state.ts` — get/set round-trip, defaults when key absent, tolerant of
-    malformed JSON.
+  - `toolbar-state.ts` — get/set round-trip (incl. `hiddenTools`), defaults when
+    key absent, tolerant of malformed JSON.
   - `useActiveTool.ts` — with a mocked api: `setTool` calls `setActiveTool`,
     `toggleLock` flips `locked`, `activeType` tracks `appState.activeTool`. Must
     `vi.mock("@excalidraw/excalidraw")` (same jsdom gotcha as
     `useSelectionStyle.test.tsx`).
-- **Component (RTL)** — `ToolBar`: renders all tool buttons, click dispatches
-  `setActiveTool`, active highlight follows `activeType`, lock toggles, ✕ hides.
+- **Component (RTL)**
+  - `ToolBar`: renders visible tool buttons, click dispatches `setActiveTool`,
+    active highlight follows `activeType`, lock toggles, ✕ hides; a tool in
+    `hiddenTools` is not rendered.
+  - `ToolbarConfigMenu`: Float/Dock toggles `floating`, unchecking a tool calls the
+    hide callback, the menu self-clamps (position from `clampMenuPosition`).
 - **E2E** (`e2e/toolbar.spec.ts`) — rail renders on the left; select rectangle then
-  draw → a shape appears; **View ▸ Show Toolbar** toggles visibility and the state
-  persists across reload; tear-off floats the rail. Honors the project e2e gotchas
-  (fresh context per test, no `addInitScript` localStorage clearing).
+  draw → a shape appears; **View ▸ Show Toolbar** toggles visibility and persists
+  across reload; tear-off floats the rail; the hamburger hides a tool and the
+  choice persists across reload. Honors the project e2e gotchas (fresh context per
+  test, no `addInitScript` localStorage clearing).
 
 ## Fork footprint
 
@@ -139,6 +158,8 @@ components, and public-API tool dispatch.
 
 ## Out of scope
 
-- Reordering tools or a customizable tool set (mirror the native set for now).
+- **Reordering** tools within the rail (show/hide is in scope; drag-to-reorder is
+  not).
 - Horizontal orientation when floating (stays vertical).
 - Making the rail a first-class member of the right-side accordion dock.
+- Per-tool config beyond visibility (e.g. custom groupings, saved tool presets).
