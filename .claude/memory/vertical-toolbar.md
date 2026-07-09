@@ -13,6 +13,11 @@ Spec/plan: `docs/superpowers/specs|plans/2026-07-08-vertical-toolbar*.md`.
   effect, mounts `<ToolBar>`, insets the canvas left by `--flow-toolbar-reserved`.
 - MenuBar: View ▸ Show Toolbar (`Menubar.CheckboxItem`).
 - Native island hidden via `index.css` `.App-toolbar-container { display:none }`.
+- Laser pointer added as a rail tool (2026-07-08): `"laser"` is the LAST entry
+  in `TOOLS` (shortcut `K`, label "Laser pointer") + a `laser` icon in
+  `TOOL_ICONS`. No other code touched — selection/highlight/config-menu/persist
+  all derive from `TOOLS`. Dispatches `setActiveTool({type:"laser"})` (public
+  API, zero fork edits). Spec/plan: `docs/superpowers/{specs,plans}/2026-07-08-laser-tool-rail*.md`.
 
 ## Key facts
 - ZERO fork edits — `setActiveTool`/`appState.activeTool` are public API.
