@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useNumberField } from "./useNumberField";
 
 interface SliderInputProps {
   /** Current value in display units, or null when the selection is mixed. */
@@ -16,14 +16,12 @@ interface SliderInputProps {
   hideValue?: boolean;
 }
 
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
 /**
  * A range slider paired with a numeric field and an optional unit suffix. The
  * shared primitive behind stroke width and opacity. `null` renders an empty
- * field (mixed selection) with the slider parked at `min`. The field is
- * loosely controlled so the user can type freely; every parse-able, in-range
- * value commits via `onChange`.
+ * field (mixed selection) with the slider parked at `min`. Dragging the slider
+ * commits live (a deliberate gesture); the numeric field commits only on blur or
+ * Enter so it doesn't churn while typing.
  */
 export function SliderInput({
   value,
@@ -36,19 +34,7 @@ export function SliderInput({
   disabled = false,
   hideValue = false,
 }: SliderInputProps) {
-  const [text, setText] = useState(value === null ? "" : String(value));
-  const focused = useRef(false);
-
-  // Reflect external value changes unless the user is mid-edit.
-  useEffect(() => {
-    if (!focused.current) setText(value === null ? "" : String(value));
-  }, [value]);
-
-  const commit = (raw: string) => {
-    setText(raw);
-    const n = Number(raw);
-    if (raw.trim() !== "" && Number.isFinite(n)) onChange(clamp(n, min, max));
-  };
+  const field = useNumberField({ value, min, max, onChange });
 
   return (
     <div className="flow-ctl-slider" aria-disabled={disabled || undefined}>
@@ -61,11 +47,7 @@ export function SliderInput({
         step={step}
         value={value ?? min}
         disabled={disabled}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          setText(String(n));
-          onChange(n);
-        }}
+        onChange={(e) => onChange(Number(e.target.value))}
       />
       {!hideValue && (
       <div className="flow-ctl-slider__field">
@@ -76,16 +58,12 @@ export function SliderInput({
           min={min}
           max={max}
           step={step}
-          value={text}
+          value={field.text}
           disabled={disabled}
-          onFocus={() => {
-            focused.current = true;
-          }}
-          onBlur={() => {
-            focused.current = false;
-            setText(value === null ? "" : String(value));
-          }}
-          onChange={(e) => commit(e.target.value)}
+          onFocus={field.onFocus}
+          onBlur={field.onBlur}
+          onChange={field.onChange}
+          onKeyDown={field.onKeyDown}
         />
         {unit && <span className="flow-ctl-slider__unit">{unit}</span>}
       </div>

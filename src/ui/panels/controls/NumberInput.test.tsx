@@ -15,22 +15,45 @@ describe("NumberInput", () => {
     expect(screen.getByLabelText("Font size value")).toHaveValue(null);
   });
 
-  it("commits a typed number, clamped to range", async () => {
+  it("does not commit while typing, only on Enter", async () => {
     const onChange = vi.fn();
     render(<NumberInput value={20} min={1} max={999} onChange={onChange} ariaLabel="Font size value" />);
     const field = screen.getByLabelText("Font size value");
     await userEvent.clear(field);
     await userEvent.type(field, "24");
-    expect(onChange).toHaveBeenLastCalledWith(24);
+    expect(onChange).not.toHaveBeenCalled(); // still editing
+    await userEvent.keyboard("{Enter}");
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(24);
   });
 
-  it("clamps below the minimum", async () => {
+  it("commits on blur", async () => {
     const onChange = vi.fn();
     render(<NumberInput value={20} min={1} max={999} onChange={onChange} ariaLabel="Font size value" />);
     const field = screen.getByLabelText("Font size value");
     await userEvent.clear(field);
-    await userEvent.type(field, "0");
+    await userEvent.type(field, "24");
+    await userEvent.tab();
+    expect(onChange).toHaveBeenLastCalledWith(24);
+  });
+
+  it("clamps below the minimum on commit", async () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={20} min={1} max={999} onChange={onChange} ariaLabel="Font size value" />);
+    const field = screen.getByLabelText("Font size value");
+    await userEvent.clear(field);
+    await userEvent.type(field, "0{Enter}");
     expect(onChange).toHaveBeenLastCalledWith(1);
+  });
+
+  it("reverts to the current value on Escape without committing", async () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={20} min={1} max={999} onChange={onChange} ariaLabel="Font size value" />);
+    const field = screen.getByLabelText("Font size value");
+    await userEvent.clear(field);
+    await userEvent.type(field, "99{Escape}");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(field).toHaveValue(20);
   });
 
   it("reflects an external value change when not focused", () => {

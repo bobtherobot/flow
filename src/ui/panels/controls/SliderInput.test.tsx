@@ -15,16 +15,28 @@ describe("SliderInput", () => {
     expect(screen.getByLabelText("Stroke width value")).toHaveValue(null);
   });
 
-  it("commits a typed number, clamped to range", async () => {
+  it("commits the numeric field only on Enter, clamped to range", async () => {
     const onChange = vi.fn();
     render(<SliderInput value={4} min={0} max={20} onChange={onChange} ariaLabel="Stroke width" />);
     const field = screen.getByLabelText("Stroke width value");
     await userEvent.clear(field);
     await userEvent.type(field, "50");
+    expect(onChange).not.toHaveBeenCalled(); // still editing
+    await userEvent.keyboard("{Enter}");
     expect(onChange).toHaveBeenLastCalledWith(20); // clamped to max
   });
 
-  it("commits when the range slider moves", () => {
+  it("commits the numeric field on blur", async () => {
+    const onChange = vi.fn();
+    render(<SliderInput value={4} min={0} max={20} onChange={onChange} ariaLabel="Stroke width" />);
+    const field = screen.getByLabelText("Stroke width value");
+    await userEvent.clear(field);
+    await userEvent.type(field, "12");
+    await userEvent.tab();
+    expect(onChange).toHaveBeenLastCalledWith(12);
+  });
+
+  it("commits live when the range slider moves", () => {
     const onChange = vi.fn();
     render(<SliderInput value={4} min={0} max={100} onChange={onChange} ariaLabel="Stroke width" />);
     const range = screen.getByRole("slider", { name: "Stroke width" });

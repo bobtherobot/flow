@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useNumberField } from "./useNumberField";
 
 interface NumberInputProps {
   /** Current value, or null when the selection is mixed (renders empty). */
@@ -13,13 +13,10 @@ interface NumberInputProps {
   disabled?: boolean;
 }
 
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
 /**
- * A standalone numeric field (no slider). Loosely controlled so the user can
- * type freely; every parse-able, in-range value commits via `onChange`. `null`
- * renders empty (mixed selection). The field reflects external value changes
- * unless the user is mid-edit.
+ * A standalone numeric field (no slider). `null` renders empty (mixed
+ * selection). The typed value only commits via `onChange` on blur or Enter (not
+ * per keystroke); Escape reverts. Reflects external value changes when idle.
  */
 export function NumberInput({
   value,
@@ -31,18 +28,7 @@ export function NumberInput({
   ariaLabel,
   disabled = false,
 }: NumberInputProps) {
-  const [text, setText] = useState(value === null ? "" : String(value));
-  const focused = useRef(false);
-
-  useEffect(() => {
-    if (!focused.current) setText(value === null ? "" : String(value));
-  }, [value]);
-
-  const commit = (raw: string) => {
-    setText(raw);
-    const n = Number(raw);
-    if (raw.trim() !== "" && Number.isFinite(n)) onChange(clamp(n, min, max));
-  };
+  const field = useNumberField({ value, min, max, onChange });
 
   return (
     <div className="flow-ctl-num" aria-disabled={disabled || undefined}>
@@ -53,16 +39,12 @@ export function NumberInput({
         min={Number.isFinite(min) ? min : undefined}
         max={Number.isFinite(max) ? max : undefined}
         step={step}
-        value={text}
+        value={field.text}
         disabled={disabled}
-        onFocus={() => {
-          focused.current = true;
-        }}
-        onBlur={() => {
-          focused.current = false;
-          setText(value === null ? "" : String(value));
-        }}
-        onChange={(e) => commit(e.target.value)}
+        onFocus={field.onFocus}
+        onBlur={field.onBlur}
+        onChange={field.onChange}
+        onKeyDown={field.onKeyDown}
       />
       {unit && <span className="flow-ctl-num__unit">{unit}</span>}
     </div>
