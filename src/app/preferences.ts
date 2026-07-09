@@ -2,6 +2,7 @@ import { DEFAULT_SLOPPINESS, isSloppiness, type Sloppiness } from "../lib/roughn
 import { DEFAULT_UNIT, isUnit, type Unit } from "../lib/units";
 import { normalizeToolbarState, type ToolbarState } from "../ui/toolbar/toolbar-state";
 import { normalizeQuickbarState, type QuickbarState } from "../ui/quickbar/quickbar-state";
+import { normalizeBottombarState, type BottombarState } from "../ui/bottombar/bottombar-state";
 import { DEFAULT_BINDING_MODE, isBindingMode, type BindingMode } from "../lib/binding-mode";
 
 const SLOPPINESS_KEY = "flow.sloppiness";
@@ -94,6 +95,18 @@ export function getQuickbarState(): QuickbarState {
 /** Persist the quick-actions-bar state. */
 export function setQuickbarState(value: QuickbarState): void {
   writeJson(QUICKBAR_KEY, value);
+}
+
+const BOTTOMBAR_KEY = "flow.bottombar";
+
+/** Read the persisted bottom-bar state, normalized (default on miss/parse error). */
+export function getBottombarState(): BottombarState {
+  return normalizeBottombarState(readJson(BOTTOMBAR_KEY));
+}
+
+/** Persist the bottom-bar state. */
+export function setBottombarState(value: BottombarState): void {
+  writeJson(BOTTOMBAR_KEY, value);
 }
 
 const BINDING_MODE_KEY = "flow.bindingMode";

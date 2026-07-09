@@ -38,14 +38,19 @@ body,
 }
 
 /*
- * flow does not use Excalidraw's shape library. Hide the Library trigger button
- * (top-right) and the docked library panel it opens. `.default-sidebar-trigger`
- * and `.default-sidebar` are the stable classes from vendor DefaultSidebar.tsx;
- * hiding the trigger removes the entry point, and hiding the panel covers a
- * previously-docked state persisted in localStorage. Degrades gracefully.
+ * flow does not use Excalidraw's shape library, but the SAME default sidebar
+ * hosts the canvas search (Ctrl+F / flow's bottom-bar search). So hide the
+ * Library trigger button (top-right) outright, but only hide the sidebar panel
+ * when it is NOT showing search — keyed on the presence of the search input
+ * wrapper via `:has()`. This suppresses the library panel while letting the
+ * search sidebar appear. `.default-sidebar-trigger` / `.default-sidebar` /
+ * `.layer-ui__search-inputWrapper` are stable vendor classes; degrades
+ * gracefully.
  */
-.excalidraw .default-sidebar-trigger,
-.excalidraw .default-sidebar {
+.excalidraw .default-sidebar-trigger {
+  display: none;
+}
+.excalidraw .default-sidebar:not(:has(.layer-ui__search-inputWrapper)) {
   display: none;
 }
 
@@ -82,11 +87,14 @@ body,
 }
 
 /*
- * flow moves undo/redo into its own quick-actions bar (src/ui/quickbar), so
- * Excalidraw's bottom-left undo/redo cluster is redundant. `.undo-redo-buttons`
- * is the stable wrapper from vendor Actions.tsx (UndoRedoActions); hiding it
- * leaves the adjacent zoom controls untouched and degrades gracefully.
+ * flow relocates the entire bottom-left footer into its own chrome: undo/redo
+ * live in the quick-actions bar (src/ui/quickbar) and zoom lives in the bottom
+ * bar (src/ui/bottombar). `.App-menu_bottom` is the stable footer wrapper from
+ * vendor Footer.tsx; hiding it removes the redundant zoom/undo cluster. The
+ * footer's exit-zen-mode button goes with it, but the bottom bar's zen toggle
+ * (which stays visible in zen mode as it lives outside the Excalidraw tree)
+ * covers exiting zen. Degrades gracefully if the class ever changes.
  */
-.excalidraw .undo-redo-buttons {
+.excalidraw .App-menu_bottom {
   display: none;
 }

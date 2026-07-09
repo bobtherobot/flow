@@ -14,6 +14,7 @@ import {
   getSloppiness, setSloppiness, getUnits, setUnits,
   getToolbarState, setToolbarState,
   getQuickbarState, setQuickbarState,
+  getBottombarState, setBottombarState,
   getBindingMode, setBindingMode,
 } from "./app/preferences";
 import { type Unit } from "./lib/units";
@@ -47,6 +48,8 @@ import { ToolBar } from "./ui/toolbar/ToolBar";
 import { type ToolbarState } from "./ui/toolbar/toolbar-state";
 import { QuickBar } from "./ui/quickbar/QuickBar";
 import { type QuickbarState } from "./ui/quickbar/quickbar-state";
+import { BottomBar } from "./ui/bottombar/BottomBar";
+import { type BottombarState } from "./ui/bottombar/bottombar-state";
 import { SaveDialog } from "./ui/SaveDialog";
 import { OpenDialog } from "./ui/OpenDialog";
 import { PreferencesDialog } from "./ui/PreferencesDialog";
@@ -102,6 +105,13 @@ export default function App() {
   useEffect(() => {
     setQuickbarState(quickbar);
   }, [quickbar]);
+
+  // Bottom bar (grid/zen/zoom/background/search). Same ownership pattern; App
+  // owns it so the View menu can read visibility. Persisted to flow.bottombar.
+  const [bottombar, setBottombar] = useState<BottombarState>(() => getBottombarState());
+  useEffect(() => {
+    setBottombarState(bottombar);
+  }, [bottombar]);
 
   // Persistent arrow-binding lock. Applied to Excalidraw's appState below so the
   // fork's isBindingEnabled selector honors it over the transient per-input flag.
@@ -276,6 +286,8 @@ export default function App() {
         onToggleToolbar={() => setToolbar((s) => ({ ...s, visible: !s.visible }))}
         isQuickbarVisible={quickbar.visible}
         onToggleQuickbar={() => setQuickbar((s) => ({ ...s, visible: !s.visible }))}
+        isBottombarVisible={bottombar.visible}
+        onToggleBottombar={() => setBottombar((s) => ({ ...s, visible: !s.visible }))}
         onAbout={() => setAboutOpen(true)}
         onDocumentation={() => openExternal(FLOW_DOCS_URL)}
         onSubmitIssue={() => openExternal(FLOW_ISSUES_URL)}
@@ -322,6 +334,8 @@ export default function App() {
         bindingMode={bindingMode}
         onSetBindingMode={handleSetBindingMode}
       />
+
+      <BottomBar api={excalidrawApi} state={bottombar} onChange={setBottombar} />
 
       {saveOpen && (
         <SaveDialog

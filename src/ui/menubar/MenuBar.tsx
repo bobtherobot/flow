@@ -25,6 +25,10 @@ export interface MenuBarProps {
   isQuickbarVisible?: boolean;
   /** Toggle the quick-actions bar's visibility. */
   onToggleQuickbar?: () => void;
+  /** Whether the bottom bar is currently shown (drives the View checkbox). */
+  isBottombarVisible?: boolean;
+  /** Toggle the bottom bar's visibility. */
+  onToggleBottombar?: () => void;
   onAbout: () => void;
   onDocumentation: () => void;
   onSubmitIssue: () => void;
@@ -192,6 +196,16 @@ export function MenuBar(props: MenuBarProps) {
                 ✓
               </Menubar.ItemIndicator>
               Show Quick Actions
+            </Menubar.CheckboxItem>
+            <Menubar.CheckboxItem
+              className="flow-menu__item flow-menu__item--check"
+              checked={props.isBottombarVisible ?? true}
+              onCheckedChange={() => props.onToggleBottombar?.()}
+            >
+              <Menubar.ItemIndicator className="flow-menu__check" aria-hidden="true">
+                ✓
+              </Menubar.ItemIndicator>
+              Show Bottom Bar
             </Menubar.CheckboxItem>
           </Menubar.Content>
         </Menubar.Portal>

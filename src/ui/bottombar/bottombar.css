@@ -1,0 +1,174 @@
+/* src/ui/bottombar/bottombar.css
+ * Flow-native horizontal bottom bar. Built on the shared --flow-* tokens
+ * (defined in menubar.css). Docks bottom-left (clearing the tool rail) as its
+ * own floating-style pill; tears off to float anywhere. The config dropdown
+ * reuses .flow-pnl-config* (panels.css). */
+
+.flow-bottombar {
+  position: fixed;
+  z-index: 101;
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 6px;
+  gap: 2px;
+  font-family: var(--flow-font);
+  color: var(--flow-ink);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-md);
+  box-shadow: var(--flow-shadow);
+  max-width: calc(100vw - 16px);
+  /* Must NOT clip: the ColorSwatch popover is absolutely positioned inside the
+     bar. `overflow-x: auto` would force overflow-y to clip too (a CSS gotcha)
+     and swallow the popover, so keep the bar a non-clipping container. The bar
+     hugs its compact, curated content, so horizontal scroll isn't needed. */
+  overflow: visible;
+}
+
+/* Leading drag handle: hamburger + close + grip. */
+.flow-bottombar__handle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  height: 100%;
+  padding-right: 4px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.flow-bottombar__grip {
+  color: var(--flow-ink-disabled);
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: -2px;
+  padding: 0 2px;
+}
+.flow-bottombar__iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--flow-ink-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--flow-radius-sm);
+}
+.flow-bottombar__iconbtn:hover {
+  background: var(--flow-hover);
+  color: var(--flow-ink);
+}
+
+/* Item row. */
+.flow-bottombar__items {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  height: 100%;
+}
+.flow-bottombar__cell {
+  display: inline-flex;
+  align-items: center;
+}
+.flow-bottombar__sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--flow-border);
+  flex-shrink: 0;
+}
+.flow-bottombar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: var(--flow-radius-sm);
+  background: transparent;
+  color: var(--flow-ink);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--flow-dur-fast) var(--flow-ease),
+    color var(--flow-dur-fast) var(--flow-ease);
+}
+.flow-bottombar__btn:hover {
+  background: var(--flow-hover);
+}
+.flow-bottombar__btn[data-active] {
+  background: var(--flow-active);
+  color: var(--flow-accent);
+}
+
+/* Zoom cluster: − [pct] +. */
+.flow-bottombar__zoom {
+  display: inline-flex;
+  align-items: center;
+}
+.flow-bottombar__zoom-pct {
+  min-width: 46px;
+  height: 30px;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--flow-radius-sm);
+  background: transparent;
+  color: var(--flow-ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.flow-bottombar__zoom-pct:hover {
+  background: var(--flow-hover);
+}
+
+/* Canvas-background swatch: reuses ColorSwatch; its popover opens upward here
+   because the bar sits at the bottom of the viewport. */
+.flow-bottombar__bg {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+}
+.flow-bottombar .flow-ctl-color__popover {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+/* Inline search: input + magnify button. */
+.flow-bottombar__search {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 2px;
+}
+.flow-bottombar__search-input {
+  width: 130px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-sm);
+  background: var(--flow-input-bg, var(--flow-panel-bg));
+  color: var(--flow-ink);
+  font-family: var(--flow-font);
+  font-size: 12px;
+}
+.flow-bottombar__search-input:focus {
+  outline: none;
+  border-color: var(--flow-accent);
+}
+.flow-bottombar__search-input::placeholder {
+  color: var(--flow-ink-disabled);
+}
+
+/* Config dropdown: section headings + scroll when tall. */
+.flow-bottombar-config {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
