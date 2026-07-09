@@ -88,6 +88,12 @@ export const TOOL_ICONS: Record<ToolId | typeof LOCK_ID, ReactNode> = {
       <path d="M6 3v14M14 3v14M3 6h14M3 14h14" />
     </Svg>
   ),
+  laser: (
+    <Svg>
+      <path d="M13 4l3 3-7 7-3 1 1-3z" />
+      <path d="M4 4l2.5 2.5M4 9h2.5M9 4v2.5" />
+    </Svg>
+  ),
   [LOCK_ID]: (
     <Svg>
       <rect x="5" y="9" width="10" height="7" rx="1" />
