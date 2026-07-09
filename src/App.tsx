@@ -16,6 +16,7 @@ import {
   getQuickbarState, setQuickbarState,
   getBottombarState, setBottombarState,
   getBindingMode, setBindingMode,
+  getLaserColor, setLaserColor,
 } from "./app/preferences";
 import { type Unit } from "./lib/units";
 import { type BindingMode } from "./lib/binding-mode";
@@ -152,6 +153,20 @@ export default function App() {
       appState: { bindingMode },
     } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
   }, [excalidrawApi, bindingMode]);
+
+  const [laserColor, setLaserColorState] = useState<string>(() => getLaserColor());
+  const handleChangeLaserColor = useCallback((next: string) => {
+    setLaserColorState(next);
+    setLaserColor(next);
+  }, []);
+  // Push the color into appState whenever it changes or the API becomes ready.
+  // laserColor isn't in the vendor .d.ts yet (fork addition) so cast the arg.
+  useEffect(() => {
+    if (!excalidrawApi) return;
+    excalidrawApi.updateScene({
+      appState: { laserColor },
+    } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
+  }, [excalidrawApi, laserColor]);
 
   // Google Drive is wired in a later phase; sign-in is not available yet.
   const isGoogleConnected = false;
@@ -343,10 +358,11 @@ export default function App() {
               // it immediately (an effect-driven apply races initialData restore).
               // bindingMode is a fork addition not yet in the vendor .d.ts.
               bindingMode,
+              laserColor,
             },
           } as ComponentProps<typeof Excalidraw>["initialData"]}
         />
-        <PanelsRoot api={excalidrawApi} units={units} search={search} />
+        <PanelsRoot api={excalidrawApi} units={units} search={search} onChangeLaserColor={handleChangeLaserColor} />
       </div>
 
       <ToolBar api={excalidrawApi} state={toolbar} onChange={setToolbar} />
