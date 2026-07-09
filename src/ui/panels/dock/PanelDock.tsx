@@ -21,6 +21,10 @@ interface PanelDockProps {
   defs: PanelDef[];
   /** Height (px) of the menu bar the dock sits below. */
   topOffset?: number;
+  /** External "reveal this panel" trigger. Each time `nonce` increments the
+   *  named panel is made visible + expanded and the dock un-collapsed. Used by
+   *  the bottom-bar search to auto-open the Search panel. */
+  openPanel?: { id: string; nonce: number };
 }
 
 function initDockState(ids: string[]): DockState {
@@ -33,12 +37,22 @@ function initDockState(ids: string[]): DockState {
  * each interaction (matching draw's save-on-commit model rather than writing
  * localStorage on every drag frame).
  */
-export function PanelDock({ defs, topOffset = 36 }: PanelDockProps) {
+export function PanelDock({ defs, topOffset = 36, openPanel }: PanelDockProps) {
   const ids = defs.map((d) => d.id);
   const idsKey = ids.join("|");
 
   const [state, dispatch] = useReducer(dockReducer, ids, initDockState);
   const [layoutsOpen, setLayoutsOpen] = useState(false);
+
+  // Reveal a panel when an external trigger fires (nonce increments). Skips the
+  // initial 0 nonce so a page load doesn't force-open anything.
+  const openId = openPanel?.id;
+  const openNonce = openPanel?.nonce ?? 0;
+  useEffect(() => {
+    if (openId && openNonce > 0) {
+      dispatch({ type: "openSub", id: openId });
+    }
+  }, [openId, openNonce]);
 
   // Reconcile if the registered panel set changes (rare; ids are static today).
   useEffect(() => {

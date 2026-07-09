@@ -38,51 +38,15 @@ body,
 }
 
 /*
- * flow does not use Excalidraw's shape library, but the SAME default sidebar
- * hosts the canvas search (Ctrl+F / flow's bottom-bar search). So hide the
- * Library trigger button (top-right) outright, but only hide the sidebar panel
- * when it is NOT showing search — keyed on the presence of the search input
- * wrapper via `:has()`. This suppresses the library panel while letting the
- * search sidebar appear. `.default-sidebar-trigger` / `.default-sidebar` /
- * `.layer-ui__search-inputWrapper` are stable vendor classes; degrades
- * gracefully.
+ * flow uses neither Excalidraw's shape library nor its built-in search sidebar:
+ * search lives in flow's own Search sub-panel (src/ui/panels/SearchPanel), and
+ * Ctrl/Cmd+F is intercepted (App.tsx) before Excalidraw's shortcut fires. So the
+ * default sidebar (which hosts both library and native search) is hidden wholesale,
+ * along with its top-right Library trigger. `.default-sidebar-trigger` /
+ * `.default-sidebar` are stable vendor classes; degrades gracefully.
  */
-.excalidraw .default-sidebar-trigger {
-  display: none;
-}
-.excalidraw .default-sidebar:not(:has(.layer-ui__search-inputWrapper)) {
-  display: none;
-}
-
-/*
- * When the search sidebar IS showing, pin it as a fixed overlay just to the
- * LEFT of flow's docked controls panel. Docked, it renders inside the
- * `overflow: hidden` excalidraw container and gets clipped / squeezed between
- * the canvas and flow's panel (effectively invisible on narrow layouts). Fixed
- * positioning takes it out of that clip so it's always fully visible; `right`
- * tracks the panel's reserved width so the two sit side by side (falls back to
- * the viewport edge when the panel is closed/floating). `--flow-menubar-h` /
- * `--flow-panel-reserved` are flow-published; the docked-sidebar width var is
- * Excalidraw's own.
- */
-.excalidraw .default-sidebar:has(.layer-ui__search-inputWrapper) {
-  position: fixed;
-  top: var(--flow-menubar-h, 36px);
-  right: var(--flow-panel-reserved, 0px);
-  bottom: 0;
-  height: auto;
-  z-index: 150;
-  border-left: 1px solid var(--flow-border);
-  box-shadow: var(--flow-shadow);
-}
-
-/*
- * Hide the Library tab in the search sidebar's tab strip — flow has no library,
- * so search is the only meaningful tab. The trigger is targeted by its stable
- * Radix `aria-controls` suffix (the id prefix is auto-generated). Its content
- * panel is already suppressed by the `:has()` rule above.
- */
-.excalidraw .sidebar-tab-trigger[aria-controls$="-content-library"] {
+.excalidraw .default-sidebar-trigger,
+.excalidraw .default-sidebar {
   display: none;
 }
 

@@ -64,18 +64,10 @@ describe("useBottomActions", () => {
     expect(api.updateScene).toHaveBeenCalled();
   });
 
-  it("opens the search sidebar on runSearch", () => {
-    const api = fakeApi();
-    const { result } = renderHook(() => useBottomActions(api));
-    result.current.runSearch("");
-    expect(api.executeAction).toHaveBeenCalledWith("searchMenu");
-  });
-
   it("is inert with a null api", () => {
     const { result } = renderHook(() => useBottomActions(null));
     expect(result.current.zoomPct).toBe(100);
     expect(result.current.background).toBe("#ffffff");
     expect(() => result.current.zoomIn()).not.toThrow();
-    expect(() => result.current.runSearch("x")).not.toThrow();
   });
 });

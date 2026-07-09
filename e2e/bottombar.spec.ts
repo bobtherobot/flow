@@ -60,16 +60,19 @@ test.describe("bottom bar", () => {
     );
   });
 
-  test("executing a search opens the native search sidebar pre-filled", async ({ page }) => {
+  test("executing a search opens the flow Search sub-panel with the query", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("searchbox", { name: "Search canvas" }).fill("hello");
+    await page.waitForSelector(".flow-pnl");
+    await page.getByRole("searchbox", { name: "Search canvas", exact: true }).fill("hello");
     await page.getByRole("button", { name: "Run search" }).click();
-    // The native search sidebar becomes visible, driven by the query (proves the
-    // bridge: value set + input event so Excalidraw's search engine runs — and
-    // that flow un-hides the default sidebar for search).
-    const nativeInput = page.locator(".layer-ui__search-inputWrapper input");
-    await expect(nativeInput).toBeVisible();
-    await expect(nativeInput).toHaveValue("hello");
+
+    // The flow-native Search sub-panel opens in the controls dock, pre-filled.
+    const panel = page.locator(".flow-search-panel");
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole("searchbox", { name: "Search canvas text" })).toHaveValue("hello");
+    // No canvas text → "No matches"; the native Excalidraw sidebar stays hidden.
+    await expect(panel.getByText("No matches")).toBeVisible();
+    await expect(page.locator(".excalidraw .default-sidebar")).toBeHidden();
   });
 
   test("View ▸ Show Bottom Bar hides the bar and persists", async ({ page }) => {

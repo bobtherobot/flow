@@ -24,6 +24,8 @@ interface BottomBarProps {
   api: ExcalidrawAPI | null;
   state: BottombarState;
   onChange: (next: BottombarState) => void;
+  /** Run a search — routed to the Search sub-panel in the controls dock. */
+  onSearch: (query: string) => void;
 }
 
 /** Measure the left tool rail's reserved width so the docked bar clears it. */
@@ -39,7 +41,7 @@ function measureDockLeft(): number {
  * rail); tears off into a floating strip (drag the leading handle); items
  * shown/hidden from the hamburger menu. Sibling of the quick-actions bar.
  */
-export function BottomBar({ api, state, onChange }: BottomBarProps) {
+export function BottomBar({ api, state, onChange, onSearch }: BottomBarProps) {
   const actions = useBottomActions(api);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dockLeft, setDockLeft] = useState(DOCK_MARGIN);
@@ -156,7 +158,7 @@ export function BottomBar({ api, state, onChange }: BottomBarProps) {
               {item.kind === "background" && (
                 <BackgroundControl value={actions.background} onChange={actions.setBackground} />
               )}
-              {item.kind === "search" && <SearchControl onExecute={actions.runSearch} />}
+              {item.kind === "search" && <SearchControl onExecute={onSearch} />}
             </span>
           );
         })}

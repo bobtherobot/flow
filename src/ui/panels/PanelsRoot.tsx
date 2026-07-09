@@ -8,6 +8,7 @@ import { StylePanel } from "./StylePanel";
 import { StrokePanel } from "./StrokePanel";
 import { TextPanel } from "./TextPanel";
 import { AlignPanel } from "./AlignPanel";
+import { SearchPanel, type SearchSignal } from "./SearchPanel";
 
 /** Menu-bar height the dock sits below (matches --flow-menubar-h). */
 const MENUBAR_H = 36;
@@ -21,6 +22,8 @@ function LayersPlaceholder() {
 interface PanelsRootProps {
   api: ExcalidrawAPI | null;
   units: Unit;
+  /** Drives the Search sub-panel; bumping its nonce opens the panel. */
+  search: SearchSignal;
 }
 
 /**
@@ -28,7 +31,7 @@ interface PanelsRootProps {
  * The selection-style subscription is created once here and shared by every
  * panel, so the whole dock re-renders together as the selection changes.
  */
-export function PanelsRoot({ api, units }: PanelsRootProps) {
+export function PanelsRoot({ api, units, search }: PanelsRootProps) {
   const sel = useSelectionStyle(api);
 
   const defs: PanelDef[] = [
@@ -36,8 +39,9 @@ export function PanelsRoot({ api, units }: PanelsRootProps) {
     { id: "stroke", label: "Stroke", render: () => <StrokePanel sel={sel} units={units} /> },
     { id: "text", label: "Text", render: () => <TextPanel sel={sel} /> },
     { id: "align", label: "Align", render: () => <AlignPanel sel={sel} /> },
+    { id: "search", label: "Search", render: () => <SearchPanel api={api} signal={search} /> },
     { id: "layers", label: "Layers", render: () => <LayersPlaceholder /> },
   ];
 
-  return <PanelDock defs={defs} topOffset={MENUBAR_H} />;
+  return <PanelDock defs={defs} topOffset={MENUBAR_H} openPanel={{ id: "search", nonce: search.nonce }} />;
 }

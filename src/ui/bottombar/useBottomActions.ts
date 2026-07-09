@@ -1,7 +1,6 @@
 import { useEffect, useReducer } from "react";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import { zoomIn as doZoomIn, zoomOut as doZoomOut, resetZoom as doResetZoom } from "../../lib/view-actions";
-import { openSearch } from "../../lib/search-bridge";
 import type { BottomItem } from "./items";
 
 /** Default canvas background when appState hasn't reported one yet. */
@@ -20,8 +19,6 @@ export interface BottomActions {
   /** Current canvas background color (`#rrggbb`). */
   background: string;
   setBackground: (color: string) => void;
-  /** Open the native search sidebar, pre-filled with `query`. */
-  runSearch: (query: string) => void;
 }
 
 /**
@@ -65,6 +62,5 @@ export function useBottomActions(api: ExcalidrawAPI | null): BottomActions {
     resetZoom: () => api && doResetZoom(api),
     background,
     setBackground,
-    runSearch: (query: string) => api && openSearch(api, query),
   };
 }

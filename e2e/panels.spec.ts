@@ -10,9 +10,9 @@ test("dockable accordion replaces the Excalidraw island", async ({ page }) => {
   const panel = page.locator(".flow-pnl");
   await expect(panel).toBeVisible();
 
-  // Style / Stroke / Text / Align / Layers sub-panels present, in order.
+  // Style / Stroke / Text / Align / Search / Layers sub-panels present, in order.
   const titles = page.locator(".flow-pnl-sub__title");
-  await expect(titles).toHaveText(["Style", "Stroke", "Text", "Align", "Layers"]);
+  await expect(titles).toHaveText(["Style", "Stroke", "Text", "Align", "Search", "Layers"]);
 
   // Excalidraw's context-aware properties island is suppressed.
   await expect(page.locator(".excalidraw .selected-shape-actions")).toHaveCount(0);

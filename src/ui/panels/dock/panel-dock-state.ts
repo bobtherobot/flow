@@ -168,6 +168,7 @@ export type DockAction =
   | { type: "resizeDocked"; dockedWidth: number }
   | { type: "clampToViewport"; vw: number; vh: number; topOffset: number }
   | { type: "toggleSubExpanded"; id: string }
+  | { type: "openSub"; id: string }
   | { type: "setSubVisible"; id: string; visible: boolean }
   | { type: "closeSub"; id: string }
   | { type: "floatSub"; id: string; floatX: number; floatY: number; floatW: number }
@@ -247,6 +248,15 @@ export function dockReducer(state: DockState, action: DockAction): DockState {
 
     case "toggleSubExpanded":
       return mapPanel(state, action.id, (p) => ({ ...p, expanded: !p.expanded }));
+
+    case "openSub":
+      // Reveal a panel (e.g. driven by an external trigger like running a
+      // search): make it visible + expanded and un-collapse the dock so it's
+      // actually seen. A floating panel is left floating (respecting a tear-off).
+      return {
+        ...mapPanel(state, action.id, (p) => ({ ...p, visible: true, expanded: true })),
+        collapsed: false,
+      };
 
     case "setSubVisible":
       return mapPanel(state, action.id, (p) => ({

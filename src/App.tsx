@@ -50,6 +50,7 @@ import { QuickBar } from "./ui/quickbar/QuickBar";
 import { type QuickbarState } from "./ui/quickbar/quickbar-state";
 import { BottomBar } from "./ui/bottombar/BottomBar";
 import { type BottombarState } from "./ui/bottombar/bottombar-state";
+import { type SearchSignal } from "./ui/panels/SearchPanel";
 import { SaveDialog } from "./ui/SaveDialog";
 import { OpenDialog } from "./ui/OpenDialog";
 import { PreferencesDialog } from "./ui/PreferencesDialog";
@@ -112,6 +113,26 @@ export default function App() {
   useEffect(() => {
     setBottombarState(bottombar);
   }, [bottombar]);
+
+  // Drives the Search sub-panel in the controls dock. Bumping `nonce` opens the
+  // panel; a string `query` is adopted + run (bottom-bar search), `null` just
+  // opens + focuses it (Ctrl/Cmd+F). Not persisted — search is transient.
+  const [search, setSearch] = useState<SearchSignal>({ query: "", nonce: 0 });
+  const runSearch = (query: string) => setSearch((s) => ({ query, nonce: s.nonce + 1 }));
+
+  // Repoint Ctrl/Cmd+F to flow's Search panel (capture phase, before Excalidraw's
+  // own search-menu shortcut fires).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "f" || e.key === "F")) {
+        e.preventDefault();
+        e.stopPropagation();
+        setSearch((s) => ({ query: null, nonce: s.nonce + 1 }));
+      }
+    };
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => window.removeEventListener("keydown", onKey, { capture: true });
+  }, []);
 
   // Persistent arrow-binding lock. Applied to Excalidraw's appState below so the
   // fork's isBindingEnabled selector honors it over the transient per-input flag.
@@ -322,7 +343,7 @@ export default function App() {
             },
           } as ComponentProps<typeof Excalidraw>["initialData"]}
         />
-        <PanelsRoot api={excalidrawApi} units={units} />
+        <PanelsRoot api={excalidrawApi} units={units} search={search} />
       </div>
 
       <ToolBar api={excalidrawApi} state={toolbar} onChange={setToolbar} />
@@ -335,7 +356,7 @@ export default function App() {
         onSetBindingMode={handleSetBindingMode}
       />
 
-      <BottomBar api={excalidrawApi} state={bottombar} onChange={setBottombar} />
+      <BottomBar api={excalidrawApi} state={bottombar} onChange={setBottombar} onSearch={runSearch} />
 
       {saveOpen && (
         <SaveDialog

@@ -149,6 +149,32 @@ describe("dockReducer — sub panels", () => {
     expect(c).toMatchObject({ visible: false, floating: false });
   });
 
+  it("openSub reveals a hidden/collapsed panel and un-collapses the dock", () => {
+    // Hide c and collapse both the panel and the dock.
+    let s = dockReducer(seed(), { type: "closeSub", id: "c" });
+    s = dockReducer(s, { type: "toggleSubExpanded", id: "c" }); // expanded → false
+    s = { ...s, collapsed: true };
+
+    const opened = dockReducer(s, { type: "openSub", id: "c" });
+    expect(opened.panels.find((p) => p.id === "c")).toMatchObject({
+      visible: true,
+      expanded: true,
+    });
+    expect(opened.collapsed).toBe(false);
+  });
+
+  it("openSub leaves a torn-off panel floating", () => {
+    const floated = dockReducer(seed(), {
+      type: "floatSub",
+      id: "a",
+      floatX: 10,
+      floatY: 10,
+      floatW: 240,
+    });
+    const opened = dockReducer(floated, { type: "openSub", id: "a" });
+    expect(opened.panels.find((p) => p.id === "a")?.floating).toBe(true);
+  });
+
   it("floatSub then dockSub round-trips floating flag", () => {
     const f = dockReducer(seed(), {
       type: "floatSub",
