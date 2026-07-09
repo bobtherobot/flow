@@ -13,7 +13,7 @@ async function drawRect(page: Page, x1: number, y1: number, x2: number, y2: numb
 
 /** The Align sub-panel is expanded by default (fresh localStorage per test). */
 async function openAlignPanel(page: Page) {
-  await expect(page.getByRole("button", { name: "Align left" })).toBeVisible();
+  await expect(page.locator(".flow-align-panel").getByRole("button", { name: "Align left" })).toBeVisible();
 }
 
 test("align buttons are disabled without a 2+ selection", async ({ page }) => {
@@ -21,12 +21,12 @@ test("align buttons are disabled without a 2+ selection", async ({ page }) => {
   await page.waitForSelector(".flow-pnl");
   await openAlignPanel(page);
   // No selection at all.
-  await expect(page.getByRole("button", { name: "Align left" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Distribute horizontally" })).toBeDisabled();
+  await expect(page.locator(".flow-align-panel").getByRole("button", { name: "Align left" })).toBeDisabled();
+  await expect(page.locator(".flow-align-panel").getByRole("button", { name: "Distribute horizontally" })).toBeDisabled();
 
   // A single element is still below the align threshold.
   await drawRect(page, 560, 300, 660, 380);
-  await expect(page.getByRole("button", { name: "Align left" })).toBeDisabled();
+  await expect(page.locator(".flow-align-panel").getByRole("button", { name: "Align left" })).toBeDisabled();
 });
 
 test("align enables with 2 selected and dispatches; distribute needs 3", async ({ page }) => {
@@ -38,16 +38,16 @@ test("align enables with 2 selected and dispatches; distribute needs 3", async (
   await drawRect(page, 720, 440, 800, 500);
   await page.keyboard.press("Control+a");
 
-  const alignLeft = page.getByRole("button", { name: "Align left" });
+  const alignLeft = page.locator(".flow-align-panel").getByRole("button", { name: "Align left" });
   await expect(alignLeft).toBeEnabled();
   // Distribute needs 3.
-  await expect(page.getByRole("button", { name: "Distribute horizontally" })).toBeDisabled();
+  await expect(page.locator(".flow-align-panel").getByRole("button", { name: "Distribute horizontally" })).toBeDisabled();
 
   await alignLeft.click();
   // Draw a third and select all → distribute enables.
   await drawRect(page, 620, 380, 700, 440);
   await page.keyboard.press("Control+a");
-  const distH = page.getByRole("button", { name: "Distribute horizontally" });
+  const distH = page.locator(".flow-align-panel").getByRole("button", { name: "Distribute horizontally" });
   await expect(distH).toBeEnabled();
   await distH.click();
 

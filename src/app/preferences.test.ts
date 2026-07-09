@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getSloppiness, setSloppiness, getUnits, setUnits, getToolbarState, setToolbarState } from "./preferences";
+import {
+  getSloppiness, setSloppiness, getUnits, setUnits,
+  getToolbarState, setToolbarState,
+  getQuickbarState, setQuickbarState,
+  getBindingMode, setBindingMode,
+} from "./preferences";
 import { DEFAULT_TOOLBAR_STATE } from "../ui/toolbar/toolbar-state";
+import { DEFAULT_QUICKBAR_STATE } from "../ui/quickbar/quickbar-state";
 
 // Mock localStorage with a simple in-memory implementation
 const mockStorage: Record<string, string> = {};
@@ -90,5 +96,42 @@ describe("toolbar state persistence", () => {
   it("falls back to the default on malformed JSON", () => {
     localStorage.setItem("flow.toolbar", "{not json");
     expect(getToolbarState()).toEqual(DEFAULT_TOOLBAR_STATE);
+  });
+});
+
+describe("quickbar state persistence", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("returns the default when nothing is stored", () => {
+    expect(getQuickbarState()).toEqual(DEFAULT_QUICKBAR_STATE);
+  });
+
+  it("round-trips a stored state", () => {
+    const state = { visible: false, floating: true, x: 200, y: 6, hiddenItems: ["zenMode"] };
+    setQuickbarState(state);
+    expect(getQuickbarState()).toEqual(state);
+  });
+
+  it("falls back to the default on malformed JSON", () => {
+    localStorage.setItem("flow.quickbar", "{not json");
+    expect(getQuickbarState()).toEqual(DEFAULT_QUICKBAR_STATE);
+  });
+});
+
+describe("binding mode persistence", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to on when unset", () => {
+    expect(getBindingMode()).toBe("on");
+  });
+
+  it("round-trips a set mode", () => {
+    setBindingMode("off");
+    expect(getBindingMode()).toBe("off");
+  });
+
+  it("falls back to on for a corrupt stored value", () => {
+    localStorage.setItem("flow.bindingMode", "banana");
+    expect(getBindingMode()).toBe("on");
   });
 });
