@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { TOOLS, LOCK_ID } from "./tools";
 
 describe("TOOLS", () => {
-  it("lists the 12 native tools in order", () => {
+  it("lists the 12 native tools plus laser, in order", () => {
     expect(TOOLS.map((t) => t.id)).toEqual([
       "selection", "hand", "rectangle", "diamond", "ellipse",
       "arrow", "line", "freedraw", "text", "image", "eraser", "frame",
+      "laser",
     ]);
   });
 

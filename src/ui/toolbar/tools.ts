@@ -12,7 +12,8 @@ export type ToolId =
   | "text"
   | "image"
   | "eraser"
-  | "frame";
+  | "frame"
+  | "laser";
 
 export interface ToolDef {
   id: ToolId;
@@ -37,6 +38,7 @@ export const TOOLS: readonly ToolDef[] = [
   { id: "image", label: "Image", shortcut: "9" },
   { id: "eraser", label: "Eraser", shortcut: "E" },
   { id: "frame", label: "Frame", shortcut: "F" },
+  { id: "laser", label: "Laser pointer", shortcut: "K" },
 ];
 
 /** Membership key for the lock toggle within `hiddenTools` (lock is not a
