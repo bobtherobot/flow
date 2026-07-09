@@ -1,6 +1,8 @@
 import { DEFAULT_SLOPPINESS, isSloppiness, type Sloppiness } from "../lib/roughness";
 import { DEFAULT_UNIT, isUnit, type Unit } from "../lib/units";
 import { normalizeToolbarState, type ToolbarState } from "../ui/toolbar/toolbar-state";
+import { normalizeQuickbarState, type QuickbarState } from "../ui/quickbar/quickbar-state";
+import { DEFAULT_BINDING_MODE, isBindingMode, type BindingMode } from "../lib/binding-mode";
 
 const SLOPPINESS_KEY = "flow.sloppiness";
 const UNITS_KEY = "flow.units";
@@ -80,6 +82,39 @@ export function getToolbarState(): ToolbarState {
 /** Persist the tool-rail state. */
 export function setToolbarState(value: ToolbarState): void {
   writeJson(TOOLBAR_KEY, value);
+}
+
+const QUICKBAR_KEY = "flow.quickbar";
+
+/** Read the persisted quick-actions-bar state, normalized (default on miss). */
+export function getQuickbarState(): QuickbarState {
+  return normalizeQuickbarState(readJson(QUICKBAR_KEY));
+}
+
+/** Persist the quick-actions-bar state. */
+export function setQuickbarState(value: QuickbarState): void {
+  writeJson(QUICKBAR_KEY, value);
+}
+
+const BINDING_MODE_KEY = "flow.bindingMode";
+
+/** Read the persisted arrow-binding lock mode (default on miss/corrupt). */
+export function getBindingMode(): BindingMode {
+  try {
+    const raw = localStorage.getItem(BINDING_MODE_KEY);
+    return isBindingMode(raw) ? raw : DEFAULT_BINDING_MODE;
+  } catch {
+    return DEFAULT_BINDING_MODE;
+  }
+}
+
+/** Persist the arrow-binding lock mode. */
+export function setBindingMode(value: BindingMode): void {
+  try {
+    localStorage.setItem(BINDING_MODE_KEY, value);
+  } catch {
+    // Quota / disabled storage: preference simply won't persist this session.
+  }
 }
 
 function readJson(key: string): unknown {

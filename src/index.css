@@ -80,3 +80,13 @@ body,
 .excalidraw .App-toolbar-container {
   display: none;
 }
+
+/*
+ * flow moves undo/redo into its own quick-actions bar (src/ui/quickbar), so
+ * Excalidraw's bottom-left undo/redo cluster is redundant. `.undo-redo-buttons`
+ * is the stable wrapper from vendor Actions.tsx (UndoRedoActions); hiding it
+ * leaves the adjacent zoom controls untouched and degrades gracefully.
+ */
+.excalidraw .undo-redo-buttons {
+  display: none;
+}

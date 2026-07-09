@@ -13,8 +13,11 @@ import { loadConfig } from "./app/config";
 import {
   getSloppiness, setSloppiness, getUnits, setUnits,
   getToolbarState, setToolbarState,
+  getQuickbarState, setQuickbarState,
+  getBindingMode, setBindingMode,
 } from "./app/preferences";
 import { type Unit } from "./lib/units";
+import { type BindingMode } from "./lib/binding-mode";
 import { IndexedDbProvider } from "./storage/indexeddb-provider";
 import type { DocumentSummary } from "./storage/types";
 import { downloadFile, openLocalFile } from "./storage/local-file-provider";
@@ -42,6 +45,8 @@ import { MenuBar } from "./ui/menubar/MenuBar";
 import { PanelsRoot } from "./ui/panels/PanelsRoot";
 import { ToolBar } from "./ui/toolbar/ToolBar";
 import { type ToolbarState } from "./ui/toolbar/toolbar-state";
+import { QuickBar } from "./ui/quickbar/QuickBar";
+import { type QuickbarState } from "./ui/quickbar/quickbar-state";
 import { SaveDialog } from "./ui/SaveDialog";
 import { OpenDialog } from "./ui/OpenDialog";
 import { PreferencesDialog } from "./ui/PreferencesDialog";
@@ -90,6 +95,30 @@ export default function App() {
   useEffect(() => {
     setToolbarState(toolbar);
   }, [toolbar]);
+
+  // Quick-actions-bar layout/config. Same ownership pattern as the tool rail:
+  // App owns it so the View menu can read visibility. Persisted to flow.quickbar.
+  const [quickbar, setQuickbar] = useState<QuickbarState>(() => getQuickbarState());
+  useEffect(() => {
+    setQuickbarState(quickbar);
+  }, [quickbar]);
+
+  // Persistent arrow-binding lock. Applied to Excalidraw's appState below so the
+  // fork's isBindingEnabled selector honors it over the transient per-input flag.
+  const [bindingMode, setBindingModeState] = useState<BindingMode>(() => getBindingMode());
+  const handleSetBindingMode = useCallback((next: BindingMode) => {
+    setBindingModeState(next);
+    setBindingMode(next);
+  }, []);
+  // Push the mode into appState whenever it changes or the API becomes ready
+  // (covers the initial apply and every toggle). bindingMode isn't in the vendor
+  // .d.ts yet (fork addition, types flow-side augmented) so cast the arg.
+  useEffect(() => {
+    if (!excalidrawApi) return;
+    excalidrawApi.updateScene({
+      appState: { bindingMode },
+    } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
+  }, [excalidrawApi, bindingMode]);
 
   // Google Drive is wired in a later phase; sign-in is not available yet.
   const isGoogleConnected = false;
@@ -245,6 +274,8 @@ export default function App() {
         onToggleGrid={withApi(toggleGrid)}
         isToolbarVisible={toolbar.visible}
         onToggleToolbar={() => setToolbar((s) => ({ ...s, visible: !s.visible }))}
+        isQuickbarVisible={quickbar.visible}
+        onToggleQuickbar={() => setQuickbar((s) => ({ ...s, visible: !s.visible }))}
         onAbout={() => setAboutOpen(true)}
         onDocumentation={() => openExternal(FLOW_DOCS_URL)}
         onSubmitIssue={() => openExternal(FLOW_ISSUES_URL)}
@@ -272,13 +303,25 @@ export default function App() {
             appState: {
               currentItemRoughness: sloppiness,
               currentItemFontFamily: FONT_FAMILY.Nunito,
+              // Seed the arrow-binding lock at init so the fork's selector honors
+              // it immediately (an effect-driven apply races initialData restore).
+              // bindingMode is a fork addition not yet in the vendor .d.ts.
+              bindingMode,
             },
-          }}
+          } as ComponentProps<typeof Excalidraw>["initialData"]}
         />
         <PanelsRoot api={excalidrawApi} units={units} />
       </div>
 
       <ToolBar api={excalidrawApi} state={toolbar} onChange={setToolbar} />
+
+      <QuickBar
+        api={excalidrawApi}
+        state={quickbar}
+        onChange={setQuickbar}
+        bindingMode={bindingMode}
+        onSetBindingMode={handleSetBindingMode}
+      />
 
       {saveOpen && (
         <SaveDialog

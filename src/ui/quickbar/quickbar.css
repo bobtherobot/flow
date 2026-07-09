@@ -1,0 +1,132 @@
+/* src/ui/quickbar/quickbar.css
+ * Flow-native horizontal quick-actions bar. Built on the shared --flow-* tokens
+ * (defined in menubar.css). Docks in the top strip to the right of the main menu
+ * (transparent, blends into the menu strip); tears off into a floating strip.
+ * The config dropdown reuses .flow-pnl-config* (panels.css). */
+
+.flow-quickbar {
+  position: fixed;
+  z-index: 101;
+  display: flex;
+  align-items: center;
+  font-family: var(--flow-font);
+  color: var(--flow-ink);
+}
+
+/* Docked: sits within the 36px menu strip, transparent so the menubar's
+   surface + bottom border show through. */
+.flow-quickbar--docked {
+  background: transparent;
+  padding: 0 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+/* Floating: its own surface, torn off from the strip. */
+.flow-quickbar--floating {
+  height: 40px;
+  padding: 0 6px;
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-md);
+  box-shadow: var(--flow-shadow);
+  max-width: calc(100vw - 16px);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Leading drag handle: hamburger + close + grip. */
+.flow-quickbar__handle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  height: 100%;
+  padding-right: 4px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.flow-quickbar__grip {
+  color: var(--flow-ink-disabled);
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: -2px;
+  padding: 0 2px;
+}
+.flow-quickbar__iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--flow-ink-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--flow-radius-sm);
+}
+.flow-quickbar__iconbtn:hover {
+  background: var(--flow-hover);
+  color: var(--flow-ink);
+}
+
+/* Item row. */
+.flow-quickbar__items {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  height: 100%;
+}
+.flow-quickbar__cell {
+  display: inline-flex;
+  align-items: center;
+}
+.flow-quickbar__sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--flow-border);
+  flex-shrink: 0;
+}
+.flow-quickbar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: var(--flow-radius-sm);
+  background: transparent;
+  color: var(--flow-ink);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--flow-dur-fast) var(--flow-ease),
+    color var(--flow-dur-fast) var(--flow-ease);
+}
+.flow-quickbar__btn:hover {
+  background: var(--flow-hover);
+}
+.flow-quickbar__btn[data-active] {
+  background: var(--flow-active);
+  color: var(--flow-accent);
+}
+
+/* Config dropdown: section headings + scroll when tall. */
+.flow-quickbar-config {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+.flow-pnl-config__heading {
+  padding: 4px 10px 2px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--flow-ink-muted);
+}
