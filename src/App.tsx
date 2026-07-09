@@ -358,6 +358,8 @@ export default function App() {
               // it immediately (an effect-driven apply races initialData restore).
               // bindingMode is a fork addition not yet in the vendor .d.ts.
               bindingMode,
+              // Seed the laser color at init too (same fork-field/race rationale
+              // as bindingMode above); flow owns its persistence.
               laserColor,
             },
           } as ComponentProps<typeof Excalidraw>["initialData"]}
