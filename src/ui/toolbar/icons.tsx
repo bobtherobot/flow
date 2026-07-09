@@ -55,6 +55,40 @@ export const TOOL_ICONS: Record<ToolId | typeof LOCK_ID, ReactNode> = {
       <path d="M16 4h-5M16 4v5" />
     </Svg>
   ),
+  // Curved/elbow glyphs are Excalidraw's own arrow-type icons (Tabler, 24×24)
+  // reused verbatim so the rail matches the Stroke ▸ Type control.
+  "arrow-curved": (
+    <svg
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M16,12L20,9L16,6" />
+      <path d="M6 20c0 -6.075 4.925 -11 11 -11h3" />
+    </svg>
+  ),
+  "arrow-elbow": (
+    <svg
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4,19L10,19C11.097,19 12,18.097 12,17L12,9C12,7.903 12.903,7 14,7L21,7" />
+      <path d="M18 4l3 3l-3 3" />
+    </svg>
+  ),
   line: (
     <Svg>
       <path d="M4 16L16 4" />

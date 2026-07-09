@@ -1,18 +1,23 @@
 import { useEffect, useReducer } from "react";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
-import type { ToolId } from "./tools";
+import type { ArrowType, ToolId } from "./tools";
 
 /** The public `setActiveTool` takes a discriminated union keyed on `type`;
  *  our ToolId is a subset, so we cast at this single boundary. */
 type SetToolArg = Parameters<ExcalidrawAPI["setActiveTool"]>[0];
+type UpdateAppState = NonNullable<Parameters<ExcalidrawAPI["updateScene"]>[0]>["appState"];
 
 export interface ActiveTool {
   /** The current tool's type (e.g. "rectangle"); "selection" when unavailable. */
   activeType: string;
+  /** The current new-arrow shape default (`appState.currentItemArrowType`);
+   *  drives which arrow variant the rail highlights. */
+  arrowType: string;
   /** Whether "keep selected tool active" is on. */
   locked: boolean;
-  /** Switch the active tool. */
-  setTool: (type: ToolId) => void;
+  /** Switch the active tool. For arrow variants, pass the shape to apply as the
+   *  new-arrow default before activating the shared "arrow" tool. */
+  setTool: (type: ToolId, arrowType?: ArrowType) => void;
   /** Toggle the lock flag on the current tool. */
   toggleLock: () => void;
 }
@@ -31,11 +36,18 @@ export function useActiveTool(api: ExcalidrawAPI | null): ActiveTool {
     return api.onChange(() => bump());
   }, [api]);
 
-  const at = api?.getAppState().activeTool;
+  const state = api?.getAppState();
+  const at = state?.activeTool;
   const activeType = at?.type ?? "selection";
+  const arrowType = state?.currentItemArrowType ?? "sharp";
   const locked = at?.locked ?? false;
 
-  const setTool = (type: ToolId) => {
+  const setTool = (type: ToolId, nextArrowType?: ArrowType) => {
+    // Arrow variants share the "arrow" tool; set the new-arrow default first so
+    // the shape is in place before the tool activates (public API, no fork edit).
+    if (nextArrowType) {
+      api?.updateScene({ appState: { currentItemArrowType: nextArrowType } as UpdateAppState });
+    }
     api?.setActiveTool({ type } as SetToolArg);
   };
 
@@ -43,5 +55,5 @@ export function useActiveTool(api: ExcalidrawAPI | null): ActiveTool {
     api?.setActiveTool({ type: activeType, locked: !locked } as SetToolArg);
   };
 
-  return { activeType, locked, setTool, toggleLock };
+  return { activeType, arrowType, locked, setTool, toggleLock };
 }

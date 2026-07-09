@@ -5,11 +5,12 @@ import { ToolBar } from "./ToolBar";
 import { DEFAULT_TOOLBAR_STATE } from "./toolbar-state";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
-function fakeApi(type = "selection", locked = false) {
+function fakeApi(type = "selection", locked = false, currentItemArrowType = "sharp") {
   return {
-    getAppState: () => ({ activeTool: { type, locked } }),
+    getAppState: () => ({ activeTool: { type, locked }, currentItemArrowType }),
     onChange: () => () => {},
     setActiveTool: vi.fn(),
+    updateScene: vi.fn(),
   } as unknown as ExcalidrawAPI;
 }
 
@@ -40,6 +41,39 @@ describe("ToolBar", () => {
     render(<ToolBar api={api} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
     await user.click(screen.getByRole("button", { name: "Diamond" }));
     expect(api.setActiveTool).toHaveBeenCalledWith({ type: "diamond" });
+  });
+
+  it("renders the three arrow-shape tools", () => {
+    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    expect(screen.getByRole("button", { name: "Arrow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Curved arrow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Elbow arrow" })).toBeInTheDocument();
+  });
+
+  it("selecting the curved arrow sets the round default and activates the arrow tool", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi();
+    render(<ToolBar api={api} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    await user.click(screen.getByRole("button", { name: "Curved arrow" }));
+    expect(api.updateScene).toHaveBeenCalledWith({
+      appState: { currentItemArrowType: "round" },
+    });
+    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "arrow" });
+  });
+
+  it("highlights only the arrow variant matching the current shape", () => {
+    render(
+      <ToolBar api={fakeApi("arrow", false, "elbow")} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />,
+    );
+    expect(screen.getByRole("button", { name: "Elbow arrow" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Arrow" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Curved arrow" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("dispatches setActiveTool when the laser tool is clicked", async () => {

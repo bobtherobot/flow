@@ -18,6 +18,43 @@ test.describe("vertical tool bar", () => {
     await expect(rect).toHaveAttribute("aria-pressed", "true");
   });
 
+  test("each of the three arrow-shape tools activates the arrow tool", async ({ page }) => {
+    await page.goto("/");
+    const rail = page.getByRole("toolbar", { name: "Tools" });
+    for (const name of ["Arrow", "Curved arrow", "Elbow arrow"]) {
+      const btn = rail.getByRole("button", { name, exact: true });
+      await btn.click();
+      // Only the clicked shape is highlighted (they share the "arrow" tool).
+      await expect(btn).toHaveAttribute("aria-pressed", "true");
+    }
+  });
+
+  test("pressing A repeatedly cycles the highlighted arrow shape and wraps", async ({ page }) => {
+    await page.goto("/");
+    const rail = page.getByRole("toolbar", { name: "Tools" });
+    const sharp = rail.getByRole("button", { name: "Arrow", exact: true });
+    const curved = rail.getByRole("button", { name: "Curved arrow" });
+    const elbow = rail.getByRole("button", { name: "Elbow arrow" });
+
+    // Excalidraw's shortcut handler is bound to the canvas container, so focus it
+    // with a harmless selection-tool click before driving the keyboard cycle.
+    await page.locator("canvas.interactive").first().click({ position: { x: 200, y: 200 } });
+
+    // First A selects the arrow tool (default shape is round); each further A
+    // advances round → elbow → sharp → round (native Excalidraw cycle).
+    await page.keyboard.press("a");
+    await expect(curved).toHaveAttribute("aria-pressed", "true");
+
+    await page.keyboard.press("a");
+    await expect(elbow).toHaveAttribute("aria-pressed", "true");
+
+    await page.keyboard.press("a");
+    await expect(sharp).toHaveAttribute("aria-pressed", "true");
+
+    await page.keyboard.press("a");
+    await expect(curved).toHaveAttribute("aria-pressed", "true"); // wrapped back
+  });
+
   test("View ▸ Show Toolbar hides the rail and persists across reload", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("toolbar", { name: "Tools" })).toBeVisible();

@@ -32,7 +32,7 @@ function configAnchor(el: HTMLElement | null): MenuPoint {
  * public Excalidraw API; the native island is hidden via CSS.
  */
 export function ToolBar({ api, state, onChange }: ToolBarProps) {
-  const { activeType, locked, setTool, toggleLock } = useActiveTool(api);
+  const { activeType, arrowType, locked, setTool, toggleLock } = useActiveTool(api);
   const [menuOpen, setMenuOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const origin = useRef({ x: 0, y: 0 });
@@ -112,16 +112,22 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
       </div>
 
       <div className="flow-toolbar__tools">
-        {TOOLS.filter((t) => !state.hiddenTools.includes(t.id)).map((t) => (
-          <ToolButton
-            key={t.id}
-            icon={TOOL_ICONS[t.id]}
-            label={t.label}
-            shortcut={t.shortcut}
-            active={activeType === t.id}
-            onClick={() => setTool(t.id)}
-          />
-        ))}
+        {TOOLS.filter((t) => !state.hiddenTools.includes(t.id)).map((t) => {
+          const toolType = t.toolType ?? t.id;
+          // Arrow variants share activeType "arrow"; disambiguate on the shape.
+          const active =
+            activeType === toolType && (t.arrowType === undefined || arrowType === t.arrowType);
+          return (
+            <ToolButton
+              key={t.id}
+              icon={TOOL_ICONS[t.id]}
+              label={t.label}
+              shortcut={t.shortcut}
+              active={active}
+              onClick={() => setTool(toolType, t.arrowType)}
+            />
+          );
+        })}
       </div>
 
       {!state.hiddenTools.includes(LOCK_ID) && (

@@ -4,8 +4,12 @@ const OUT = "/tmp/claude-1000/-home-bob-projects-flow/5e8db4eb-bcda-424a-aaeb-fe
 
 async function drawWith(page: Page, toolLabel: string, x2: number, y2: number) {
   // Scope to the tool rail: quick-actions labels can substring-collide (e.g.
-  // "Arrow" ⊂ "Arrow binding").
-  await page.getByRole("toolbar", { name: "Tools" }).getByRole("button", { name: toolLabel }).click();
+  // "Arrow" ⊂ "Arrow binding"). exact: the arrow tool is split into
+  // "Arrow" / "Curved arrow" / "Elbow arrow", so "Arrow" alone matches three.
+  await page
+    .getByRole("toolbar", { name: "Tools" })
+    .getByRole("button", { name: toolLabel, exact: true })
+    .click();
   await page.mouse.move(560, 320);
   await page.mouse.down();
   await page.mouse.move(x2, y2, { steps: 8 });

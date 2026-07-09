@@ -13,6 +13,26 @@ Spec/plan: `docs/superpowers/specs|plans/2026-07-08-vertical-toolbar*.md`.
   effect, mounts `<ToolBar>`, insets the canvas left by `--flow-toolbar-reserved`.
 - MenuBar: View ▸ Show Toolbar (`Menubar.CheckboxItem`).
 - Native island hidden via `index.css` `.App-toolbar-container { display:none }`.
+- Arrow-shape tools added (2026-07-09): the single Arrow rail tool split into
+  three — `arrow` (sharp), `arrow-curved` (round), `arrow-elbow` (elbow), grouped
+  before `line`. ZERO fork edits. `ToolDef` gained optional `toolType` (all three
+  map to Excalidraw's `"arrow"`) + `arrowType`. `useActiveTool.setTool(type,
+  arrowType?)` sets `currentItemArrowType` via `updateScene({appState})` (public
+  API, like `currentItemRoughness`) THEN `setActiveTool` — new arrows read
+  `currentItemArrowType` at creation (vendor App.tsx ~L7729/7741). Rail highlight
+  is composite: `activeType==="arrow" && currentItemArrowType===tool.arrowType`,
+  so exactly one arrow variant lights up. Curved/elbow have NO shortcut (empty
+  string; `tools.test` special-cases them); icons reuse Excalidraw's own
+  arrow-type glyphs (ported from StrokePanel). Clicking a tool = deterministic
+  shape; pressing `A` while arrow active CYCLES sharp→round→elbow→sharp (native
+  Excalidraw, vendor App.tsx:4466) and the rail follows via `onChange`. Vendor
+  default `currentItemArrowType` is `round` (appState.ts:43) — left as-is, so a
+  fresh canvas highlights Curved. Stroke ▸ Type row KEPT (it converts a *selected*
+  arrow via `changeArrowType`; new division: rail = new-arrow shape, panel =
+  convert selection). e2e keyboard note: shortcuts are container-bound
+  (`handleKeyboardGlobally` off), so tests must `canvas.interactive` click to
+  focus before `keyboard.press`; and `drawWith` helpers need `{exact:true}` now
+  that "Arrow" ⊂ "Curved arrow"/"Elbow arrow".
 - Laser pointer added as a rail tool (2026-07-08): `"laser"` is the LAST entry
   in `TOOLS` (shortcut `K`, label "Laser pointer") + a `laser` icon in
   `TOOL_ICONS`. No other code touched — selection/highlight/config-menu/persist
