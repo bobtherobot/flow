@@ -243,8 +243,47 @@
   align-items: center;
   gap: 6px;
 }
+/* Stacked control: segmented group with a field beneath it (e.g. font size). */
+.flow-ctl-row--top {
+  align-items: flex-start;
+}
+.flow-ctl-row--top .flow-ctl-row__label {
+  padding-top: 5px;
+}
+.flow-ctl-row__control--stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
 .flow-ctl-row[aria-disabled="true"] {
   opacity: 0.45;
+}
+
+/* Standalone numeric field (no slider) */
+.flow-ctl-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.flow-ctl-num__input {
+  width: 56px;
+  padding: 3px 5px;
+  font: inherit;
+  font-size: 12px;
+  text-align: right;
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-sm);
+  background: #fff;
+  color: var(--flow-ink);
+}
+.flow-ctl-num__input:focus {
+  outline: none;
+  border-color: var(--flow-accent);
+  box-shadow: 0 0 0 2px var(--flow-active);
+}
+.flow-ctl-num__unit {
+  font-size: 11px;
+  color: var(--flow-ink-muted);
 }
 
 /* Segmented icon group */

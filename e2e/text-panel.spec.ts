@@ -44,3 +44,24 @@ test("edits font size, align and family on a text element", async ({ page }) => 
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${OUT}/text-panel.png` });
 });
+
+test("font-size field reflects a preset, and a custom value deselects presets", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await addText(page, "Flow");
+
+  const field = page.getByRole("spinbutton", { name: "Font size value" });
+  const xl = page.getByRole("radio", { name: "Extra large" });
+
+  // Clicking a preset drives the numeric field.
+  await xl.click();
+  await expect(xl).toBeChecked();
+  await expect(field).toHaveValue("36");
+
+  // Typing a custom (off-preset) value deselects every S/M/L/XL preset.
+  await field.fill("24");
+  await field.blur();
+  await expect(field).toHaveValue("24");
+  await expect(xl).not.toBeChecked();
+  await expect(page.getByRole("radio", { name: "Medium", exact: true })).not.toBeChecked();
+});

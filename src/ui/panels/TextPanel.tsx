@@ -1,8 +1,13 @@
 import { FONT_FAMILY } from "@excalidraw/excalidraw";
 import { FontDropdown, type FontOption } from "./controls/FontDropdown";
 import { IconToggleGroup, type IconOption } from "./controls/IconToggleGroup";
+import { NumberInput } from "./controls/NumberInput";
 import { MIXED, readFormValue } from "../../lib/selection-style";
 import type { SelectionStyle } from "./useSelectionStyle";
+
+/** Bounds for the manual font-size field (px). */
+const FONT_SIZE_MIN = 1;
+const FONT_SIZE_MAX = 999;
 
 /** Excalidraw's original hand-drawn/normal/code families — hidden per spec. */
 const DEPRECATED = new Set(["Virgil", "Helvetica", "Cascadia"]);
@@ -89,9 +94,9 @@ export function TextPanel({ sel }: { sel: SelectionStyle }) {
         </div>
       </div>
 
-      <div className="flow-ctl-row" aria-disabled={disabled || undefined}>
+      <div className="flow-ctl-row flow-ctl-row--top" aria-disabled={disabled || undefined}>
         <span className="flow-ctl-row__label">Size</span>
-        <div className="flow-ctl-row__control">
+        <div className="flow-ctl-row__control flow-ctl-row__control--stack">
           <IconToggleGroup
             options={FONT_SIZES}
             value={fontSizeValue}
@@ -99,6 +104,19 @@ export function TextPanel({ sel }: { sel: SelectionStyle }) {
             disabled={disabled}
             onChange={(v) =>
               sel.setProp({ prop: "fontSize", value: Number(v), currentItemKey: "currentItemFontSize", ids })
+            }
+          />
+          {/* Manual size. Reflects the current value (incl. a preset click); a
+              custom value simply won't match any S/M/L/XL, so none stays lit. */}
+          <NumberInput
+            value={fontSizeNum === MIXED ? null : fontSizeNum}
+            min={FONT_SIZE_MIN}
+            max={FONT_SIZE_MAX}
+            unit="px"
+            ariaLabel="Font size value"
+            disabled={disabled}
+            onChange={(n) =>
+              sel.setProp({ prop: "fontSize", value: n, currentItemKey: "currentItemFontSize", ids })
             }
           />
         </div>
