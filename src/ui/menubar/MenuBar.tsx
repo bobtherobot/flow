@@ -22,14 +22,29 @@ export interface MenuBarProps {
   isToolbarVisible?: boolean;
   /** Toggle the tool rail's visibility. */
   onToggleToolbar?: () => void;
+  /** Whether the tool rail is floating (drives the Dock item's enabled state). */
+  isToolbarFloating?: boolean;
+  /** Re-dock the tool rail to the left edge. */
+  onDockToolbar?: () => void;
   /** Whether the quick-actions bar is currently shown (drives the View checkbox). */
   isQuickbarVisible?: boolean;
   /** Toggle the quick-actions bar's visibility. */
   onToggleQuickbar?: () => void;
+  /** Whether the quick-actions bar is floating (drives the Dock item's enabled state). */
+  isQuickbarFloating?: boolean;
+  /** Re-dock the quick-actions bar into the top strip. */
+  onDockQuickbar?: () => void;
   /** Whether the bottom bar is currently shown (drives the View checkbox). */
   isBottombarVisible?: boolean;
   /** Toggle the bottom bar's visibility. */
   onToggleBottombar?: () => void;
+  /** Whether the bottom bar is floating (drives the Dock item's enabled state). */
+  isBottombarFloating?: boolean;
+  /** Re-dock the bottom bar into the lower-left corner. */
+  onDockBottombar?: () => void;
+  /** Restore the factory layout: every bar shown, docked, and its drag
+   *  position/config memory reset. */
+  onResetLayout?: () => void;
   onAbout: () => void;
   onDocumentation: () => void;
   onSubmitIssue: () => void;
@@ -211,6 +226,32 @@ export function MenuBar(props: MenuBarProps) {
               </Menubar.ItemIndicator>
               Show Bottom Bar
             </Menubar.CheckboxItem>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item
+              className="flow-menu__item"
+              disabled={!props.isToolbarFloating}
+              onSelect={() => props.onDockToolbar?.()}
+            >
+              Dock Toolbar
+            </Menubar.Item>
+            <Menubar.Item
+              className="flow-menu__item"
+              disabled={!props.isQuickbarFloating}
+              onSelect={() => props.onDockQuickbar?.()}
+            >
+              Dock Quick Actions
+            </Menubar.Item>
+            <Menubar.Item
+              className="flow-menu__item"
+              disabled={!props.isBottombarFloating}
+              onSelect={() => props.onDockBottombar?.()}
+            >
+              Dock Bottom Bar
+            </Menubar.Item>
+            <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={() => props.onResetLayout?.()}>
+              Reset Layout
+            </Menubar.Item>
           </Menubar.Content>
         </Menubar.Portal>
       </Menubar.Menu>

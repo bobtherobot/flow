@@ -48,6 +48,15 @@ Spec/plan: `docs/superpowers/specs|plans/2026-07-08-vertical-toolbar*.md`.
   same split as the panel dock. Unit/component tests cover the rest.
 - Config menu: dock/undock + per-tool show/hide (incl. lock), persisted in
   `hiddenTools`.
+- **View menu layout controls** (2026-07-09): MenuBar ▸ View adds **Dock Toolbar /
+  Dock Quick Actions / Dock Bottom Bar** (each disabled via `data-disabled` when
+  that bar is already docked — App passes `isXFloating` + `onDockX` = set
+  `floating:false`) and **Reset Layout** (`onResetLayout` → `setToolbar/Quickbar/
+  Bottombar(DEFAULT_*_STATE)` with fresh `hidden*` array copies). Reset wipes the
+  drag x/y memory too, so a later detach starts from the default spot rather than
+  the last-dragged position. `DEFAULT_{TOOLBAR,QUICKBAR,BOTTOMBAR}_STATE` are the
+  factory source. Mirrored intent across all three bars. e2e:
+  `toolbar.spec.ts` "Reset Layout … wipes its drag memory".
 - **Header = grip THEN hamburger (stacked vertically); no close (✕)** (2026-07-09):
   `.flow-toolbar__topbar` is now a `flex-direction: column` — `⠿` grip on top
   (`pointer-events:none` so drags fall through to the topbar drag surface),

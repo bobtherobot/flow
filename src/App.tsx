@@ -46,11 +46,11 @@ import { FLOW_DOCS_URL, FLOW_ISSUES_URL } from "./lib/links";
 import { MenuBar } from "./ui/menubar/MenuBar";
 import { PanelsRoot } from "./ui/panels/PanelsRoot";
 import { ToolBar, RAIL_WIDTH } from "./ui/toolbar/ToolBar";
-import { type ToolbarState } from "./ui/toolbar/toolbar-state";
+import { DEFAULT_TOOLBAR_STATE, type ToolbarState } from "./ui/toolbar/toolbar-state";
 import { QuickBar } from "./ui/quickbar/QuickBar";
-import { type QuickbarState } from "./ui/quickbar/quickbar-state";
+import { DEFAULT_QUICKBAR_STATE, type QuickbarState } from "./ui/quickbar/quickbar-state";
 import { BottomBar } from "./ui/bottombar/BottomBar";
-import { type BottombarState } from "./ui/bottombar/bottombar-state";
+import { DEFAULT_BOTTOMBAR_STATE, type BottombarState } from "./ui/bottombar/bottombar-state";
 import { type SearchSignal } from "./ui/panels/SearchPanel";
 import { SaveDialog } from "./ui/SaveDialog";
 import { OpenDialog } from "./ui/OpenDialog";
@@ -116,6 +116,15 @@ export default function App() {
   useEffect(() => {
     setBottombarState(bottombar);
   }, [bottombar]);
+
+  // Restore the factory layout: every bar shown, docked, and its drag position /
+  // per-item config memory wiped (fresh copies so a later detach starts from the
+  // default spot rather than wherever it was last dragged).
+  const handleResetLayout = () => {
+    setToolbar({ ...DEFAULT_TOOLBAR_STATE, hiddenTools: [...DEFAULT_TOOLBAR_STATE.hiddenTools] });
+    setQuickbar({ ...DEFAULT_QUICKBAR_STATE, hiddenItems: [...DEFAULT_QUICKBAR_STATE.hiddenItems] });
+    setBottombar({ ...DEFAULT_BOTTOMBAR_STATE, hiddenItems: [...DEFAULT_BOTTOMBAR_STATE.hiddenItems] });
+  };
 
   // Drives the Search sub-panel in the controls dock. Bumping `nonce` opens the
   // panel; a string `query` is adopted + run (bottom-bar search), `null` just
@@ -323,10 +332,17 @@ export default function App() {
         onToggleGrid={withApi(toggleGrid)}
         isToolbarVisible={toolbar.visible}
         onToggleToolbar={() => setToolbar((s) => ({ ...s, visible: !s.visible }))}
+        isToolbarFloating={toolbar.floating}
+        onDockToolbar={() => setToolbar((s) => ({ ...s, floating: false }))}
         isQuickbarVisible={quickbar.visible}
         onToggleQuickbar={() => setQuickbar((s) => ({ ...s, visible: !s.visible }))}
+        isQuickbarFloating={quickbar.floating}
+        onDockQuickbar={() => setQuickbar((s) => ({ ...s, floating: false }))}
         isBottombarVisible={bottombar.visible}
         onToggleBottombar={() => setBottombar((s) => ({ ...s, visible: !s.visible }))}
+        isBottombarFloating={bottombar.floating}
+        onDockBottombar={() => setBottombar((s) => ({ ...s, floating: false }))}
+        onResetLayout={handleResetLayout}
         onAbout={() => setAboutOpen(true)}
         onDocumentation={() => openExternal(FLOW_DOCS_URL)}
         onSubmitIssue={() => openExternal(FLOW_ISSUES_URL)}

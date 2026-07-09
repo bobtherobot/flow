@@ -94,4 +94,33 @@ describe("MenuBar", () => {
     await user.click(item);
     expect(onToggleBottombar).toHaveBeenCalledOnce();
   });
+
+  it("docks a floating bar from the View menu", async () => {
+    const user = userEvent.setup();
+    const onDockToolbar = vi.fn();
+    render(<MenuBar {...props} isToolbarFloating onDockToolbar={onDockToolbar} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Dock Toolbar" }));
+    expect(onDockToolbar).toHaveBeenCalledOnce();
+  });
+
+  it("disables the Dock item when the bar is already docked", async () => {
+    const user = userEvent.setup();
+    const onDockToolbar = vi.fn();
+    render(<MenuBar {...props} isToolbarFloating={false} onDockToolbar={onDockToolbar} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    const item = await screen.findByRole("menuitem", { name: "Dock Toolbar" });
+    expect(item).toHaveAttribute("data-disabled");
+    await user.click(item);
+    expect(onDockToolbar).not.toHaveBeenCalled();
+  });
+
+  it("resets the layout from the View menu", async () => {
+    const user = userEvent.setup();
+    const onResetLayout = vi.fn();
+    render(<MenuBar {...props} onResetLayout={onResetLayout} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Reset Layout" }));
+    expect(onResetLayout).toHaveBeenCalledOnce();
+  });
 });

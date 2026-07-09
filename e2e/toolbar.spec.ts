@@ -95,4 +95,28 @@ test.describe("vertical tool bar", () => {
     const after = await rail.boundingBox();
     expect(after!.x).toBeGreaterThan(before!.x + 100); // moved right, now floating
   });
+
+  test("View ▸ Reset Layout re-docks the rail and wipes its drag memory", async ({ page }) => {
+    await page.goto("/");
+    const rail = page.getByRole("toolbar", { name: "Tools" });
+
+    // Detach and drag the rail far to the right.
+    const grip = page.locator(".flow-toolbar__grip");
+    const g = (await grip.boundingBox())!;
+    await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(g.x + 400, g.y + 200, { steps: 10 });
+    await page.mouse.up();
+    expect((await rail.boundingBox())!.x).toBeGreaterThan(300);
+
+    // Reset Layout → docked back at the left edge.
+    await page.getByRole("menuitem", { name: "View" }).click();
+    await page.getByRole("menuitem", { name: "Reset Layout" }).click();
+    expect((await rail.boundingBox())!.x).toBeLessThan(10);
+
+    // Detaching again starts from the default spot, not the old far-right one.
+    await page.getByRole("button", { name: "Toolbar options" }).click();
+    await page.getByRole("menuitem", { name: "Detach toolbar" }).click();
+    expect((await rail.boundingBox())!.x).toBeLessThan(50);
+  });
 });
