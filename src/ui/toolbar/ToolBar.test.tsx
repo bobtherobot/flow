@@ -55,6 +55,11 @@ describe("ToolBar", () => {
     expect(screen.getByRole("button", { name: "Ellipse" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("marks the laser tool as pressed when active", () => {
+    render(<ToolBar api={fakeApi("laser")} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    expect(screen.getByRole("button", { name: "Laser pointer" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("hides the rail via onChange when the close button is clicked", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
