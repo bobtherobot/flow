@@ -82,12 +82,16 @@ const ACTION_ICONS: Record<string, ReactNode> = {
       <rect x="10" y="10" width="5" height="5" fill="currentColor" stroke="none" />
     </Svg>
   ),
-  // Snap to objects: two boxes with a shared alignment guide.
+  // Snap to objects: a horseshoe magnet.
   objectsSnapMode: (
     <Svg>
-      <path d="M10 2v16" strokeDasharray="2 2" />
-      <rect x="3.5" y="5" width="6" height="4" rx="1" fill="currentColor" stroke="none" />
-      <rect x="10.5" y="11" width="6" height="4" rx="1" fill="currentColor" stroke="none" />
+      <path
+        d="M4 6h3v5a3 3 0 006 0V6h3v5a6 6 0 01-12 0z"
+        fill="currentColor"
+        stroke="none"
+      />
+      {/* pole-tip bands */}
+      <path d="M4 4h3M13 4h3" strokeWidth="1.6" />
     </Svg>
   ),
   // Grid: 2×2 cells.
