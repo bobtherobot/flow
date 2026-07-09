@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getSloppiness, setSloppiness, getUnits, setUnits } from "./preferences";
+import { getSloppiness, setSloppiness, getUnits, setUnits, getToolbarState, setToolbarState } from "./preferences";
+import { DEFAULT_TOOLBAR_STATE } from "../ui/toolbar/toolbar-state";
 
 // Mock localStorage with a simple in-memory implementation
 const mockStorage: Record<string, string> = {};
@@ -70,5 +71,24 @@ describe("units preference", () => {
   it("falls back to px on an unknown stored value", () => {
     localStorage.setItem("flow.units", "furlong");
     expect(getUnits()).toBe("px");
+  });
+});
+
+describe("toolbar state persistence", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("returns the default when nothing is stored", () => {
+    expect(getToolbarState()).toEqual(DEFAULT_TOOLBAR_STATE);
+  });
+
+  it("round-trips a stored state", () => {
+    const state = { visible: false, floating: true, x: 33, y: 44, hiddenTools: ["frame"] };
+    setToolbarState(state);
+    expect(getToolbarState()).toEqual(state);
+  });
+
+  it("falls back to the default on malformed JSON", () => {
+    localStorage.setItem("flow.toolbar", "{not json");
+    expect(getToolbarState()).toEqual(DEFAULT_TOOLBAR_STATE);
   });
 });

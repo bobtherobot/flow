@@ -1,5 +1,6 @@
 import { DEFAULT_SLOPPINESS, isSloppiness, type Sloppiness } from "../lib/roughness";
 import { DEFAULT_UNIT, isUnit, type Unit } from "../lib/units";
+import { normalizeToolbarState, type ToolbarState } from "../ui/toolbar/toolbar-state";
 
 const SLOPPINESS_KEY = "flow.sloppiness";
 const UNITS_KEY = "flow.units";
@@ -67,6 +68,18 @@ export function getNamedLayouts(): unknown[] {
 /** Persist the named layouts list. */
 export function setNamedLayouts(value: unknown[]): void {
   writeJson(PANEL_LAYOUTS_KEY, value);
+}
+
+const TOOLBAR_KEY = "flow.toolbar";
+
+/** Read the persisted tool-rail state, normalized (default on miss/parse error). */
+export function getToolbarState(): ToolbarState {
+  return normalizeToolbarState(readJson(TOOLBAR_KEY));
+}
+
+/** Persist the tool-rail state. */
+export function setToolbarState(value: ToolbarState): void {
+  writeJson(TOOLBAR_KEY, value);
 }
 
 function readJson(key: string): unknown {
