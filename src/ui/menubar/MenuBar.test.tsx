@@ -9,6 +9,7 @@ const props = {
   onClearCanvas: noop, onZoomIn: noop, onZoomOut: noop, onZoomToFit: noop,
   onResetZoom: noop, onToggleGrid: noop, onAbout: noop, onEditAction: noop,
   onDocumentation: noop, onSubmitIssue: noop, onShowShortcuts: noop,
+  isToolbarVisible: true, onToggleToolbar: noop,
 };
 
 describe("MenuBar", () => {
@@ -60,5 +61,16 @@ describe("MenuBar", () => {
     await user.click(screen.getByRole("menuitem", { name: "Help" }));
     await user.click(await screen.findByRole("menuitem", { name: "Keyboard Shortcuts" }));
     expect(onShowShortcuts).toHaveBeenCalledOnce();
+  });
+
+  it("toggles the toolbar from the View menu", async () => {
+    const user = userEvent.setup();
+    const onToggleToolbar = vi.fn();
+    render(<MenuBar {...props} isToolbarVisible onToggleToolbar={onToggleToolbar} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    const item = await screen.findByRole("menuitemcheckbox", { name: "Show Toolbar" });
+    expect(item).toBeInTheDocument();
+    await user.click(item);
+    expect(onToggleToolbar).toHaveBeenCalledOnce();
   });
 });
