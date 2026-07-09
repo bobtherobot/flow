@@ -42,9 +42,22 @@ describe("ToolBar", () => {
     expect(api.setActiveTool).toHaveBeenCalledWith({ type: "diamond" });
   });
 
+  it("dispatches setActiveTool when the laser tool is clicked", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi();
+    render(<ToolBar api={api} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    await user.click(screen.getByRole("button", { name: "Laser pointer" }));
+    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "laser" });
+  });
+
   it("marks the active tool as pressed", () => {
     render(<ToolBar api={fakeApi("ellipse")} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
     expect(screen.getByRole("button", { name: "Ellipse" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("marks the laser tool as pressed when active", () => {
+    render(<ToolBar api={fakeApi("laser")} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    expect(screen.getByRole("button", { name: "Laser pointer" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("hides the rail via onChange when the close button is clicked", async () => {
