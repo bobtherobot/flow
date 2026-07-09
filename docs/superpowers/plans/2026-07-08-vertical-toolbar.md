@@ -962,10 +962,10 @@ function fakeApi(type = "selection", locked = false) {
 
 describe("ToolBar", () => {
   it("renders nothing when not visible", () => {
-    const { container } = render(
+    render(
       <ToolBar api={fakeApi()} state={{ ...DEFAULT_TOOLBAR_STATE, visible: false }} onChange={() => {}} />,
     );
-    expect(container.querySelector(".flow-toolbar")).toBeNull();
+    expect(screen.queryByRole("toolbar", { name: "Tools" })).toBeNull();
   });
 
   it("renders a button for every visible tool plus lock", () => {
