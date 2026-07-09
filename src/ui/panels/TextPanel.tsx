@@ -87,9 +87,7 @@ export function TextPanel({ sel }: { sel: SelectionStyle }) {
             value={fontFamily}
             ariaLabel="Font family"
             disabled={disabled}
-            onChange={(id) =>
-              sel.setProp({ prop: "fontFamily", value: id, currentItemKey: "currentItemFontFamily", ids })
-            }
+            onChange={(id) => sel.executeAction("changeFontFamily", { currentItemFontFamily: id })}
           />
         </div>
       </div>

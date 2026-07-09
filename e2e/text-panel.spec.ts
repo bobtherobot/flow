@@ -104,3 +104,39 @@ test("changing size recenters text bound to a container (no resize needed)", asy
   expect(after.h).toBeGreaterThan(before.h); // bounding box recomputed for the bigger font
   expect(after.textMid).toBe(after.boxMid); // still centered — the bug was it drifting off-center
 });
+
+test("changing font family recenters text bound to a container", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+
+  await page.getByRole("button", { name: "Rectangle" }).click();
+  await page.mouse.move(560, 300);
+  await page.mouse.down();
+  await page.mouse.move(820, 460, { steps: 8 });
+  await page.mouse.up();
+  await page.mouse.dblclick(690, 380);
+  await page.keyboard.type("Hi");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Selection" }).click();
+  await page.mouse.click(690, 380);
+
+  const read = () =>
+    page.evaluate(() => {
+      const t = window.h.elements.find((e: any) => e.type === "text" && e.containerId);
+      const c = window.h.elements.find((e: any) => e.type === "rectangle");
+      return {
+        lineHeight: t.lineHeight,
+        textMid: Math.round(t.y + t.height / 2),
+        boxMid: Math.round(c.y + c.height / 2),
+      };
+    });
+
+  const before = await read();
+  await page.getByRole("button", { name: "Font family" }).click();
+  await page.getByRole("option", { name: "Lilita One" }).click();
+  await page.waitForTimeout(500); // async font load + redraw
+
+  const after = await read();
+  expect(after.lineHeight).not.toBe(before.lineHeight); // metrics recomputed for the new font
+  expect(after.textMid).toBe(after.boxMid); // still centered
+});
