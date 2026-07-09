@@ -197,3 +197,40 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Properties dialog: grouped key/value rows. */
+.flow-props__section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.flow-props__section + .flow-props__section {
+  margin-top: 14px;
+}
+.flow-props__heading {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--flow-ink-muted, #6b7280);
+}
+.flow-props__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 3px 0;
+  font-size: 0.875rem;
+}
+.flow-props__key {
+  color: var(--flow-ink-muted, #6b7280);
+}
+.flow-props__val {
+  color: var(--flow-ink, #1e1e1e);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

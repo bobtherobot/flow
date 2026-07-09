@@ -6,7 +6,8 @@ import { MenuBar } from "./MenuBar";
 const noop = () => {};
 const props = {
   onNew: noop, onOpen: noop, onSave: noop, onExport: noop, onPreferences: noop,
-  onClearCanvas: noop, onZoomIn: noop, onZoomOut: noop, onZoomToFit: noop,
+  onClearCanvas: noop, onProperties: noop,
+  onZoomIn: noop, onZoomOut: noop, onZoomToFit: noop,
   onResetZoom: noop, onToggleGrid: noop, onAbout: noop, onEditAction: noop,
   onDocumentation: noop, onSubmitIssue: noop, onShowShortcuts: noop,
   isToolbarVisible: true, onToggleToolbar: noop,
@@ -72,6 +73,15 @@ describe("MenuBar", () => {
     expect(item).toBeInTheDocument();
     await user.click(item);
     expect(onToggleToolbar).toHaveBeenCalledOnce();
+  });
+
+  it("opens Properties from the File menu", async () => {
+    const user = userEvent.setup();
+    const onProperties = vi.fn();
+    render(<MenuBar {...props} onProperties={onProperties} />);
+    await user.click(screen.getByRole("menuitem", { name: "File" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Properties…" }));
+    expect(onProperties).toHaveBeenCalledOnce();
   });
 
   it("toggles the bottom bar from the View menu", async () => {

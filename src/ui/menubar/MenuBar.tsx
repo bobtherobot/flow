@@ -8,6 +8,7 @@ export interface MenuBarProps {
   onSave: () => void;
   onExport: (format: ImageFormat) => void;
   onPreferences: () => void;
+  onProperties: () => void;
   onClearCanvas: () => void;
   /** Dispatch an Excalidraw action by name (z-order, group, align, etc.). */
   onEditAction: (name: string) => void;
@@ -78,6 +79,9 @@ export function MenuBar(props: MenuBarProps) {
               </Menubar.Portal>
             </Menubar.Sub>
             <Menubar.Separator className="flow-menu__sep" />
+            <Menubar.Item className="flow-menu__item" onSelect={props.onProperties}>
+              Properties…
+            </Menubar.Item>
             <Menubar.Item className="flow-menu__item" onSelect={props.onPreferences}>
               Preferences…
             </Menubar.Item>

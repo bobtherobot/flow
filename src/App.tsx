@@ -54,6 +54,7 @@ import { type SearchSignal } from "./ui/panels/SearchPanel";
 import { SaveDialog } from "./ui/SaveDialog";
 import { OpenDialog } from "./ui/OpenDialog";
 import { PreferencesDialog } from "./ui/PreferencesDialog";
+import { PropertiesDialog } from "./ui/PropertiesDialog";
 import { AboutDialog } from "./ui/AboutDialog";
 import type { SaveDestination } from "./ui/dialog-types";
 
@@ -75,6 +76,7 @@ export default function App() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [openOpen, setOpenOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
+  const [propsOpen, setPropsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [internalDocs, setInternalDocs] = useState<DocumentSummary[]>([]);
   const [appName, setAppName] = useState("Flow");
@@ -296,6 +298,7 @@ export default function App() {
         onSave={openSaveDialog}
         onExport={handleExport}
         onPreferences={() => setPrefsOpen(true)}
+        onProperties={() => setPropsOpen(true)}
         onClearCanvas={handleClearCanvas}
         onEditAction={(name) => apiRef.current?.executeAction(name)}
         onZoomIn={withApi(zoomIn)}
@@ -392,6 +395,16 @@ export default function App() {
       )}
 
       {aboutOpen && <AboutDialog appName={appName} onClose={() => setAboutOpen(false)} />}
+
+      {propsOpen && (
+        <PropertiesDialog
+          appName={appName}
+          sceneName={currentName}
+          api={excalidrawApi}
+          provider={provider}
+          onClose={() => setPropsOpen(false)}
+        />
+      )}
     </div>
   );
 }
