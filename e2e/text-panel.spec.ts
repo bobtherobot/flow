@@ -3,7 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 const OUT = "/tmp/claude-1000/-home-bob-projects-flow/5e8db4eb-bcda-424a-aaeb-fe2bb7d655e1/scratchpad";
 
 async function addText(page: Page, text: string) {
-  await page.getByTestId("toolbar-text").click({ force: true });
+  await page.getByRole("button", { name: "Text", exact: true }).click();
   await page.mouse.click(600, 380);
   await page.keyboard.type(text);
   await page.keyboard.press("Escape");
@@ -12,7 +12,7 @@ async function addText(page: Page, text: string) {
 test("text controls are disabled without a text selection", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
-  await page.getByTestId("toolbar-rectangle").click({ force: true });
+  await page.getByRole("button", { name: "Rectangle" }).click();
   await page.mouse.move(560, 320);
   await page.mouse.down();
   await page.mouse.move(820, 500, { steps: 6 });

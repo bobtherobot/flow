@@ -1,9 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 
-/** Draw a rectangle (right of the docked panel) — leaves it selected. The tool
- *  radio is visually hidden behind its label, so force-click it. */
+/** Draw a rectangle (right of the docked panel) — leaves it selected. Clicks
+ *  flow's tool rail button (the native tool island is hidden via CSS). */
 async function drawRectangle(page: Page) {
-  await page.getByTestId("toolbar-rectangle").click({ force: true });
+  await page.getByRole("button", { name: "Rectangle" }).click();
   await page.mouse.move(560, 320);
   await page.mouse.down();
   await page.mouse.move(820, 500, { steps: 8 });

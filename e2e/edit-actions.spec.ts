@@ -2,8 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 
 const OUT = "/tmp/claude-1000/-home-bob-projects-flow/5e8db4eb-bcda-424a-aaeb-fe2bb7d655e1/scratchpad";
 
-async function drawWith(page: Page, testid: string, x2: number, y2: number) {
-  await page.getByTestId(testid).click({ force: true });
+async function drawWith(page: Page, toolLabel: string, x2: number, y2: number) {
+  await page.getByRole("button", { name: toolLabel }).click();
   await page.mouse.move(560, 340);
   await page.mouse.down();
   await page.mouse.move(x2, y2, { steps: 8 });
@@ -25,7 +25,7 @@ test("Edit menu exposes z-order, group and align actions", async ({ page }) => {
 test("arrow elbow applies via the executeAction fork export", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
-  await drawWith(page, "toolbar-arrow", 900, 560); // diagonal so elbow routing is visible
+  await drawWith(page, "Arrow", 900, 560); // diagonal so elbow routing is visible
 
   await page.getByRole("radio", { name: "Elbow" }).click();
   await expect(page.getByRole("radio", { name: "Elbow" })).toBeChecked();
@@ -37,7 +37,7 @@ test("arrow elbow applies via the executeAction fork export", async ({ page }) =
 test("Edit ▸ Duplicate runs the action without error", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
-  await drawWith(page, "toolbar-rectangle", 760, 480);
+  await drawWith(page, "Rectangle", 760, 480);
 
   await page.getByRole("menuitem", { name: "Edit" }).click();
   await page.getByRole("menuitem", { name: "Duplicate" }).click();
