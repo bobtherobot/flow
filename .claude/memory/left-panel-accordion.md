@@ -26,6 +26,22 @@ JS → reimplemented in React/TS).
   `e2e/panels.spec.ts`. Mounted in `App.tsx` beside `<Excalidraw>`.
 
 ## Recent tweaks
+- **Sub-panel reorder fix + drag ghost** (2026-07-09): two bugs in docked
+  reorder. (1) **Drop never persisted** — `useDrag` snapshotted `onEnd` at
+  pointer-down, so `onSubDragEnd` read a stale `dropIndex===null` and skipped the
+  `reorderSub` dispatch. Fixed by having `useDrag` invoke callbacks through
+  `optsRef.current` (latest closure) in both `handleMove`/`handleUp`, not a
+  pointer-down snapshot. `onEnd` is used ONLY by the sub-panel header drag, so
+  zero blast radius. (2) **No drag feedback** — added a pointer-following ghost:
+  the dragged docked panel stays MOUNTED in `docked.map` (critical — its `useDrag`
+  window listeners live inside the SubPanel, so unmounting it mid-drag by
+  excluding it from the list tore the drag down after one move) and instead gets
+  `.flow-pnl-sub--dragging` (`position:fixed` + `opacity:.5` + `pointer-events:none`).
+  Fixed positioning lifts it out of flow so the accordion closes the gap; the drop
+  indicator indices track `flowDocked` (dragged excluded) to match `computeDropIndex`.
+  Ghost is cleared on tear-off (real float takes over) and drop. `PanelShell` `ghost`
+  state {id,left,top,width}; `SubPanel` gained `isDragging`/`dragStyle` props. Tests:
+  `useDrag.test.tsx` (latest-closure regression) + panels e2e reorder-persists-after-reload.
 - **Drag grips** (2026-07-09): a leading `⠿` grip on the controls-panel topbar
   (`.flow-pnl__grip`, shown only when `showBody` — hidden on the collapsed docked
   strip) and on every sub-panel header (`.flow-pnl-sub__grip`). Both are 16px,

@@ -25,8 +25,6 @@ interface ActiveDrag {
   startX: number;
   startY: number;
   moved: boolean;
-  onMove: DragOptions["onMove"];
-  onEnd: DragOptions["onEnd"];
   threshold: number;
 }
 
@@ -51,13 +49,15 @@ export function useDrag(options: DragOptions): (e: React.PointerEvent) => void {
       const dy = e.clientY - d.startY;
       if (!d.moved && dx * dx + dy * dy < d.threshold) return;
       d.moved = true;
-      d.onMove({ dx, dy, x: e.clientX, y: e.clientY, moved: true }, e);
+      // Read callbacks through optsRef (not a pointer-down snapshot) so they see
+      // the latest closures — e.g. `onEnd` reading React state set mid-drag.
+      optsRef.current.onMove({ dx, dy, x: e.clientX, y: e.clientY, moved: true }, e);
     };
     const handleUp = (e: PointerEvent) => {
       const d = active.current;
       if (!d) return;
       active.current = null;
-      d.onEnd?.(
+      optsRef.current.onEnd?.(
         { dx: e.clientX - d.startX, dy: e.clientY - d.startY, x: e.clientX, y: e.clientY, moved: d.moved },
         e,
       );
@@ -79,8 +79,6 @@ export function useDrag(options: DragOptions): (e: React.PointerEvent) => void {
       startX: e.clientX,
       startY: e.clientY,
       moved: false,
-      onMove: opts.onMove,
-      onEnd: opts.onEnd,
       threshold: opts.threshold ?? 4,
     };
   }, []);

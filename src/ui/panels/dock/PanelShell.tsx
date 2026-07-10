@@ -37,6 +37,14 @@ export function PanelShell({
 
   const [configOpen, setConfigOpen] = useState(false);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  // The docked sub-panel currently being dragged, rendered as a pointer-following
+  // ghost (fixed at left/top). Null unless a docked reorder drag is in progress.
+  const [ghost, setGhost] = useState<{
+    id: string;
+    left: number;
+    top: number;
+    width: number;
+  } | null>(null);
 
   const defById = useCallback((id: string) => defs.find((d) => d.id === id), [defs]);
 
@@ -136,7 +144,7 @@ export function PanelShell({
   });
 
   // ── Sub-panel header drag: tear off / reorder / move-while-floating ─────────
-  const sub = useRef({ id: "", grabDX: 0, grabDY: 0, floating: false });
+  const sub = useRef({ id: "", grabDX: 0, grabDY: 0, w: 0, floating: false });
 
   const computeDropIndex = (clientY: number, excludeId: string): number => {
     const list = dockedPanels(state).filter((p) => p.id !== excludeId);
@@ -154,6 +162,7 @@ export function PanelShell({
       id,
       grabDX: r ? e.clientX - r.left : 20,
       grabDY: r ? e.clientY - r.top : 12,
+      w: r?.width ?? state.dockedWidth,
       floating: p.floating,
     };
   };
@@ -167,13 +176,19 @@ export function PanelShell({
     }
     const shellR = shellRef.current!.getBoundingClientRect();
     if (e.clientX < shellR.left - TEAR_OFF_MARGIN) {
+      // Torn off: commit a real float and let the floating path take over — clear
+      // the ghost so we don't double-render the panel.
       setDropIndex(null);
+      setGhost(null);
       const floatW = state.floating ? state.floatW : state.dockedWidth;
       dispatch({ type: "floatSub", id, ...place, floatW });
       s.floating = true;
       return;
     }
+    // Still in the dock: the panel lifts out of the accordion flow and follows
+    // the pointer as a ghost, with the drop indicator marking the landing slot.
     setDropIndex(computeDropIndex(e.clientY, id));
+    setGhost({ id, left: place.floatX, top: place.floatY, width: s.w });
   };
 
   const onSubDragEnd = (id: string, m: DragMove) => {
@@ -181,6 +196,7 @@ export function PanelShell({
       dispatch({ type: "reorderSub", id, targetIndex: dropIndex });
     }
     setDropIndex(null);
+    setGhost(null);
   };
 
   // ── Sub-panel floating resize ───────────────────────────────────────────────
@@ -202,10 +218,11 @@ export function PanelShell({
     else subRefs.current.delete(id);
   };
 
-  const renderSub = (id: string) => {
+  const renderSub = (id: string, dragStyle?: React.CSSProperties) => {
     const def = defById(id);
     const panel = state.panels.find((p) => p.id === id);
     if (!def || !panel) return null;
+    const isDragging = dragStyle !== undefined;
     return (
       <SubPanel
         key={id}
@@ -220,11 +237,17 @@ export function PanelShell({
         onHeaderDragEnd={(m) => onSubDragEnd(id, m)}
         onResizeStart={() => onSubResizeStart(id)}
         onResizeMove={(m) => onSubResizeMove(id, m)}
+        isDragging={isDragging}
+        dragStyle={dragStyle}
       />
     );
   };
 
   const docked = dockedPanels(state);
+  // While ghost-dragging, the dragged panel leaves the accordion flow (the list
+  // reflows to close the gap); the drop indicator indices then line up with
+  // `computeDropIndex`, which excludes the same id.
+  const flowDocked = docked.filter((p) => p.id !== ghost?.id);
   const floating = orderedPanels(state).filter((p) => p.visible && p.floating);
   const showBody = !(state.collapsed && !state.floating);
 
@@ -297,13 +320,26 @@ export function PanelShell({
 
         {showBody && (
           <div ref={bodyRef} className="flow-pnl__body">
-            {docked.map((p, i) => (
-              <Fragment key={p.id}>
-                {dropIndex === i && <div className="flow-pnl__drop" />}
-                {renderSub(p.id)}
-              </Fragment>
-            ))}
-            {dropIndex === docked.length && <div className="flow-pnl__drop" />}
+            {docked.map((p) => {
+              // The dragged panel stays mounted in place (so its drag listeners
+              // survive) but renders as a fixed ghost — fixed positioning lifts it
+              // out of the flow, so the accordion closes the gap. It consumes no
+              // drop-indicator slot; indices track `flowDocked` (== computeDropIndex).
+              const isDragged = p.id === ghost?.id;
+              const i = isDragged ? -1 : flowDocked.findIndex((fp) => fp.id === p.id);
+              return (
+                <Fragment key={p.id}>
+                  {!isDragged && dropIndex === i && <div className="flow-pnl__drop" />}
+                  {renderSub(
+                    p.id,
+                    isDragged
+                      ? { left: ghost.left, top: ghost.top, width: ghost.width }
+                      : undefined,
+                  )}
+                </Fragment>
+              );
+            })}
+            {dropIndex === flowDocked.length && <div className="flow-pnl__drop" />}
             {docked.length === 0 && (
               <p className="flow-pnl__empty">All panels are hidden or floating.</p>
             )}

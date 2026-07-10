@@ -16,6 +16,9 @@ interface SubPanelProps {
   onHeaderDragEnd: (m: DragMove, e: PointerEvent) => void;
   onResizeStart: () => void;
   onResizeMove: (m: DragMove) => void;
+  /** When set, render as a pointer-following drag ghost (fixed at dragStyle). */
+  isDragging?: boolean;
+  dragStyle?: React.CSSProperties;
 }
 
 const Chevron = ({ open }: { open: boolean }) => (
@@ -49,6 +52,8 @@ export function SubPanel({
   onHeaderDragEnd,
   onResizeStart,
   onResizeMove,
+  isDragging = false,
+  dragStyle,
 }: SubPanelProps) {
   const headerPointerDown = useDrag({
     threshold: 16,
@@ -71,13 +76,16 @@ export function SubPanel({
     "flow-pnl-sub",
     panel.expanded ? "" : "flow-pnl-sub--collapsed",
     panel.floating ? "flow-pnl-sub--floating" : "",
+    isDragging ? "flow-pnl-sub--dragging" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
-  const style = panel.floating
-    ? { left: panel.floatX, top: panel.floatY, width: panel.floatW }
-    : undefined;
+  const style = isDragging
+    ? dragStyle
+    : panel.floating
+      ? { left: panel.floatX, top: panel.floatY, width: panel.floatW }
+      : undefined;
 
   return (
     <section ref={registerRef} className={className} style={style} data-pid={panel.id}>

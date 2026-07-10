@@ -166,6 +166,19 @@
   box-shadow: var(--flow-shadow);
   overflow: hidden;
 }
+/* Pointer-following ghost while reordering a docked sub-panel: same card look as
+ * a floating panel, but translucent and click-through so it reads as "lifted". */
+.flow-pnl-sub--dragging {
+  position: fixed;
+  z-index: 96;
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-md);
+  background: var(--flow-panel-bg);
+  box-shadow: var(--flow-shadow);
+  overflow: hidden;
+  opacity: 0.5;
+  pointer-events: none;
+}
 .flow-pnl-sub__header {
   display: flex;
   align-items: center;

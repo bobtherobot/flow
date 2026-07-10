@@ -69,3 +69,41 @@ test("config menu stays fully on-screen when the panel is docked right", async (
   expect(box.x + box.width).toBeLessThanOrEqual(vp.width);
   expect(box.y + box.height).toBeLessThanOrEqual(vp.height);
 });
+
+test("reordering a docked sub-panel persists after drop and reload", async ({ page }) => {
+  await page.goto("/");
+  const titles = page.locator(".flow-pnl-sub__title");
+  await expect(titles).toHaveText([
+    "Transform",
+    "Color",
+    "Stroke",
+    "Text",
+    "Align",
+    "Search",
+    "Layers",
+  ]);
+
+  // Drag Stroke's header up above Transform to drop it at the top of the stack.
+  const strokeHeader = page.locator('.flow-pnl-sub[data-pid="stroke"] .flow-pnl-sub__header');
+  const transform = page.locator('.flow-pnl-sub[data-pid="transform"]');
+  const sh = (await strokeHeader.boundingBox())!;
+  const tb = (await transform.boundingBox())!;
+  const grabX = sh.x + sh.width / 2;
+
+  await page.mouse.move(grabX, sh.y + sh.height / 2);
+  await page.mouse.down();
+  // Move up in steps so pointermove fires, the ghost lifts, and the drop index
+  // resolves. Stay at the same x so we don't cross the tear-off threshold.
+  await page.mouse.move(grabX, sh.y - 24, { steps: 6 });
+  await page.mouse.move(grabX, tb.y + 4, { steps: 6 });
+  // The dragged panel is lifted out of the flow as a translucent ghost.
+  await expect(page.locator(".flow-pnl-sub--dragging")).toBeVisible();
+  await expect(page.locator(".flow-pnl__drop")).toBeVisible();
+  await page.mouse.up();
+
+  const reordered = ["Stroke", "Transform", "Color", "Text", "Align", "Search", "Layers"];
+  await expect(titles).toHaveText(reordered);
+
+  await page.reload();
+  await expect(page.locator(".flow-pnl-sub__title")).toHaveText(reordered);
+});
