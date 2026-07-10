@@ -1,25 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { MIXED, type Mixed } from "../../../lib/selection-style";
-
-/** A compact, opinionated palette for the flow-native picker. */
-const PRESETS = [
-  "#1e1e1e", "#343a40", "#495057", "#868e96", "#ced4da", "#ffffff",
-  "#e03131", "#e8590c", "#f08c00", "#2f9e44", "#099268", "#1971c2",
-  "#4263eb", "#7048e8", "#ae3ec9", "#c2255c",
-];
-
-const HEX_RE = /^#?([0-9a-fA-F]{6})$/;
-
-/** Normalize loose hex input to `#rrggbb` lowercase, or null if invalid. */
-function normalizeHex(input: string): string | null {
-  const m = HEX_RE.exec(input.trim());
-  return m ? `#${m[1].toLowerCase()}` : null;
-}
+import { scrubHex } from "../../../lib/color-palettes";
+import { useDefaultPaletteColors } from "../../../lib/palette-store";
 
 /** A hex the native `<input type=color>` will accept (it rejects transparent). */
 function safeNativeHex(value: string | Mixed): string {
   if (value === MIXED || value === "transparent") return "#000000";
-  return normalizeHex(value) ?? "#000000";
+  return scrubHex(value) ?? "#000000";
 }
 
 interface ColorSwatchProps {
@@ -48,6 +35,7 @@ export function ColorSwatch({
   const [open, setOpen] = useState(false);
   const [hexText, setHexText] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
+  const presets = useDefaultPaletteColors();
 
   const isMixed = value === MIXED;
   const isTransparent = value === "transparent";
@@ -69,7 +57,7 @@ export function ColorSwatch({
     .join(" ");
 
   const commitHex = () => {
-    const hex = normalizeHex(hexText);
+    const hex = scrubHex(hexText);
     if (hex) onChange(hex);
   };
 
@@ -92,7 +80,7 @@ export function ColorSwatch({
       {open && (
         <div className="flow-ctl-color__popover" role="dialog" aria-label={`${ariaLabel} picker`}>
           <div className="flow-ctl-color__grid">
-            {PRESETS.map((c) => (
+            {presets.map((c) => (
               <button
                 key={c}
                 type="button"
