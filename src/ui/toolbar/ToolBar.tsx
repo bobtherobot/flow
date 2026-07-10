@@ -108,6 +108,17 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
         </button>
       </div>
 
+      {!state.hiddenTools.includes(LOCK_ID) && (
+        <div className="flow-toolbar__lock">
+          <ToolButton
+            icon={TOOL_ICONS[LOCK_ID]}
+            label="Keep tool active"
+            active={locked}
+            onClick={toggleLock}
+          />
+        </div>
+      )}
+
       <div className="flow-toolbar__tools">
         {TOOLS.filter((t) => !state.hiddenTools.includes(t.id)).map((t) => {
           const toolType = t.toolType ?? t.id;
@@ -126,17 +137,6 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
           );
         })}
       </div>
-
-      {!state.hiddenTools.includes(LOCK_ID) && (
-        <div className="flow-toolbar__foot">
-          <ToolButton
-            icon={TOOL_ICONS[LOCK_ID]}
-            label="Keep tool active"
-            active={locked}
-            onClick={toggleLock}
-          />
-        </div>
-      )}
 
       {menuOpen && (
         <ToolbarConfigMenu
