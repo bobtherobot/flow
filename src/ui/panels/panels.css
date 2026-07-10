@@ -803,24 +803,24 @@
 .flow-sw-select { flex: 1 1 auto; min-width: 0; }
 .flow-sw-icon {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; border-radius: 6px; cursor: pointer;
-  background: transparent; border: 1px solid var(--flow-border, #d0d0d0);
+  width: 24px; height: 24px; border-radius: var(--flow-radius-sm); cursor: pointer;
+  background: transparent; border: 1px solid var(--flow-border);
 }
-.flow-sw-icon:hover { background: var(--flow-hover, rgba(0,0,0,0.06)); }
+.flow-sw-icon:hover { background: var(--flow-hover); }
 
 .flow-sw-grid { display: flex; flex-wrap: wrap; gap: 6px; }
 .flow-sw-add,
 .flow-sw-tile {
-  width: 22px; height: 22px; border-radius: 6px; cursor: pointer; padding: 0;
-  border: 1px solid var(--flow-border, #d0d0d0);
+  width: 22px; height: 22px; border-radius: var(--flow-radius-sm); cursor: pointer; padding: 0;
+  border: 1px solid var(--flow-border);
 }
 .flow-sw-add {
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 15px; line-height: 1; background: transparent;
 }
-.flow-sw-add:hover { background: var(--flow-hover, rgba(0,0,0,0.06)); }
+.flow-sw-add:hover { background: var(--flow-hover); }
 .flow-sw-tile[aria-pressed="true"] {
-  outline: 2px solid var(--flow-accent, #4263eb); outline-offset: 1px;
+  outline: 2px solid var(--flow-accent); outline-offset: 1px;
 }
 
 .flow-sw-name { flex: 1 1 auto; min-width: 0; }
@@ -829,16 +829,18 @@
 
 .flow-sw-picker {
   display: flex; align-items: center; gap: 6px;
-  padding: 6px; border-radius: 8px;
-  border: 1px solid var(--flow-border, #d0d0d0);
-  background: var(--flow-surface, #fff);
+  padding: 6px; border-radius: var(--flow-radius-md);
+  border: 1px solid var(--flow-border);
+  background: var(--flow-panel-bg);
+  color: var(--flow-ink);
 }
 .flow-sw-picker__hex { width: 82px; }
 
 .flow-sw-confirm {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 8px; text-align: center;
-  padding: 12px; border-radius: 8px;
-  background: var(--flow-surface, #fff); border: 1px solid var(--flow-border, #d0d0d0);
+  padding: 12px; border-radius: var(--flow-radius-md);
+  background: var(--flow-panel-bg); border: 1px solid var(--flow-border);
+  color: var(--flow-ink);
 }
 .flow-sw-confirm__actions { display: flex; gap: 8px; }
