@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import { useViewToggles } from "./useViewToggles";
 
 type Api = Parameters<typeof useViewToggles>[0];
@@ -56,5 +56,34 @@ describe("useViewToggles", () => {
       result.current.grid.toggle();
       result.current.toolLock.toggle();
     }).not.toThrow();
+  });
+
+  it("re-renders checked state when onChange fires", () => {
+    let state: Record<string, unknown> = {
+      gridModeEnabled: false,
+      objectsSnapModeEnabled: false,
+      zenModeEnabled: true,
+      activeTool: { type: "rectangle", locked: true },
+    };
+    let fire = () => {};
+    const api = {
+      onChange: (cb: () => void) => {
+        fire = cb;
+        return () => {};
+      },
+      getAppState: () => state,
+      executeAction: vi.fn(),
+      setActiveTool: vi.fn(),
+    };
+    const { result } = renderHook(() => useViewToggles(api as unknown as Api));
+    expect(result.current.grid.checked).toBe(false);
+    state = {
+      gridModeEnabled: true,
+      objectsSnapModeEnabled: false,
+      zenModeEnabled: true,
+      activeTool: { type: "rectangle", locked: true },
+    };
+    act(() => fire());
+    expect(result.current.grid.checked).toBe(true);
   });
 });
