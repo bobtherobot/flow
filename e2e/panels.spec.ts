@@ -10,11 +10,12 @@ test("dockable accordion replaces the Excalidraw island", async ({ page }) => {
   const panel = page.locator(".flow-pnl");
   await expect(panel).toBeVisible();
 
-  // Transform / Color / Stroke / Text / Align / Search / Layers sub-panels, in order.
+  // Transform / Color / Color Swatches / Stroke / Text / Align / Search / Layers sub-panels, in order.
   const titles = page.locator(".flow-pnl-sub__title");
   await expect(titles).toHaveText([
     "Transform",
     "Color",
+    "Color Swatches",
     "Stroke",
     "Text",
     "Align",
