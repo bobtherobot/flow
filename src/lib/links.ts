@@ -6,5 +6,5 @@ export const FLOW_REPO_URL = "https://github.com/bobtherobot/flow";
 export const FLOW_DOCS_URL = "https://github.com/bobtherobot/flow#readme";
 export const FLOW_ISSUES_URL = "https://github.com/bobtherobot/flow/issues";
 
-/** Upstream Excalidraw fork that flow is built on. */
-export const EXCALIDRAW_FORK_URL = "https://github.com/bobtherobot/excalidraw";
+/** The upstream Excalidraw project that flow is built on. */
+export const EXCALIDRAW_URL = "https://github.com/excalidraw/excalidraw";

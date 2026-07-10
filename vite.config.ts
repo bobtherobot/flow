@@ -8,6 +8,10 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   base: "./",
   plugins: [react()],
+  // Stamp the build date (YYYY-MM-DD) into the bundle for the About dialog.
+  define: {
+    __FLOW_BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+  },
   build: {
     rollupOptions: {
       output: {
