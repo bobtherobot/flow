@@ -61,6 +61,7 @@ export function PreferencesDialog({
     value: gridSize,
     min: MIN_GRID_SIZE,
     max: MAX_GRID_SIZE,
+    step: GRID_SIZE_STEP,
     onChange: onChangeGridSize,
   });
 

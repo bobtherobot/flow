@@ -7,6 +7,9 @@ interface UseNumberFieldArgs {
   value: number | null;
   min: number;
   max: number;
+  /** Optional step to snap the committed value to (within [min,max]). When
+   *  omitted, the committed value is only range-clamped, not snapped. */
+  step?: number;
   onChange: (value: number) => void;
 }
 
@@ -26,7 +29,7 @@ interface NumberFieldBinding {
  * reflects external value changes. Shared by NumberInput and SliderInput's field
  * (the slider's drag stays live, since that's a deliberate gesture, not typing).
  */
-export function useNumberField({ value, min, max, onChange }: UseNumberFieldArgs): NumberFieldBinding {
+export function useNumberField({ value, min, max, step, onChange }: UseNumberFieldArgs): NumberFieldBinding {
   const [text, setText] = useState(value === null ? "" : String(value));
   const focused = useRef(false);
   // Tracks the last value we know the parent holds, so re-committing an unchanged
@@ -51,10 +54,14 @@ export function useNumberField({ value, min, max, onChange }: UseNumberFieldArgs
       return;
     }
     const clamped = clamp(n, min, max);
-    setText(String(clamped));
-    if (clamped !== committed.current) {
-      committed.current = clamped;
-      onChange(clamped);
+    const snapped =
+      typeof step === "number" && Number.isFinite(step) && step > 0
+        ? Math.min(max, Math.max(min, Math.round(clamped / step) * step))
+        : clamped;
+    setText(String(snapped));
+    if (snapped !== committed.current) {
+      committed.current = snapped;
+      onChange(snapped);
     }
   };
 
