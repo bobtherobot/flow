@@ -10,6 +10,7 @@ import {
   isSelectionMode,
   type SelectionMode,
 } from "../lib/selection-mode";
+import { clampGridSize, isGridSize, DEFAULT_GRID_SIZE } from "../lib/grid";
 
 const SLOPPINESS_KEY = "flow.sloppiness";
 const UNITS_KEY = "flow.units";
@@ -152,6 +153,29 @@ export function getSelectionMode(): SelectionMode {
 export function setSelectionMode(value: SelectionMode): void {
   try {
     localStorage.setItem(SELECTION_MODE_KEY, value);
+  } catch {
+    // Quota / disabled storage: preference simply won't persist this session.
+  }
+}
+
+const GRID_SIZE_KEY = "flow.gridSize";
+
+/** Read the app-wide grid-size preference (default on miss/corrupt). */
+export function getGridSize(): number {
+  try {
+    const raw = localStorage.getItem(GRID_SIZE_KEY);
+    if (raw === null) return DEFAULT_GRID_SIZE;
+    const parsed = Number(raw);
+    return isGridSize(parsed) ? clampGridSize(parsed) : DEFAULT_GRID_SIZE;
+  } catch {
+    return DEFAULT_GRID_SIZE;
+  }
+}
+
+/** Persist the app-wide grid-size preference (clamped before write). */
+export function setGridSize(value: number): void {
+  try {
+    localStorage.setItem(GRID_SIZE_KEY, String(clampGridSize(value)));
   } catch {
     // Quota / disabled storage: preference simply won't persist this session.
   }

@@ -6,6 +6,7 @@ import {
   getBindingMode, setBindingMode,
   getLaserColor, setLaserColor,
   getSelectionMode, setSelectionMode,
+  getGridSize, setGridSize,
 } from "./preferences";
 import { DEFAULT_TOOLBAR_STATE } from "../ui/toolbar/toolbar-state";
 import { DEFAULT_QUICKBAR_STATE } from "../ui/quickbar/quickbar-state";
@@ -172,5 +173,28 @@ describe("laser color preference", () => {
   it("falls back to the default on a corrupt value", () => {
     localStorage.setItem("flow.laserColor", "not-a-color");
     expect(getLaserColor()).toBe(DEFAULT_LASER_HEX);
+  });
+});
+
+describe("grid size preference", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to 20 when unset", () => {
+    expect(getGridSize()).toBe(20);
+  });
+
+  it("round-trips a valid value", () => {
+    setGridSize(40);
+    expect(getGridSize()).toBe(40);
+  });
+
+  it("clamps an out-of-range value on write", () => {
+    setGridSize(500);
+    expect(getGridSize()).toBe(100);
+  });
+
+  it("falls back to the default on a corrupt stored value", () => {
+    localStorage.setItem("flow.gridSize", "banana");
+    expect(getGridSize()).toBe(20);
   });
 });
