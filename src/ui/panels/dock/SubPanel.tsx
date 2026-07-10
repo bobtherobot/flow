@@ -89,6 +89,7 @@ export function SubPanel({
           if (!(e.target as HTMLElement).closest("button")) onToggleExpand();
         }}
       >
+        <span className="flow-pnl-sub__grip" aria-hidden="true">⠿</span>
         <button
           type="button"
           className="flow-pnl-sub__btn flow-pnl-sub__disclosure"

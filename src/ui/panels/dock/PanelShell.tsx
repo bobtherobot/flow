@@ -254,6 +254,9 @@ export function PanelShell({
     <>
       <div ref={shellRef} className={shellClass} style={shellStyle}>
         <div className="flow-pnl__topbar" onPointerDown={onTopbarDown}>
+          {showBody && (
+            <span className="flow-pnl__grip" aria-hidden="true">⠿</span>
+          )}
           <button
             type="button"
             className="flow-pnl__icon-btn"

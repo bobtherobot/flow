@@ -25,6 +25,14 @@ JS → reimplemented in React/TS).
   `LayoutManagerDialog`, `useDrag`. Stub content in `PanelsRoot.tsx`. e2e:
   `e2e/panels.spec.ts`. Mounted in `App.tsx` beside `<Excalidraw>`.
 
+## Recent tweaks
+- **Drag grips** (2026-07-09): a leading `⠿` grip on the controls-panel topbar
+  (`.flow-pnl__grip`, shown only when `showBody` — hidden on the collapsed docked
+  strip) and on every sub-panel header (`.flow-pnl-sub__grip`). Both are 16px,
+  `pointer-events:none` so clicks/drags fall through to the existing header drag
+  surface (shared style block in panels.css). Mirrors the tool/quick/bottom bar
+  grips.
+
 ## Key gotchas / architecture
 - flow consumes the **built** vendor dist (`vendor/excalidraw/.../dist/prod/index.js`).
   Adding a fork export requires editing source **and** `npm run build:excalidraw`.

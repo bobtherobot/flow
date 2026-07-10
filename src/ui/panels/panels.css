@@ -57,6 +57,19 @@
   text-transform: uppercase;
   color: var(--flow-ink-muted);
 }
+
+/* Drag-grip affordance on the panel topbar + each sub-panel header. Purely
+   visual: pointer-events pass through to the header's drag surface below. */
+.flow-pnl__grip,
+.flow-pnl-sub__grip {
+  flex-shrink: 0;
+  padding: 0 2px;
+  color: var(--flow-ink-disabled);
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: -2px;
+  pointer-events: none;
+}
 .flow-pnl__icon-btn {
   display: inline-flex;
   align-items: center;
