@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PreferencesDialog } from "./PreferencesDialog";
 
@@ -7,6 +7,7 @@ function setup(overrides = {}) {
   const onChangeSloppiness = vi.fn();
   const onChangeUnits = vi.fn();
   const onChangeSelectionMode = vi.fn();
+  const onChangeGridSize = vi.fn();
   const onShowShortcuts = vi.fn();
   const onClose = vi.fn();
   render(
@@ -17,6 +18,8 @@ function setup(overrides = {}) {
       onChangeUnits={onChangeUnits}
       selectionMode="enclose"
       onChangeSelectionMode={onChangeSelectionMode}
+      gridSize={20}
+      onChangeGridSize={onChangeGridSize}
       onShowShortcuts={onShowShortcuts}
       onClose={onClose}
       {...overrides}
@@ -26,6 +29,7 @@ function setup(overrides = {}) {
     onChangeSloppiness,
     onChangeUnits,
     onChangeSelectionMode,
+    onChangeGridSize,
     onShowShortcuts,
     onClose,
   };
@@ -65,6 +69,31 @@ describe("PreferencesDialog", () => {
     const { onChangeSelectionMode } = setup({ selectionMode: "enclose" });
     await userEvent.click(screen.getByRole("radio", { name: "marquee touch" }));
     expect(onChangeSelectionMode).toHaveBeenCalledWith("touch");
+  });
+
+  it("shows the grid-size input reflecting the current value", () => {
+    setup({ gridSize: 40 });
+    expect(screen.getByLabelText("Grid size")).toHaveValue(40);
+  });
+
+  it("fires onChangeGridSize with the entered value", () => {
+    // NOTE: `gridSize` is a controlled prop backed by a `vi.fn()` mock that
+    // never updates it, so sequential userEvent.type() keystrokes don't
+    // accumulate as expected — each render resets the DOM value back to the
+    // fixed `gridSize` prop between keystrokes. Firing a single definite
+    // change exercises the same commit behavior deterministically.
+    const { onChangeGridSize } = setup();
+    const input = screen.getByLabelText("Grid size");
+    fireEvent.change(input, { target: { value: "50" } });
+    expect(onChangeGridSize).toHaveBeenLastCalledWith(50);
+  });
+
+  it("clamps an out-of-range entry before firing onChangeGridSize", async () => {
+    const { onChangeGridSize } = setup();
+    const input = screen.getByLabelText("Grid size");
+    await userEvent.clear(input);
+    await userEvent.type(input, "500");
+    expect(onChangeGridSize).toHaveBeenLastCalledWith(100);
   });
 
   it("switches to the Keyboard category and fires onShowShortcuts", async () => {

@@ -95,3 +95,40 @@
   outline: 2px solid #6366f1;
   outline-offset: -2px;
 }
+
+/* Number-input field (e.g. Grid size). */
+.flow-num {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 1rem;
+}
+.flow-num__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #4a5163;
+}
+.flow-num__control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+}
+.flow-num__input {
+  font: inherit;
+  font-size: 0.875rem;
+  width: 5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #d6dae4;
+  border-radius: 8px;
+  background: #fbfcfe;
+  color: #4a5163;
+}
+.flow-num__input:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: -2px;
+}
+.flow-num__suffix {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}

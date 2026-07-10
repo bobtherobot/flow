@@ -10,6 +10,12 @@ import {
   SELECTION_MODE_LABELS,
   type SelectionMode,
 } from "../lib/selection-mode";
+import {
+  MIN_GRID_SIZE,
+  MAX_GRID_SIZE,
+  GRID_SIZE_STEP,
+  clampGridSize,
+} from "../lib/grid";
 import "./dialogs.css";
 import "./preferences-dialog.css";
 
@@ -20,6 +26,8 @@ export interface PreferencesDialogProps {
   onChangeUnits: (value: Unit) => void;
   selectionMode: SelectionMode;
   onChangeSelectionMode: (value: SelectionMode) => void;
+  gridSize: number;
+  onChangeGridSize: (value: number) => void;
   onShowShortcuts: () => void;
   onClose: () => void;
 }
@@ -41,12 +49,15 @@ export function PreferencesDialog({
   onChangeUnits,
   selectionMode,
   onChangeSelectionMode,
+  gridSize,
+  onChangeGridSize,
   onShowShortcuts,
   onClose,
 }: PreferencesDialogProps) {
   const [category, setCategory] = useState<Category>("general");
   const titleId = useId();
   const unitsId = useId();
+  const gridSizeId = useId();
 
   return (
     <div
@@ -154,6 +165,27 @@ export function PreferencesDialog({
                       {SELECTION_MODE_LABELS[mode]}
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {category === "general" && (
+              <div className="flow-num">
+                <label className="flow-num__label" htmlFor={gridSizeId}>
+                  Grid size
+                </label>
+                <div className="flow-num__control">
+                  <input
+                    id={gridSizeId}
+                    className="flow-num__input"
+                    type="number"
+                    min={MIN_GRID_SIZE}
+                    max={MAX_GRID_SIZE}
+                    step={GRID_SIZE_STEP}
+                    value={gridSize}
+                    onChange={(e) => onChangeGridSize(clampGridSize(Number(e.target.value)))}
+                  />
+                  <span className="flow-num__suffix">px</span>
                 </div>
               </div>
             )}
