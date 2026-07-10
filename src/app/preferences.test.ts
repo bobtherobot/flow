@@ -7,6 +7,10 @@ import {
   getLaserColor, setLaserColor,
   getSelectionMode, setSelectionMode,
   getGridSize, setGridSize,
+  getColorPalettes,
+  setColorPalettes,
+  getDefaultPaletteId,
+  setDefaultPaletteId,
 } from "./preferences";
 import { DEFAULT_TOOLBAR_STATE } from "../ui/toolbar/toolbar-state";
 import { DEFAULT_QUICKBAR_STATE } from "../ui/quickbar/quickbar-state";
@@ -196,5 +200,34 @@ describe("grid size preference", () => {
   it("falls back to the default on a corrupt stored value", () => {
     localStorage.setItem("flow.gridSize", "banana");
     expect(getGridSize()).toBe(20);
+  });
+});
+
+describe("color palettes persistence", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("round-trips a normalized palette list", () => {
+    setColorPalettes([{ id: "a", name: "A", colors: ["#ffffff"] }]);
+    expect(getColorPalettes()).toEqual([{ id: "a", name: "A", colors: ["#ffffff"] }]);
+  });
+
+  it("returns [] when unset or corrupt", () => {
+    expect(getColorPalettes()).toEqual([]);
+    localStorage.setItem("flow.colorPalettes", "{not json");
+    expect(getColorPalettes()).toEqual([]);
+  });
+
+  it("scrubs colors on read via normalizePalettes", () => {
+    localStorage.setItem(
+      "flow.colorPalettes",
+      JSON.stringify([{ id: "a", name: "A", colors: ["#FFF", "nothex"] }]),
+    );
+    expect(getColorPalettes()).toEqual([{ id: "a", name: "A", colors: ["#ffffff"] }]);
+  });
+
+  it("round-trips the default palette id, null when unset", () => {
+    expect(getDefaultPaletteId()).toBeNull();
+    setDefaultPaletteId("xyz");
+    expect(getDefaultPaletteId()).toBe("xyz");
   });
 });
