@@ -2,15 +2,37 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MenuBar } from "./MenuBar";
+import type { MenuBarProps } from "./MenuBar";
 
 const noop = () => {};
+
+/** Fake api is a partial stand-in for ExcalidrawAPI; cast at this single
+ *  boundary (mirrors the pattern in useViewToggles.test.ts). */
+function fakeApi(state: Record<string, unknown> = {}): NonNullable<MenuBarProps["api"]> {
+  return {
+    onChange: () => () => {},
+    getAppState: () => ({
+      gridModeEnabled: false,
+      objectsSnapModeEnabled: true,
+      zenModeEnabled: false,
+      activeTool: { type: "selection", locked: false },
+      ...state,
+    }),
+    executeAction: vi.fn(),
+    setActiveTool: vi.fn(),
+  } as unknown as NonNullable<MenuBarProps["api"]>;
+}
+
 const props = {
   onNew: noop, onOpen: noop, onSave: noop, onExport: noop, onPreferences: noop,
   onClearCanvas: noop, onProperties: noop,
   onZoomIn: noop, onZoomOut: noop, onZoomToFit: noop,
-  onResetZoom: noop, onToggleGrid: noop, onAbout: noop, onEditAction: noop,
+  onResetZoom: noop, onAbout: noop, onEditAction: noop,
   onDocumentation: noop, onSubmitIssue: noop, onShowShortcuts: noop,
   isToolbarVisible: true, onToggleToolbar: noop,
+  api: fakeApi(),
+  isArrowBindingOn: false,
+  onToggleArrowBinding: noop,
 };
 
 describe("MenuBar", () => {
@@ -122,5 +144,67 @@ describe("MenuBar", () => {
     await user.click(screen.getByRole("menuitem", { name: "View" }));
     await user.click(await screen.findByRole("menuitem", { name: "Reset Layout" }));
     expect(onResetLayout).toHaveBeenCalledOnce();
+  });
+
+  it("shows the five canvas toggles in the View menu", async () => {
+    const user = userEvent.setup();
+    render(<MenuBar {...props} api={fakeApi()} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    for (const name of ["Grid", "Snap to Objects", "Arrow Binding", "Tool Lock", "Zen Mode"]) {
+      expect(await screen.findByRole("menuitemcheckbox", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("reflects live checked state from appState", async () => {
+    const user = userEvent.setup();
+    render(<MenuBar {...props} api={fakeApi({ gridModeEnabled: false, objectsSnapModeEnabled: true })} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    expect(await screen.findByRole("menuitemcheckbox", { name: "Snap to Objects" })).toBeChecked();
+    expect(screen.getByRole("menuitemcheckbox", { name: "Grid" })).not.toBeChecked();
+  });
+
+  it("dispatches gridMode when Grid is clicked", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi();
+    render(<MenuBar {...props} api={api} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    await user.click(await screen.findByRole("menuitemcheckbox", { name: "Grid" }));
+    expect(api.executeAction).toHaveBeenCalledWith("gridMode");
+  });
+
+  it("dispatches objectsSnapMode when Snap to Objects is clicked", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi();
+    render(<MenuBar {...props} api={api} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    await user.click(await screen.findByRole("menuitemcheckbox", { name: "Snap to Objects" }));
+    expect(api.executeAction).toHaveBeenCalledWith("objectsSnapMode");
+  });
+
+  it("dispatches zenMode when Zen Mode is clicked", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi();
+    render(<MenuBar {...props} api={api} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    await user.click(await screen.findByRole("menuitemcheckbox", { name: "Zen Mode" }));
+    expect(api.executeAction).toHaveBeenCalledWith("zenMode");
+  });
+
+  it("flips the tool lock via setActiveTool when Tool Lock is clicked", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({ activeTool: { type: "selection", locked: false } });
+    render(<MenuBar {...props} api={api} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    await user.click(await screen.findByRole("menuitemcheckbox", { name: "Tool Lock" }));
+    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "selection", locked: true });
+  });
+
+  it("fires onToggleArrowBinding when Arrow Binding is clicked", async () => {
+    const user = userEvent.setup();
+    const onToggleArrowBinding = vi.fn();
+    render(<MenuBar {...props} api={fakeApi()} onToggleArrowBinding={onToggleArrowBinding} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    await user.click(await screen.findByRole("menuitemcheckbox", { name: "Arrow Binding" }));
+    expect(onToggleArrowBinding).toHaveBeenCalledOnce();
   });
 });

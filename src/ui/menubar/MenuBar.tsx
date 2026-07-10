@@ -1,5 +1,6 @@
 import * as Menubar from "@radix-ui/react-menubar";
-import type { ImageFormat } from "../../lib/excalidraw-scene";
+import type { ExcalidrawAPI, ImageFormat } from "../../lib/excalidraw-scene";
+import { useViewToggles } from "./useViewToggles";
 import "./menubar.css";
 
 export interface MenuBarProps {
@@ -16,7 +17,12 @@ export interface MenuBarProps {
   onZoomOut: () => void;
   onZoomToFit: () => void;
   onResetZoom: () => void;
-  onToggleGrid: () => void;
+  /** Live Excalidraw handle; drives the View-menu canvas toggles. */
+  api: ExcalidrawAPI | null;
+  /** Whether arrow-binding is on (flow-owned bindingMode). */
+  isArrowBindingOn: boolean;
+  /** Flip the arrow-binding lock. */
+  onToggleArrowBinding: () => void;
   /** Whether the tool rail is currently shown (drives the View checkbox).
    *  Optional so the tree builds before App wires it (Task 11); App always sets it. */
   isToolbarVisible?: boolean;
@@ -59,6 +65,7 @@ const contentProps = { align: "start", sideOffset: 4, className: "flow-menu" } a
  * flyout); every action is delegated to a callback owned by App.
  */
 export function MenuBar(props: MenuBarProps) {
+  const view = useViewToggles(props.api);
   return (
     <Menubar.Root className="flow-menubar" aria-label="Application menu">
       <Menubar.Menu>
@@ -193,9 +200,47 @@ export function MenuBar(props: MenuBarProps) {
               Reset Zoom
             </Menubar.Item>
             <Menubar.Separator className="flow-menu__sep" />
-            <Menubar.Item className="flow-menu__item" onSelect={props.onToggleGrid}>
-              Toggle Grid
-            </Menubar.Item>
+            <Menubar.CheckboxItem
+              className="flow-menu__item flow-menu__item--check"
+              checked={view.grid.checked}
+              onCheckedChange={view.grid.toggle}
+            >
+              <Menubar.ItemIndicator className="flow-menu__check" aria-hidden="true">✓</Menubar.ItemIndicator>
+              Grid
+            </Menubar.CheckboxItem>
+            <Menubar.CheckboxItem
+              className="flow-menu__item flow-menu__item--check"
+              checked={view.objectsSnap.checked}
+              onCheckedChange={view.objectsSnap.toggle}
+            >
+              <Menubar.ItemIndicator className="flow-menu__check" aria-hidden="true">✓</Menubar.ItemIndicator>
+              Snap to Objects
+            </Menubar.CheckboxItem>
+            <Menubar.CheckboxItem
+              className="flow-menu__item flow-menu__item--check"
+              checked={props.isArrowBindingOn}
+              onCheckedChange={props.onToggleArrowBinding}
+            >
+              <Menubar.ItemIndicator className="flow-menu__check" aria-hidden="true">✓</Menubar.ItemIndicator>
+              Arrow Binding
+            </Menubar.CheckboxItem>
+            <Menubar.CheckboxItem
+              className="flow-menu__item flow-menu__item--check"
+              checked={view.toolLock.checked}
+              onCheckedChange={view.toolLock.toggle}
+            >
+              <Menubar.ItemIndicator className="flow-menu__check" aria-hidden="true">✓</Menubar.ItemIndicator>
+              Tool Lock
+            </Menubar.CheckboxItem>
+            <Menubar.CheckboxItem
+              className="flow-menu__item flow-menu__item--check"
+              checked={view.zenMode.checked}
+              onCheckedChange={view.zenMode.toggle}
+            >
+              <Menubar.ItemIndicator className="flow-menu__check" aria-hidden="true">✓</Menubar.ItemIndicator>
+              Zen Mode
+            </Menubar.CheckboxItem>
+            <Menubar.Separator className="flow-menu__sep" />
             <Menubar.CheckboxItem
               className="flow-menu__item flow-menu__item--check"
               checked={props.isToolbarVisible ?? true}
