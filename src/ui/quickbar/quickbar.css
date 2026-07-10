@@ -54,6 +54,7 @@
   line-height: 1;
   letter-spacing: -2px;
   padding: 0 2px;
+  margin-top: 4px;
 }
 .flow-quickbar__iconbtn {
   display: inline-flex;
@@ -65,7 +66,7 @@
   border: none;
   background: transparent;
   color: var(--flow-ink-muted);
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1;
   cursor: pointer;
   border-radius: var(--flow-radius-sm);

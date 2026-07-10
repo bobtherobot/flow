@@ -53,7 +53,13 @@ Branch `feat/quick-actions-bar` (built 2026-07-08). Mirrors
   (tool) ⊂ "Arrow binding", and align labels duplicate the Align panel. Existing
   specs were scoped (tool draws → `toolbar[name=Tools]`; align asserts →
   `.flow-align-panel`). New tests scope tool checks to the Quick actions toolbar.
-- Config-menu default: tools hidden (opt-in); everything else shown.
+- Config-menu default: tools hidden (opt-in); **plus grid/zen/undo/redo hidden**
+  (2026-07-09) — `actions.ts` `DEFAULT_HIDDEN_ITEM_IDS` = `[...TOOL_ITEM_IDS,
+  "gridMode","zenMode","undo","redo"]`, consumed by `DEFAULT_QUICKBAR_STATE`. The
+  default bar is arrange/group/align/snap/binding/lock; users opt the rest back in
+  from the hamburger. (Grid/zen still live in the bottom bar by default.) Note:
+  `color-panel.spec.ts` undo test now enables the Undo item via the config menu
+  first, since no undo button is shown by default.
 - **Handle = grip THEN hamburger; no close (✕) icon** (2026-07-09): the leading
   drag handle is `⠿` grip first, then `☰`. The old ✕ close button was removed;
   hiding the bar is now a **"Hide quick actions"** action button at the top of the

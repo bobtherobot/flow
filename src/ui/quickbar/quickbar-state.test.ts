@@ -5,11 +5,14 @@ import {
   withHiddenToggled,
   shouldRedock,
 } from "./quickbar-state";
-import { TOOL_ITEM_IDS } from "./actions";
+import { DEFAULT_HIDDEN_ITEM_IDS, TOOL_ITEM_IDS } from "./actions";
 
 describe("DEFAULT_QUICKBAR_STATE", () => {
-  it("hides every tool by default (tools are opt-in)", () => {
-    expect(DEFAULT_QUICKBAR_STATE.hiddenItems).toEqual([...TOOL_ITEM_IDS]);
+  it("hides tools plus grid/zen/undo/redo by default (all opt-in)", () => {
+    expect(DEFAULT_QUICKBAR_STATE.hiddenItems).toEqual([...DEFAULT_HIDDEN_ITEM_IDS]);
+    expect(DEFAULT_QUICKBAR_STATE.hiddenItems).toEqual(
+      expect.arrayContaining(["gridMode", "zenMode", "undo", "redo", ...TOOL_ITEM_IDS]),
+    );
     expect(DEFAULT_QUICKBAR_STATE.visible).toBe(true);
     expect(DEFAULT_QUICKBAR_STATE.floating).toBe(false);
   });
@@ -29,7 +32,7 @@ describe("normalizeQuickbarState", () => {
       floating: true,
       x: 120,
       y: 8,
-      hiddenItems: [...TOOL_ITEM_IDS],
+      hiddenItems: [...DEFAULT_HIDDEN_ITEM_IDS],
     });
   });
 
@@ -40,7 +43,7 @@ describe("normalizeQuickbarState", () => {
   it("coerces hiddenItems to an array of strings", () => {
     expect(normalizeQuickbarState({ hiddenItems: ["zenMode", 5, "gridMode"] }).hiddenItems)
       .toEqual(["zenMode", "gridMode"]);
-    expect(normalizeQuickbarState({ hiddenItems: "zenMode" }).hiddenItems).toEqual([...TOOL_ITEM_IDS]);
+    expect(normalizeQuickbarState({ hiddenItems: "zenMode" }).hiddenItems).toEqual([...DEFAULT_HIDDEN_ITEM_IDS]);
   });
 });
 

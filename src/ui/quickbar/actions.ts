@@ -44,6 +44,17 @@ const TOOL_ITEMS: readonly QuickItem[] = TOOLS.map((t) => ({
 /** The ids of every tool item — hidden by default (tools are opt-in). */
 export const TOOL_ITEM_IDS: readonly string[] = TOOL_ITEMS.map((t) => t.id);
 
+/** Items hidden from the bar by default (opt-in via the config menu): every
+ *  tool, plus the grid/zen toggles and undo/redo. Keeps the default bar focused
+ *  on arrange/group/align; users can enable any of these from the hamburger. */
+export const DEFAULT_HIDDEN_ITEM_IDS: readonly string[] = [
+  ...TOOL_ITEM_IDS,
+  "gridMode",
+  "zenMode",
+  "undo",
+  "redo",
+];
+
 /** All quick-bar items in render order. */
 export const QUICK_ITEMS: readonly QuickItem[] = [
   // Z-order

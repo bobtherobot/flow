@@ -1,4 +1,4 @@
-import { TOOL_ITEM_IDS } from "./actions";
+import { DEFAULT_HIDDEN_ITEM_IDS } from "./actions";
 
 /** Persisted layout/config of the quick-actions bar. Mirrors ToolbarState but
  *  docks horizontally (top strip, right of the menu) instead of vertically. */
@@ -19,8 +19,9 @@ export const DEFAULT_QUICKBAR_STATE: QuickbarState = {
   floating: false,
   x: 0,
   y: 0,
-  // Tools are opt-in: hidden until the user adds them from the config menu.
-  hiddenItems: [...TOOL_ITEM_IDS],
+  // Tools, grid/zen toggles and undo/redo are opt-in: hidden until the user
+  // adds them from the config menu.
+  hiddenItems: [...DEFAULT_HIDDEN_ITEM_IDS],
 };
 
 /** Distance (px) from the top edge within which a dropped floating bar

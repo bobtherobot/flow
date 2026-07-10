@@ -76,6 +76,13 @@ test("text color is disabled without text in the selection", async ({ page }) =>
 test("a color edit is undoable via Excalidraw's history", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
+
+  // Undo lives in the quick-actions bar but is hidden by default — enable it.
+  const quickbar = page.getByRole("toolbar", { name: "Quick actions" });
+  await page.getByRole("button", { name: "Quick actions options" }).click();
+  await quickbar.getByRole("checkbox", { name: "Undo" }).check();
+  await page.locator(".flow-pnl__title").click(); // close the config menu
+
   await drawRectangle(page);
 
   const strokeSwatch = page.getByRole("button", { name: "Stroke color", exact: true });
@@ -84,9 +91,9 @@ test("a color edit is undoable via Excalidraw's history", async ({ page }) => {
   await expect(strokeSwatch).toHaveAttribute("title", "#2f9e44");
   await page.locator(".flow-pnl__title").click(); // close the picker
 
-  // The Undo button is no longer covered by the panel; the rect stays selected so
-  // the swatch reflects the reverted element (proving the write recorded history).
-  await page.getByRole("button", { name: "Undo" }).click();
+  // Click the (now-enabled) Undo button; the rect stays selected so the swatch
+  // reflects the reverted element (proving the write recorded history).
+  await quickbar.getByRole("button", { name: "Undo" }).click();
   await expect(strokeSwatch).toHaveAttribute("title", "#1e1e1e");
 });
 
