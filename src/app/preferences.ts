@@ -5,6 +5,11 @@ import { normalizeQuickbarState, type QuickbarState } from "../ui/quickbar/quick
 import { normalizeBottombarState, type BottombarState } from "../ui/bottombar/bottombar-state";
 import { DEFAULT_BINDING_MODE, isBindingMode, type BindingMode } from "../lib/binding-mode";
 import { DEFAULT_LASER_HEX, isLaserColor } from "../lib/laser-color";
+import {
+  DEFAULT_SELECTION_MODE,
+  isSelectionMode,
+  type SelectionMode,
+} from "../lib/selection-mode";
 
 const SLOPPINESS_KEY = "flow.sloppiness";
 const UNITS_KEY = "flow.units";
@@ -126,6 +131,27 @@ export function getBindingMode(): BindingMode {
 export function setBindingMode(value: BindingMode): void {
   try {
     localStorage.setItem(BINDING_MODE_KEY, value);
+  } catch {
+    // Quota / disabled storage: preference simply won't persist this session.
+  }
+}
+
+const SELECTION_MODE_KEY = "flow.selectionMode";
+
+/** Read the persisted marquee selection mode (default on miss/corrupt). */
+export function getSelectionMode(): SelectionMode {
+  try {
+    const raw = localStorage.getItem(SELECTION_MODE_KEY);
+    return isSelectionMode(raw) ? raw : DEFAULT_SELECTION_MODE;
+  } catch {
+    return DEFAULT_SELECTION_MODE;
+  }
+}
+
+/** Persist the marquee selection mode. */
+export function setSelectionMode(value: SelectionMode): void {
+  try {
+    localStorage.setItem(SELECTION_MODE_KEY, value);
   } catch {
     // Quota / disabled storage: preference simply won't persist this session.
   }

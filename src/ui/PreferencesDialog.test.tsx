@@ -6,6 +6,7 @@ import { PreferencesDialog } from "./PreferencesDialog";
 function setup(overrides = {}) {
   const onChangeSloppiness = vi.fn();
   const onChangeUnits = vi.fn();
+  const onChangeSelectionMode = vi.fn();
   const onShowShortcuts = vi.fn();
   const onClose = vi.fn();
   render(
@@ -14,12 +15,20 @@ function setup(overrides = {}) {
       onChangeSloppiness={onChangeSloppiness}
       units="px"
       onChangeUnits={onChangeUnits}
+      selectionMode="enclose"
+      onChangeSelectionMode={onChangeSelectionMode}
       onShowShortcuts={onShowShortcuts}
       onClose={onClose}
       {...overrides}
     />,
   );
-  return { onChangeSloppiness, onChangeUnits, onShowShortcuts, onClose };
+  return {
+    onChangeSloppiness,
+    onChangeUnits,
+    onChangeSelectionMode,
+    onShowShortcuts,
+    onClose,
+  };
 }
 
 describe("PreferencesDialog", () => {
@@ -42,6 +51,20 @@ describe("PreferencesDialog", () => {
     expect(select).toHaveValue("px");
     await userEvent.selectOptions(select, "mm");
     expect(onChangeUnits).toHaveBeenCalledWith("mm");
+  });
+
+  it("shows the marquee selection mode as radios and reflects the current mode", () => {
+    setup({ selectionMode: "touch" });
+    const group = screen.getByRole("radiogroup", { name: /marquee selection mode/i });
+    expect(group).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "marquee touch" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "marquee enclose" })).not.toBeChecked();
+  });
+
+  it("fires onChangeSelectionMode with the chosen mode", async () => {
+    const { onChangeSelectionMode } = setup({ selectionMode: "enclose" });
+    await userEvent.click(screen.getByRole("radio", { name: "marquee touch" }));
+    expect(onChangeSelectionMode).toHaveBeenCalledWith("touch");
   });
 
   it("switches to the Keyboard category and fires onShowShortcuts", async () => {

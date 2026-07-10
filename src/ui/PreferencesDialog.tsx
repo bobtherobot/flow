@@ -5,6 +5,11 @@ import {
   type Sloppiness,
 } from "../lib/roughness";
 import { UNITS, type Unit } from "../lib/units";
+import {
+  SELECTION_MODE_ORDER,
+  SELECTION_MODE_LABELS,
+  type SelectionMode,
+} from "../lib/selection-mode";
 import "./dialogs.css";
 import "./preferences-dialog.css";
 
@@ -13,6 +18,8 @@ export interface PreferencesDialogProps {
   onChangeSloppiness: (value: Sloppiness) => void;
   units: Unit;
   onChangeUnits: (value: Unit) => void;
+  selectionMode: SelectionMode;
+  onChangeSelectionMode: (value: SelectionMode) => void;
   onShowShortcuts: () => void;
   onClose: () => void;
 }
@@ -32,6 +39,8 @@ export function PreferencesDialog({
   onChangeSloppiness,
   units,
   onChangeUnits,
+  selectionMode,
+  onChangeSelectionMode,
   onShowShortcuts,
   onClose,
 }: PreferencesDialogProps) {
@@ -122,6 +131,30 @@ export function PreferencesDialog({
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {category === "general" && (
+              <div className="flow-seg-field">
+                <span className="flow-seg-field__label">Select</span>
+                <div
+                  className="flow-seg"
+                  role="radiogroup"
+                  aria-label="Marquee selection mode"
+                >
+                  {SELECTION_MODE_ORDER.map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={selectionMode === mode}
+                      className="flow-seg__btn"
+                      onClick={() => onChangeSelectionMode(mode)}
+                    >
+                      {SELECTION_MODE_LABELS[mode]}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

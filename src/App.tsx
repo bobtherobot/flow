@@ -17,9 +17,11 @@ import {
   getBottombarState, setBottombarState,
   getBindingMode, setBindingMode,
   getLaserColor, setLaserColor,
+  getSelectionMode, setSelectionMode,
 } from "./app/preferences";
 import { type Unit } from "./lib/units";
 import { type BindingMode } from "./lib/binding-mode";
+import { type SelectionMode } from "./lib/selection-mode";
 import { IndexedDbProvider } from "./storage/indexeddb-provider";
 import type { DocumentSummary } from "./storage/types";
 import { downloadFile, openLocalFile } from "./storage/local-file-provider";
@@ -176,6 +178,23 @@ export default function App() {
       appState: { laserColor },
     } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
   }, [excalidrawApi, laserColor]);
+
+  // Marquee (drag-selection) mode: enclose vs touch. Applied to appState so the
+  // fork's getElementsWithinSelection honors it at the box-select call site.
+  const [selectionMode, setSelectionModeState] = useState<SelectionMode>(() =>
+    getSelectionMode(),
+  );
+  const handleChangeSelectionMode = useCallback((next: SelectionMode) => {
+    setSelectionModeState(next);
+    setSelectionMode(next);
+  }, []);
+  // selectionMode isn't in the vendor .d.ts yet (fork addition) so cast the arg.
+  useEffect(() => {
+    if (!excalidrawApi) return;
+    excalidrawApi.updateScene({
+      appState: { selectionMode },
+    } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
+  }, [excalidrawApi, selectionMode]);
 
   // Google Drive is wired in a later phase; sign-in is not available yet.
   const isGoogleConnected = false;
@@ -377,6 +396,8 @@ export default function App() {
               // Seed the laser color at init too (same fork-field/race rationale
               // as bindingMode above); flow owns its persistence.
               laserColor,
+              // Seed the marquee selection mode at init (same fork-field rationale).
+              selectionMode,
             },
           } as ComponentProps<typeof Excalidraw>["initialData"]}
         />
@@ -429,6 +450,8 @@ export default function App() {
           onChangeSloppiness={handleChangeSloppiness}
           units={units}
           onChangeUnits={handleChangeUnits}
+          selectionMode={selectionMode}
+          onChangeSelectionMode={handleChangeSelectionMode}
           onShowShortcuts={handleShowShortcuts}
           onClose={() => setPrefsOpen(false)}
         />

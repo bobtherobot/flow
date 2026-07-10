@@ -5,6 +5,7 @@ import {
   getQuickbarState, setQuickbarState,
   getBindingMode, setBindingMode,
   getLaserColor, setLaserColor,
+  getSelectionMode, setSelectionMode,
 } from "./preferences";
 import { DEFAULT_TOOLBAR_STATE } from "../ui/toolbar/toolbar-state";
 import { DEFAULT_QUICKBAR_STATE } from "../ui/quickbar/quickbar-state";
@@ -135,6 +136,24 @@ describe("binding mode persistence", () => {
   it("falls back to on for a corrupt stored value", () => {
     localStorage.setItem("flow.bindingMode", "banana");
     expect(getBindingMode()).toBe("on");
+  });
+});
+
+describe("selection mode persistence", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to enclose when unset", () => {
+    expect(getSelectionMode()).toBe("enclose");
+  });
+
+  it("round-trips a set mode", () => {
+    setSelectionMode("touch");
+    expect(getSelectionMode()).toBe("touch");
+  });
+
+  it("falls back to enclose for a corrupt stored value", () => {
+    localStorage.setItem("flow.selectionMode", "banana");
+    expect(getSelectionMode()).toBe("enclose");
   });
 });
 
