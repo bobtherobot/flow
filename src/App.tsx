@@ -21,7 +21,7 @@ import {
   getGridSize, setGridSize,
 } from "./app/preferences";
 import { type Unit } from "./lib/units";
-import { type BindingMode } from "./lib/binding-mode";
+import { type BindingMode, isBindingActive, toggledBindingMode } from "./lib/binding-mode";
 import { type SelectionMode } from "./lib/selection-mode";
 import { clampGridSize } from "./lib/grid";
 import { IndexedDbProvider } from "./storage/indexeddb-provider";
@@ -40,7 +40,6 @@ import {
 import { type Sloppiness } from "./lib/roughness";
 import {
   resetZoom,
-  toggleGrid,
   zoomIn,
   zoomOut,
   zoomToFit,
@@ -366,7 +365,9 @@ export default function App() {
         onZoomOut={withApi(zoomOut)}
         onZoomToFit={withApi(zoomToFit)}
         onResetZoom={withApi(resetZoom)}
-        onToggleGrid={withApi(toggleGrid)}
+        api={excalidrawApi}
+        isArrowBindingOn={isBindingActive(bindingMode)}
+        onToggleArrowBinding={() => handleSetBindingMode(toggledBindingMode(bindingMode))}
         isToolbarVisible={toolbar.visible}
         onToggleToolbar={() => setToolbar((s) => ({ ...s, visible: !s.visible }))}
         isToolbarFloating={toolbar.floating}
