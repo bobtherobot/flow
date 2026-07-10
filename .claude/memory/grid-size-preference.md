@@ -23,17 +23,30 @@ size.
   in-range → `clampGridSize`-normalized. Write path always clamps before
   persisting.
 - `src/App.tsx`: `gridSize` state seeded from `getGridSize()`;
-  `handleChangeGridSize` updates state + persists; an effect applies it live
-  via `excalidrawApi.updateScene({ appState: { gridSize } })` — **no cast**,
+  `handleChangeGridSize` runs `clampGridSize` (range + step-round) then updates
+  state + persists; an effect applies it live via
+  `excalidrawApi.updateScene({ appState: { gridSize } })` — **no cast**,
   since `gridSize` is already typed on Excalidraw's `AppState`;
   `initialData.appState.gridSize` seeded so first paint already uses the
   stored value (no flash of default-20 grid). Passed to `PreferencesDialog`
   as `gridSize`/`onChangeGridSize` props.
 - `src/ui/PreferencesDialog.tsx`: new `.flow-num` labeled-number-input row
-  (label, number `<input>`, "px" suffix) — `onChange` clamps via
-  `clampGridSize` before calling back up. New `.flow-num` / `.flow-num__*`
-  CSS in `preferences-dialog.css` (reusable row pattern for future numeric
-  prefs, parallel to `.flow-seg` from [[selection-mode]]).
+  (label, number `<input>`, "px" suffix). The input is bound to the shared
+  **`useNumberField`** hook (`src/ui/panels/controls/`), so it **commits on
+  blur/Enter, not per keystroke** (Escape reverts). New `.flow-num` /
+  `.flow-num__*` CSS in `preferences-dialog.css` (reusable row pattern for
+  future numeric prefs, parallel to `.flow-seg` from [[selection-mode]]).
+
+### GOTCHA — never clamp a number input on every `onChange` (fixed a7433f0)
+The row first clamped on every keystroke (`onChange` → `clampGridSize` → back
+up as the controlled value). That rewrote the field mid-typing: typing "3"
+clamped to the min 5, then "0" made "50" — the field "always became 50" and
+users couldn't enter their value. Fix: reuse `useNumberField` (the same hook
+behind the Transform-panel `NumberInput`), which keeps its own local text
+state and only commits on blur/Enter. `App.handleChangeGridSize` owns the
+step-round so the input's reflected value, live appState, and stored value all
+agree. Rule for any flow numeric input: bind `useNumberField`, don't clamp
+per keystroke.
 
 ## Tests
 `src/lib/grid.test.ts` (clamp/guard boundaries), `preferences.test.ts`
