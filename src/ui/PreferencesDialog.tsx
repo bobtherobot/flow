@@ -10,12 +10,8 @@ import {
   SELECTION_MODE_LABELS,
   type SelectionMode,
 } from "../lib/selection-mode";
-import {
-  MIN_GRID_SIZE,
-  MAX_GRID_SIZE,
-  GRID_SIZE_STEP,
-  clampGridSize,
-} from "../lib/grid";
+import { MIN_GRID_SIZE, MAX_GRID_SIZE, GRID_SIZE_STEP } from "../lib/grid";
+import { useNumberField } from "./panels/controls/useNumberField";
 import "./dialogs.css";
 import "./preferences-dialog.css";
 
@@ -58,6 +54,15 @@ export function PreferencesDialog({
   const titleId = useId();
   const unitsId = useId();
   const gridSizeId = useId();
+  // Commit the grid size on blur/Enter (not per keystroke) so clamping/rounding
+  // doesn't rewrite the field while the user is still typing — mirrors the
+  // NumberInput fields used elsewhere (Transform panel, etc.).
+  const gridField = useNumberField({
+    value: gridSize,
+    min: MIN_GRID_SIZE,
+    max: MAX_GRID_SIZE,
+    onChange: onChangeGridSize,
+  });
 
   return (
     <div
@@ -182,8 +187,11 @@ export function PreferencesDialog({
                     min={MIN_GRID_SIZE}
                     max={MAX_GRID_SIZE}
                     step={GRID_SIZE_STEP}
-                    value={gridSize}
-                    onChange={(e) => onChangeGridSize(clampGridSize(Number(e.target.value)))}
+                    value={gridField.text}
+                    onFocus={gridField.onFocus}
+                    onChange={gridField.onChange}
+                    onBlur={gridField.onBlur}
+                    onKeyDown={gridField.onKeyDown}
                   />
                   <span className="flow-num__suffix">px</span>
                 </div>

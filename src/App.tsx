@@ -23,6 +23,7 @@ import {
 import { type Unit } from "./lib/units";
 import { type BindingMode } from "./lib/binding-mode";
 import { type SelectionMode } from "./lib/selection-mode";
+import { clampGridSize } from "./lib/grid";
 import { IndexedDbProvider } from "./storage/indexeddb-provider";
 import type { DocumentSummary } from "./storage/types";
 import { downloadFile, openLocalFile } from "./storage/local-file-provider";
@@ -201,8 +202,12 @@ export default function App() {
   // no cast is needed (unlike selectionMode/bindingMode/laserColor above).
   const [gridSize, setGridSizeState] = useState<number>(() => getGridSize());
   const handleChangeGridSize = useCallback((next: number) => {
-    setGridSizeState(next);
-    setGridSize(next);
+    // Round-to-step + range clamp here so the stored value, the live appState,
+    // and what the input reflects on blur all agree (the dialog commits a
+    // range-clamped value; clampGridSize also snaps it to the grid step).
+    const clamped = clampGridSize(next);
+    setGridSizeState(clamped);
+    setGridSize(clamped);
   }, []);
   useEffect(() => {
     if (!excalidrawApi) return;

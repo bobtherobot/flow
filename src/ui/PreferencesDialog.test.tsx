@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PreferencesDialog } from "./PreferencesDialog";
 
@@ -76,24 +76,36 @@ describe("PreferencesDialog", () => {
     expect(screen.getByLabelText("Grid size")).toHaveValue(40);
   });
 
-  it("fires onChangeGridSize with the entered value", () => {
-    // NOTE: `gridSize` is a controlled prop backed by a `vi.fn()` mock that
-    // never updates it, so sequential userEvent.type() keystrokes don't
-    // accumulate as expected — each render resets the DOM value back to the
-    // fixed `gridSize` prop between keystrokes. Firing a single definite
-    // change exercises the same commit behavior deterministically.
+  it("does not commit while typing, only on blur", async () => {
+    // Regression: the field must not clamp/commit per keystroke (which rewrote
+    // the value mid-typing — e.g. "3" clamped to 5, then "0" made "50"). The
+    // input is backed by the field hook's own text state, so typing accumulates.
+    const user = userEvent.setup();
     const { onChangeGridSize } = setup();
     const input = screen.getByLabelText("Grid size");
-    fireEvent.change(input, { target: { value: "50" } });
-    expect(onChangeGridSize).toHaveBeenLastCalledWith(50);
+    await user.clear(input);
+    await user.type(input, "35");
+    expect(onChangeGridSize).not.toHaveBeenCalled();
+    await user.tab(); // blur commits
+    expect(onChangeGridSize).toHaveBeenCalledWith(35);
   });
 
-  it("clamps an out-of-range entry before firing onChangeGridSize", () => {
+  it("commits the entered value on Enter", async () => {
+    const user = userEvent.setup();
     const { onChangeGridSize } = setup();
     const input = screen.getByLabelText("Grid size");
-    // Controlled input: fire a single change with a definite value rather than
-    // userEvent.type (which doesn't accumulate against a fixed value prop).
-    fireEvent.change(input, { target: { value: "500" } });
+    await user.clear(input);
+    await user.type(input, "60{Enter}");
+    expect(onChangeGridSize).toHaveBeenLastCalledWith(60);
+  });
+
+  it("clamps an out-of-range entry to the max on blur", async () => {
+    const user = userEvent.setup();
+    const { onChangeGridSize } = setup();
+    const input = screen.getByLabelText("Grid size");
+    await user.clear(input);
+    await user.type(input, "500");
+    await user.tab();
     expect(onChangeGridSize).toHaveBeenLastCalledWith(100);
   });
 
