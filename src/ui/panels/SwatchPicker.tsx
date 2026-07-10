@@ -14,8 +14,9 @@ export interface SwatchPickerProps {
  * dialog plus a forgiving hex field. Commits an opaque `#rrggbb` via scrubHex.
  */
 export function SwatchPicker({ initial, onCommit, onClose }: SwatchPickerProps) {
-  const [color, setColor] = useState(scrubHex(initial) ?? "#000000");
-  const [hexText, setHexText] = useState(scrubHex(initial) ?? "");
+  const seed = scrubHex(initial) ?? "#000000";
+  const [color, setColor] = useState(seed);
+  const [hexText, setHexText] = useState(seed);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,7 +33,15 @@ export function SwatchPicker({ initial, onCommit, onClose }: SwatchPickerProps) 
   };
 
   return (
-    <div className="flow-sw-picker" role="dialog" aria-label="Swatch picker" ref={wrapRef}>
+    <div
+      className="flow-sw-picker"
+      role="dialog"
+      aria-label="Swatch picker"
+      ref={wrapRef}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+    >
       <input
         type="color"
         className="flow-sw-picker__native"
@@ -53,7 +62,6 @@ export function SwatchPicker({ initial, onCommit, onClose }: SwatchPickerProps) 
         onChange={(e) => setHexText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") commit(hexText);
-          if (e.key === "Escape") onClose();
         }}
       />
       <button type="button" className="flow-sw-picker__add" onClick={() => commit(hexText || color)}>

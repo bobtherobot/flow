@@ -29,4 +29,19 @@ describe("SwatchPicker", () => {
     fireEvent.keyDown(hex, { key: "Enter" });
     expect(onCommit).not.toHaveBeenCalled();
   });
+
+  it("closes on Escape from anywhere inside the popover, not just the hex field", () => {
+    const onClose = vi.fn();
+    render(<SwatchPicker initial="#ffffff" onCommit={vi.fn()} onClose={onClose} />);
+    const addButton = screen.getByRole("button", { name: "Add color" });
+    fireEvent.keyDown(addButton, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes on pointerdown outside the popover", () => {
+    const onClose = vi.fn();
+    render(<SwatchPicker initial="#ffffff" onCommit={vi.fn()} onClose={onClose} />);
+    fireEvent.pointerDown(document.body);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
