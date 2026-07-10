@@ -88,11 +88,12 @@ describe("PreferencesDialog", () => {
     expect(onChangeGridSize).toHaveBeenLastCalledWith(50);
   });
 
-  it("clamps an out-of-range entry before firing onChangeGridSize", async () => {
+  it("clamps an out-of-range entry before firing onChangeGridSize", () => {
     const { onChangeGridSize } = setup();
     const input = screen.getByLabelText("Grid size");
-    await userEvent.clear(input);
-    await userEvent.type(input, "500");
+    // Controlled input: fire a single change with a definite value rather than
+    // userEvent.type (which doesn't accumulate against a fixed value prop).
+    fireEvent.change(input, { target: { value: "500" } });
     expect(onChangeGridSize).toHaveBeenLastCalledWith(100);
   });
 
