@@ -11,7 +11,9 @@ async function setGridSize(page: Page, value: number) {
 
 function readGridSize(page: Page) {
   return page.evaluate(
-    () => (window as unknown as { h: { state: { gridSize: number } } }).h.state.gridSize,
+    () =>
+      (window as unknown as { h?: { state?: { gridSize?: number } } }).h?.state
+        ?.gridSize,
   );
 }
 
