@@ -77,6 +77,7 @@ test("reordering a docked sub-panel persists after drop and reload", async ({ pa
   await expect(titles).toHaveText([
     "Transform",
     "Color",
+    "Color Swatches",
     "Stroke",
     "Text",
     "Align",
@@ -102,7 +103,16 @@ test("reordering a docked sub-panel persists after drop and reload", async ({ pa
   await expect(page.locator(".flow-pnl__drop")).toBeVisible();
   await page.mouse.up();
 
-  const reordered = ["Stroke", "Transform", "Color", "Text", "Align", "Search", "Layers"];
+  const reordered = [
+    "Stroke",
+    "Transform",
+    "Color",
+    "Color Swatches",
+    "Text",
+    "Align",
+    "Search",
+    "Layers",
+  ];
   await expect(titles).toHaveText(reordered);
 
   await page.reload();
