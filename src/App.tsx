@@ -18,6 +18,7 @@ import {
   getBindingMode, setBindingMode,
   getLaserColor, setLaserColor,
   getSelectionMode, setSelectionMode,
+  getGridSize, setGridSize,
 } from "./app/preferences";
 import { type Unit } from "./lib/units";
 import { type BindingMode } from "./lib/binding-mode";
@@ -195,6 +196,18 @@ export default function App() {
       appState: { selectionMode },
     } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
   }, [excalidrawApi, selectionMode]);
+
+  // Grid size: flow's app-wide grid-cell size (px). Native appState field, so
+  // no cast is needed (unlike selectionMode/bindingMode/laserColor above).
+  const [gridSize, setGridSizeState] = useState<number>(() => getGridSize());
+  const handleChangeGridSize = useCallback((next: number) => {
+    setGridSizeState(next);
+    setGridSize(next);
+  }, []);
+  useEffect(() => {
+    if (!excalidrawApi) return;
+    excalidrawApi.updateScene({ appState: { gridSize } });
+  }, [excalidrawApi, gridSize]);
 
   // Google Drive is wired in a later phase; sign-in is not available yet.
   const isGoogleConnected = false;
@@ -398,6 +411,9 @@ export default function App() {
               laserColor,
               // Seed the marquee selection mode at init (same fork-field rationale).
               selectionMode,
+              // Seed the grid size at init so the grid renders at the preferred
+              // cell size on first paint (native field; no cast needed).
+              gridSize,
             },
           } as ComponentProps<typeof Excalidraw>["initialData"]}
         />
@@ -452,6 +468,8 @@ export default function App() {
           onChangeUnits={handleChangeUnits}
           selectionMode={selectionMode}
           onChangeSelectionMode={handleChangeSelectionMode}
+          gridSize={gridSize}
+          onChangeGridSize={handleChangeGridSize}
           onShowShortcuts={handleShowShortcuts}
           onClose={() => setPrefsOpen(false)}
         />
