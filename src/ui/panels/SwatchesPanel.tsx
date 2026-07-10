@@ -123,7 +123,10 @@ export function SwatchesPanel() {
         onAdd={() => setPicker({ mode: "add" })}
         onSelect={onSelect}
         onEdit={(index) => setPicker({ mode: "edit", index })}
-        onReorder={(from, to) => reorderSwatches(current.id, from, to)}
+        onReorder={(from, to) => {
+          reorderSwatches(current.id, from, to);
+          setSelected([]);
+        }}
       />
 
       {picker && (

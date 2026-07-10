@@ -103,4 +103,43 @@ describe("SwatchesPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Set as default" }));
     expect(getSnapshot().defaultPaletteId).toBe(newId);
   });
+
+  it("clears the swatch selection after a drag reorder", () => {
+    render(<SwatchesPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Add palette" }));
+    addColorViaPicker("#111111");
+    addColorViaPicker("#222222");
+    addColorViaPicker("#333333");
+
+    // Select the swatch currently at index 0.
+    fireEvent.click(screen.getByRole("button", { name: "Swatch #111111" }));
+    expect(screen.getByRole("button", { name: "Swatch #111111" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    // Drag the swatch at index 2 on top of index 0 — the color that now
+    // occupies "index 0" is different, so a stale index-based selection
+    // would silently point at the wrong swatch.
+    const dragged = screen.getByRole("button", { name: "Swatch #333333" });
+    const target = screen.getByRole("button", { name: "Swatch #111111" });
+    fireEvent.dragStart(dragged);
+    fireEvent.dragOver(target);
+    fireEvent.drop(target);
+
+    // No swatch should remain selected after the reorder.
+    expect(screen.queryAllByRole("button", { pressed: true })).toHaveLength(0);
+  });
+
+  it("removes the selected swatch via Delete keydown", () => {
+    render(<SwatchesPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Add palette" }));
+    addColorViaPicker("#444444");
+
+    const swatch = screen.getByRole("button", { name: "Swatch #444444" });
+    fireEvent.click(swatch);
+    fireEvent.keyDown(swatch, { key: "Delete" });
+
+    expect(screen.queryByRole("button", { name: "Swatch #444444" })).not.toBeInTheDocument();
+  });
 });
