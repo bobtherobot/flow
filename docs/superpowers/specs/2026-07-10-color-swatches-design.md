@@ -62,9 +62,28 @@ interface ColorPalette {
 `getDefaultPaletteId()` / `setDefaultPaletteId()`, each with the established
 try/catch + normalize pattern.
 
+### Hex input scrubbing (`src/lib/color-palettes.ts`)
+
+A single forgiving scrubber, `scrubHex(input): string | null`, is the one place
+hex text is cleaned. Both the panel and `ColorSwatch`'s hex field use it, so
+typed input is auto-fixed consistently. Rules, applied in order:
+
+1. Trim whitespace and drop a leading `#` if present (kind to omitted `#`).
+2. Lowercase; keep only `[0-9a-f]` characters.
+3. Coerce length to a 6-digit `#rrggbb`:
+   - **3 chars** (shorthand `abc`) → expand to `aabbcc`.
+   - **8 chars** (`rrggbbaa`) → **drop the trailing alpha pair**, keep `rrggbb`.
+   - **6 chars** → use as-is.
+   - any other length → `null` (invalid; caller keeps the field's prior value).
+4. Return `#rrggbb` lowercase, or `null`.
+
+`isHexColor(s)` is then just `scrubHex(s) !== null && s` already in canonical
+form. The result is always **opaque 6-digit hex — no alpha** — matching how
+swatches are stored.
+
 ### Normalization & fallback (`src/lib/color-palettes.ts`)
 
-- `isHexColor(s)` — accepts `#rrggbb` (case-insensitive), normalizes to lowercase.
+- `isHexColor(s)` — true only for canonical `#rrggbb` lowercase (see `scrubHex`).
 - `normalizePalettes(raw)` — coerce unknown blob to `ColorPalette[]`: drop
   entries without a string id/name, filter each `colors` array to valid hexes,
   drop palettes that end up with no valid fields. Guarantee unique ids.
@@ -199,7 +218,9 @@ render: () => <SwatchesPanel /> }`.
 
 **Modified**
 - `src/ui/panels/controls/ColorSwatch.tsx` — preset grid sourced from
-  `useDefaultPaletteColors()`; keep OS picker / hex / "None".
+  `useDefaultPaletteColors()`; replace its local `normalizeHex` with the shared
+  `scrubHex` so the hex field auto-fixes input (missing `#`, shorthand, strips
+  alpha); keep OS picker / "None".
 - `src/ui/panels/PanelsRoot.tsx` — register the `swatches` panel.
 - `src/app/preferences.ts` — `flow.colorPalettes` + `flow.defaultPaletteId`
   keys and their `get*/set*` pairs.
@@ -224,6 +245,8 @@ render: () => <SwatchesPanel /> }`.
 ## Testing
 
 **Unit (`color-palettes.test.ts`, `palette-store.test.ts`)**
+- `scrubHex`: missing `#` → fixed; `abc` → `#aabbcc`; `rrggbbaa` → `#rrggbb`
+  (alpha stripped); uppercase → lowercase; junk/`transparent`/wrong length → `null`.
 - `isHexColor` accept/reject; `normalizePalettes` drops malformed, keeps valid,
   ensures unique ids; first-run seeding; `getDefaultPaletteColors` fallback when
   empty / default id missing.
