@@ -419,6 +419,10 @@ export default function App() {
               // Seed the grid size at init so the grid renders at the preferred
               // cell size on first paint (native field; no cast needed).
               gridSize,
+              // flow defaults object-snapping ON (Excalidraw ships it off).
+              // Users can still toggle it off in-canvas (Alt+S); saved docs
+              // restore their own value. Native field; no cast needed.
+              objectsSnapModeEnabled: true,
             },
           } as ComponentProps<typeof Excalidraw>["initialData"]}
         />
