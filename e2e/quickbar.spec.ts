@@ -23,12 +23,13 @@ test.describe("quick-actions bar", () => {
     await expect(bar.getByRole("button", { name: "Rectangle" })).toHaveCount(0);
   });
 
-  test("toggling snap-to-objects reflects the active state and persists", async ({ page }) => {
+  test("snap-to-objects is on by default and toggles off", async ({ page }) => {
     await page.goto("/");
+    // flow defaults object-snapping ON (seeded via initialData.appState).
     const snap = page.getByRole("button", { name: "Snap to objects" });
-    await expect(snap).toHaveAttribute("aria-pressed", "false");
-    await snap.click();
     await expect(snap).toHaveAttribute("aria-pressed", "true");
+    await snap.click();
+    await expect(snap).toHaveAttribute("aria-pressed", "false");
   });
 
   test("arrow binding is on by default and toggles off, persisting across reload", async ({ page }) => {
