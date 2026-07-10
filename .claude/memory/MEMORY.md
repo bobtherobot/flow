@@ -16,3 +16,4 @@ Repo-local memory index. One line per memory; see `CLAUDE.md` for the read-at-st
 - [Transform panel](transform-panel.md) — top-of-dock sub-panel for numeric W/H/X/Y/rotation/corner-radius/padding; all 3 phases shipped 2026-07-09; reuses Excalidraw resize (additive export) + per-element cornerRadius (rect/diamond/elbow) + per-container text padding
 - [Laser color](laser-color.md) — global laser-pointer trail color+opacity in the Color panel (always-global, `ColorRow` `onWrite` hatch, `ids={{}}`); 2nd appState fork field (mirrors bindingMode); shipped 2026-07-09
 - [Selection mode](selection-mode.md) — Preferences `Select: [marquee touch] [marquee enclose]`; 3rd appState fork field (`getElementsWithinSelection` touch/enclose); vendor rebuild+types gotcha; shipped 2026-07-09
+- [Grid size preference](grid-size-preference.md) — global flow.gridSize (5–100, default 20) in File ▸ Preferences; zero fork (native appState field); shipped 2026-07-09
