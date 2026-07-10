@@ -18,3 +18,4 @@ Repo-local memory index. One line per memory; see `CLAUDE.md` for the read-at-st
 - [Selection mode](selection-mode.md) — Preferences `Select: [marquee touch] [marquee enclose]`; 3rd appState fork field (`getElementsWithinSelection` touch/enclose); vendor rebuild+types gotcha; shipped 2026-07-09
 - [Grid size preference](grid-size-preference.md) — global flow.gridSize (5–100, default 20) in File ▸ Preferences; zero fork (native appState field); shipped 2026-07-09
 - [View-menu toggles](view-menu-toggles.md) — View menu: live checkboxes for Grid/Snap/Arrow-Binding/Tool-Lock/Zen; useViewToggles reactive bridge; zero fork; shipped 2026-07-09
+- [Color swatches](color-swatches.md) — palette manager sub-panel; default palette drives ColorSwatch presets everywhere; palette-store (useSyncExternalStore) + preferences keys; zero fork; shipped 2026-07-10
