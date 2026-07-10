@@ -11,6 +11,7 @@ import {
   type SelectionMode,
 } from "../lib/selection-mode";
 import { clampGridSize, isGridSize, DEFAULT_GRID_SIZE } from "../lib/grid";
+import { normalizePalettes, type ColorPalette } from "../lib/color-palettes";
 
 const SLOPPINESS_KEY = "flow.sloppiness";
 const UNITS_KEY = "flow.units";
@@ -197,6 +198,37 @@ export function getLaserColor(): string {
 export function setLaserColor(color: string): void {
   try {
     localStorage.setItem(LASER_COLOR_KEY, color);
+  } catch {
+    // Quota / disabled storage: preference simply won't persist this session.
+  }
+}
+
+const COLOR_PALETTES_KEY = "flow.colorPalettes";
+const DEFAULT_PALETTE_ID_KEY = "flow.defaultPaletteId";
+
+/** Read the saved palettes, normalized (empty on miss/parse error). */
+export function getColorPalettes(): ColorPalette[] {
+  return normalizePalettes(readJson(COLOR_PALETTES_KEY));
+}
+
+/** Persist the palette list. */
+export function setColorPalettes(value: ColorPalette[]): void {
+  writeJson(COLOR_PALETTES_KEY, value);
+}
+
+/** Read the id of the default palette (null on miss). */
+export function getDefaultPaletteId(): string | null {
+  try {
+    return localStorage.getItem(DEFAULT_PALETTE_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the default palette id. */
+export function setDefaultPaletteId(value: string): void {
+  try {
+    localStorage.setItem(DEFAULT_PALETTE_ID_KEY, value);
   } catch {
     // Quota / disabled storage: preference simply won't persist this session.
   }

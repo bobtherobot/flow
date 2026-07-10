@@ -35,7 +35,7 @@ test("edits the selected element's stroke color and opacity", async ({ page }) =
   await expect(strokeSwatch).toHaveAttribute("title", "#1e1e1e");
 
   await strokeSwatch.click();
-  await page.getByRole("button", { name: "#e03131" }).click();
+  await page.getByRole("button", { name: "#e03131", exact: true }).click();
   await expect(strokeSwatch).toHaveAttribute("title", "#e03131");
 
   await page.locator(".flow-pnl__title").click(); // close the picker
@@ -51,7 +51,7 @@ test("per-swatch opacity renders as a semi-transparent fill", async ({ page }) =
   await drawRectangle(page);
 
   await page.getByRole("button", { name: "Fill color", exact: true }).click();
-  await page.getByRole("button", { name: "#e03131" }).click();
+  await page.getByRole("button", { name: "#e03131", exact: true }).click();
   await page.locator(".flow-pnl__title").click();
   await page.getByLabel("Fill opacity value").fill("50");
   await page.getByLabel("Fill opacity value").blur();
@@ -87,7 +87,7 @@ test("a color edit is undoable via Excalidraw's history", async ({ page }) => {
 
   const strokeSwatch = page.getByRole("button", { name: "Stroke color", exact: true });
   await strokeSwatch.click();
-  await page.getByRole("button", { name: "#2f9e44" }).click();
+  await page.getByRole("button", { name: "#2f9e44", exact: true }).click();
   await expect(strokeSwatch).toHaveAttribute("title", "#2f9e44");
   await page.locator(".flow-pnl__title").click(); // close the picker
 
@@ -105,7 +105,7 @@ test("laser color round-trips through the global swatch", async ({ page }) => {
   await expect(laserSwatch).toHaveAttribute("title", "#ff0000"); // default
 
   await laserSwatch.click();
-  await page.getByRole("button", { name: "#e03131" }).click();
+  await page.getByRole("button", { name: "#e03131", exact: true }).click();
   await page.locator(".flow-pnl__title").click(); // close the picker
   await expect(laserSwatch).toHaveAttribute("title", "#e03131");
 });
@@ -116,7 +116,7 @@ test("the laser trail renders in the chosen color", async ({ page }) => {
 
   // Pick a laser color.
   await page.getByRole("button", { name: "Laser color", exact: true }).click();
-  await page.getByRole("button", { name: "#2f9e44" }).click();
+  await page.getByRole("button", { name: "#2f9e44", exact: true }).click();
   await page.locator(".flow-pnl__title").click();
 
   // Activate the laser tool and drag (right of the docked panel).
