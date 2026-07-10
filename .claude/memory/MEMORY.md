@@ -17,3 +17,4 @@ Repo-local memory index. One line per memory; see `CLAUDE.md` for the read-at-st
 - [Laser color](laser-color.md) — global laser-pointer trail color+opacity in the Color panel (always-global, `ColorRow` `onWrite` hatch, `ids={{}}`); 2nd appState fork field (mirrors bindingMode); shipped 2026-07-09
 - [Selection mode](selection-mode.md) — Preferences `Select: [marquee touch] [marquee enclose]`; 3rd appState fork field (`getElementsWithinSelection` touch/enclose); vendor rebuild+types gotcha; shipped 2026-07-09
 - [Grid size preference](grid-size-preference.md) — global flow.gridSize (5–100, default 20) in File ▸ Preferences; zero fork (native appState field); shipped 2026-07-09
+- [View-menu toggles](view-menu-toggles.md) — View menu: live checkboxes for Grid/Snap/Arrow-Binding/Tool-Lock/Zen; useViewToggles reactive bridge; zero fork; shipped 2026-07-09
