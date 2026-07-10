@@ -42,26 +42,27 @@ round-trip (get/set, clamp-on-read, clamp-on-write, corrupt/missing storage),
 `e2e/grid-size.spec.ts` — live update (`window.h.state.gridSize` reflects a
 Preferences edit without reload) + persist-across-reload.
 
-### e2e flake note (not a regression)
-Under full-suite 8-worker parallelism, "persists across reload" occasionally
-throws `Cannot read properties of undefined (reading 'gridSize')` from
-`window.h` being read immediately post-`page.reload()` before Excalidraw's API
-attaches to `window.h` — a mount-race, same family as the comment already in
-the spec about waiting for the File menu before touching `window.h` (that
-guard exists before the read, but doesn't guarantee `window.h` itself is
-attached under heavy CPU contention). Reproduced once in a full 75-test /
-8-worker run; passed 10/10 in isolated re-runs (3 solo + `--repeat-each=5`).
-Not caused by app logic — the value was correct in every run that read it
-successfully.
+### e2e mount-race — found and fixed (commit d6d2882)
+Under full-suite 8-worker parallelism, "persists across reload" once threw
+`Cannot read properties of undefined (reading 'gridSize')`: `window.h` is
+created at Excalidraw module load, but its `state` getter is only added in the
+App component's `componentDidMount`, which runs *after* flow's own menubar (the
+`File` menuitem the test waits on) renders. So post-`page.reload()` the read
+could hit `window.h.state` while still `undefined`. Fix: `readGridSize` now
+optional-chains (`h?.state?.gridSize`) so it returns `undefined` instead of
+throwing, and `expect.poll` keeps polling until the getter is ready. Verified
+stable: reload test 13/13 pass across `--repeat-each=5` solo + `--repeat-each=3`
+full-suite parallel. Lesson: waiting on flow chrome ≠ Excalidraw API ready;
+poll defensively when reading `window.h.state`.
 
-## Full suite (2026-07-09, after this feature)
-364 unit tests green. E2E: 73/75 green — the 2 failures are (1) the flake
-above, confirmed non-reproducing in isolation, and (2) a **pre-existing,
-unrelated** failure in `e2e/menu-preferences.spec.ts` ("Help ▸ About shows
-both repo links": expects a link named `/excalidraw fork/i`, but
-`AboutDialog.tsx` has rendered plain "Excalidraw" text since commit
-`06e568e` — predates this branch entirely, no files this feature touched are
-involved).
+## Full suite (2026-07-09, after this feature + flake fix)
+364 unit tests green. E2E green for this feature (reload race fixed above).
+One **pre-existing, unrelated** failure remains in `e2e/menu-preferences.spec.ts`
+("Help ▸ About shows both repo links": expects a link named `/excalidraw fork/i`,
+but `AboutDialog.tsx` has rendered plain "Excalidraw" text since commit
+`06e568e` — predates this branch entirely; no files this feature touched are
+involved). It shows a similar solo-pass/parallel-fail signature, so it may also
+be a mount-race worth a separate follow-up — but it is not caused by this branch.
 
 Related: [[selection-mode]] (contrast — needed a fork field + cast; this
 feature needed neither), [[bottom-bar]] (zero-fork-edit pattern, same as
