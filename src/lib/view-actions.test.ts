@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { zoomIn, zoomOut, resetZoom, zoomToFit, toggleGrid } from "./view-actions";
+import { zoomIn, zoomOut, resetZoom, zoomToFit } from "./view-actions";
 
 function mockApi(state: { zoom?: number; grid?: boolean } = {}) {
   const updateScene = vi.fn();
@@ -53,11 +53,5 @@ describe("view-actions", () => {
     const { api, scrollToContent } = mockApi();
     zoomToFit(api);
     expect(scrollToContent).toHaveBeenCalledWith([], { fitToContent: true, animate: true });
-  });
-
-  it("toggleGrid flips gridModeEnabled", () => {
-    const { api, updateScene } = mockApi({ grid: false });
-    toggleGrid(api);
-    expect(updateScene).toHaveBeenCalledWith({ appState: { gridModeEnabled: true } });
   });
 });

@@ -27,7 +27,3 @@ export function resetZoom(api: ExcalidrawAPI): void {
 export function zoomToFit(api: ExcalidrawAPI): void {
   api.scrollToContent(api.getSceneElements(), { fitToContent: true, animate: true });
 }
-
-export function toggleGrid(api: ExcalidrawAPI): void {
-  api.updateScene({ appState: { gridModeEnabled: !api.getAppState().gridModeEnabled } });
-}
