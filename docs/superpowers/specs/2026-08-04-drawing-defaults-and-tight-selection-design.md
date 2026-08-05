@@ -10,9 +10,12 @@ flow-level (zero fork); two need small additive edits in `vendor/excalidraw`.
 
 1. A freshly drawn box gets a large corner radius — Excalidraw's stock
    `currentItemRoundness` default is `"round"`, and the adaptive algorithm uses a
-   fixed 32px radius, which reads as gigantic on small shapes.
-2. The default stroke for shapes and arrows is 1px; flow wants 2px.
-3. flow's stroke-width slider spans 0.5–32px. Wanted: 0–10px.
+   fixed 32px radius, which reads as gigantic on small shapes. *Verified live: a
+   fresh rectangle reports a radius of 32.*
+2. The default stroke for shapes and arrows should be 2px. *Verified live: it
+   already is — see Change 2.*
+3. flow's stroke-width slider spans 0.5–32px, and the 0.5 floor renders as "1"
+   because `displayValue` rounds px to zero decimals. Wanted: 0–10px.
 4. Selection borders and transform handles sit ~4px outside the element bounds.
    Wanted: tight against the object.
 
@@ -35,18 +38,28 @@ Excalidraw's stock default is `"round"` (`packages/excalidraw/appState.ts:43`), 
 when constructing a rectangle or diamond. New boxes come out sharp; the Transform
 panel's corner-radius field still rounds them per-object.
 
-## Change 2 — Default stroke width 2px
+## Change 2 — Default stroke width 2px — ALREADY SATISFIED
 
-**flow only, 1 line.** Same block gains `currentItemStrokeWidth: 2`, overriding
-`DEFAULT_ELEMENT_PROPS.strokeWidth`. One shared tool default covers shapes and
-arrows alike.
+**No change required.** Verified live on 2026-08-04 against the running app: a
+freshly drawn rectangle *and* a freshly drawn arrow both report a stroke width of
+`2` in the Stroke panel.
 
-Both seeds sit alongside the existing `objectsSnapModeEnabled` and
-`currentItemFontFamily` seeds — same established pattern, no new preference
-plumbing.
+`DEFAULT_ELEMENT_PROPS.strokeWidth` is already `2`
+(`packages/excalidraw/constants.ts:394`), and `appState.ts:46` seeds
+`currentItemStrokeWidth` from it. Adding a redundant seed would only create drift
+risk against upstream.
 
-These are **tool defaults, not flow globals.** A saved `.excalidraw` still restores
-its author's values on open, matching Excalidraw's own behavior. They are therefore
+One real defect surfaced nearby: `src/ui/panels/StrokePanel.tsx:135` falls back to
+`1` when `appState` is unavailable, contradicting the actual 2px default. It only
+shows in the brief window before the Excalidraw API is ready, but the wrong magic
+number is corrected as part of Change 3.
+
+The corner-radius seed from Change 1 sits alongside the existing
+`objectsSnapModeEnabled` and `currentItemFontFamily` seeds — same established
+pattern, no new preference plumbing.
+
+It is a **tool default, not a flow global.** A saved `.excalidraw` still restores its
+author's value on open, matching Excalidraw's own behavior. It is therefore
 deliberately *not* added to `FLOW_GLOBAL_APP_STATE_KEYS`.
 
 ## Change 3 — Stroke slider range 0–10px
@@ -66,8 +79,13 @@ in the same options block at `generateRoughOptions` (`Shape.ts:74-82`).
 both collapse to 0. roughjs then clamps the gap to 0.1px
 (`roughjs/bin/fillers/scan-line-hachure.js:9`), so a hachure- or cross-hatch-filled
 shape generates tens of thousands of fill lines and hangs the canvas. Fix: derive
-both from `Math.max(element.strokeWidth, 1)`. Only hachure and cross-hatch are
-affected — `fillStyle: "solid"` never reaches the hachure filler.
+both from `Math.max(element.strokeWidth, 1)`.
+
+Reachability is narrower than it first appears: only hachure and cross-hatch fills
+are affected, `DEFAULT_ELEMENT_PROPS.fillStyle` is `"solid"`, and flow's UI exposes
+no fill-style control at all. The remaining path is an **opened `.excalidraw`
+document** carrying hachure or cross-hatch elements — still reachable, and the guard
+is two lines.
 
 **Stroke render.** `roughjs/bin/canvas.js:18` assigns `ctx.lineWidth = o.strokeWidth`
 directly. Canvas ignores a non-positive `lineWidth` and retains the previous draw's
