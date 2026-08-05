@@ -40,7 +40,7 @@ Three problems follow:
 | Wide-range fields | Per-field `scrubSpan` override | X/Y's ±1e6 bounds are sanity clamps, not a designed range — proportional there is ~13,000 units/px |
 | Drag surface | Grip glyph **and** field body | Grip advertises the gesture; the body is where the pointer already is |
 | Undo granularity | One entry per gesture | `EVENTUALLY` during the drag, `IMMEDIATELY` on release |
-| Font size | Commit on release, no live preview | Excalidraw's `changeFontSize` hardcodes `IMMEDIATELY`; batching it needs a fork edit we don't want |
+| Font size | Commit on release, no live preview | It writes via `executeAction`, not `updateScene`, so Change 4's fork edit does not reach it; batching it would need a second, unrelated edit inside the action's `perform` |
 | Mixed selections | Scrub disabled | There is no start value to drag from |
 
 ## Change 1 — The gesture: `useScrubDrag`
@@ -136,22 +136,87 @@ the arrowhead sliders would be the only controls left spamming undo.
 
 ## Change 4 — Undo plumbing
 
-`transient` selects the capture mode at each write boundary.
+`transient` selects the capture mode at each write boundary: `EVENTUALLY` while
+the gesture runs, `IMMEDIATELY` on release. `NEVER` is wrong — per
+`vendor/excalidraw/packages/excalidraw/store.ts:130-170` it calls
+`updateSnapshot`, advancing the history baseline so undo would step back a
+single frame.
 
-`EVENTUALLY` is the correct constant, **not** `NEVER`. Per
-`vendor/excalidraw/packages/excalidraw/store.ts:130-170`, `NEVER` calls
-`updateSnapshot` — it advances the history baseline, so a trailing `IMMEDIATELY`
-would diff against the last intermediate and undo would step back one frame.
-`EVENTUALLY` schedules neither branch: nothing is captured, the snapshot is left
-untouched, and the next `IMMEDIATELY` records a single diff from the pre-drag
-state.
+### Why this needs a fork edit
+
+**Capture modes alone cannot batch a gesture.** This was verified empirically —
+the e2e proof failed — and then traced:
+
+`App.updateScene` (`packages/excalidraw/components/App.tsx:3892`) skips its whole
+capture block when `captureUpdate === EVENTUALLY`, but still runs
+`replaceAllElements`. Intermediates therefore advance the **live scene** while
+leaving `store.snapshot` behind. On the closing `IMMEDIATELY` write, the payload
+is routed through `filterUncomittedElements` (`store.ts:221`), which sees
+`snapshot.version < liveVersion`, reads it as "in-progress local action", and
+**rewrites the payload back to the stale pre-gesture snapshot**. `captureIncrement`
+then diffs the snapshot against itself and emits nothing: zero undo entries, and
+that element's history baseline silently freezes.
+
+That guard is right for its purpose — it stops an unrelated `updateScene` from
+half-capturing an action still in flight. It cannot tell that our closing write
+*is* that action finishing.
+
+### The fork edit (additive, default-off)
+
+`updateScene` gains one optional field, `commitDeferredChanges?: boolean`. When
+set, the payload is taken as authoritative and the filter is skipped:
+
+```ts
+const nextCommittedElements = sceneData.elements
+  ? sceneData.commitDeferredChanges
+    ? arrayToMap(nextElements)
+    : this.store.filterUncomittedElements(
+        this.scene.getElementsMapIncludingDeleted(),
+        arrayToMap(nextElements),
+      )
+  : prevCommittedElements;
+```
+
+One branch and a documented field. Every existing caller — including collab
+reconciliation, the reason the filter exists — is untouched, because the field
+defaults to absent. `types.ts:778` derives the public `updateScene` type from
+`App`'s method signature, so the field reaches flow's typings with no second edit.
+
+This is flow's **4th behavioural fork edit** (after the arrowhead-size schema,
+selection chrome, and zero-stroke safety). Per the fork strategy it is additive
+and upstream-shaped rather than a patch to existing behaviour.
+
+### Knowing when a write ends a gesture
+
+The flag must be set only on a write that actually closes a deferred sequence —
+an ordinary panel write (a colour swatch click) has no deferred frames behind it
+and should keep the filter's protection.
+
+`src/lib/deferred-commit.ts` holds that one bit of state, module-level because
+only one pointer gesture can be in flight at a time:
+
+```ts
+let pending = false;
+export const markDeferred = () => { pending = true; };
+/** True exactly once per deferred sequence, then resets. */
+export const consumeDeferred = () => { const was = pending; pending = false; return was; };
+```
+
+A transient write calls `markDeferred()`; a non-transient write calls
+`consumeDeferred()` and passes the result as `commitDeferredChanges`. The control
+layer's `(value, transient)` contract is unchanged — the distinction between "a
+typed commit" and "the end of a drag" is derived at the write layer, where it
+belongs, rather than pushed into every control.
 
 | File | Change |
 |---|---|
-| `src/ui/panels/useSelectionStyle.ts` | `SetPropArgs` gains `transient?: boolean`; `update()` gains a trailing `transient?` param. Both resolve `captureUpdate: transient ? EVENTUALLY : IMMEDIATELY`. |
+| `vendor/excalidraw` (branch `flow`) | `App.updateScene` gains `commitDeferredChanges?: boolean`; when set, skip `filterUncomittedElements`. Requires a package rebuild + type regen. |
+| `src/lib/deferred-commit.ts` | New. The `markDeferred` / `consumeDeferred` pair. |
+| `src/ui/panels/useSelectionStyle.ts` | `SetPropArgs` gains `transient?: boolean`; `update()` gains a trailing `transient?` param. Both resolve the capture mode and the new flag. |
 | `src/lib/transform.ts` | `resizeElementDimension` and `setContainerPadding` gain a trailing `transient?: boolean` with the same resolution. |
 
-Existing callers omit the argument and keep today's `IMMEDIATELY` behaviour.
+Existing callers omit the argument and keep today's `IMMEDIATELY` behaviour with
+the filter intact.
 
 ## Change 5 — Call sites
 
@@ -170,14 +235,16 @@ Existing callers omit the argument and keep today's `IMMEDIATELY` behaviour.
 
 `TextPanel` writes via `sel.executeAction("changeFontSize", n)`, and that action
 hardcodes `CaptureUpdateAction.IMMEDIATELY`
-(`vendor/excalidraw/packages/excalidraw/actions/actionProperties.tsx:274`), so
-flow cannot defer it without a third behavioural fork edit.
+(`vendor/excalidraw/packages/excalidraw/actions/actionProperties.tsx:274`).
+Change 4's fork edit does not help here: it lives on `updateScene`, and the
+action path never goes through it. Batching font size would need a second,
+unrelated edit inside the action's `perform`.
 
 Instead, `TextPanel` **drops transient writes**: it holds local state for the
 in-progress value so the field's digits track the drag, and calls
 `executeAction` once on release. The canvas does not preview mid-drag — the one
-place this design accepts an inconsistency, in exchange for zero fork edits and a
-clean undo stack.
+place this design accepts an inconsistency, in exchange for a clean undo stack
+and a fork diff that stays one edit wide.
 
 ### Accessible-name rename
 
@@ -233,10 +300,16 @@ first — see Risks.
 
 ## Risks
 
-- **`EVENTUALLY` batching is inferred from the store source, not yet observed.**
-  If anything else triggers a capture mid-drag, the gesture splits into two undo
-  entries. Nothing on the panel path should, but the e2e undo test is the proof
-  and should be written before the plumbing is spread across call sites.
+- **~~`EVENTUALLY` batching is inferred from the store source, not yet
+  observed.~~ RESOLVED 2026-08-05 — the inference was wrong.** The e2e proof
+  failed: capture modes alone record *zero* undo entries for a gesture, because
+  `filterUncomittedElements` reverts the closing write's payload. See Change 4
+  for the trace and the fork edit that fixes it. The task ordering did its job —
+  the assumption was tested before eight call sites were built on it.
+- **The fork edit must survive upstream rebases.** It is one branch inside
+  `App.updateScene`; a rebase that reworks the capture block could drop it
+  silently. The e2e undo proof is the regression detector, and it must keep
+  running after every vendor bump.
 - **`type="number"` with a non-integer step.** Hiding the spin buttons is
   cosmetic, but browsers still validate against `step`; stroke width's 0.5 step
   is already in use today, so this is unchanged rather than new risk.

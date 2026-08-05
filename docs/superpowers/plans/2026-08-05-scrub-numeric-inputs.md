@@ -12,7 +12,9 @@
 
 ## Global Constraints
 
-- **Zero fork edits.** Everything lands in `src/`. Do not modify `vendor/excalidraw` — the font-size design deliberately avoids the one change that would have needed it.
+- **Exactly one fork edit, in Task 3.** `App.updateScene` gains an optional `commitDeferredChanges?: boolean` that skips `filterUncomittedElements`. Everything else lands in `src/`. No other task may modify `vendor/excalidraw`; font size in particular is *not* to be fixed with a second fork edit (see Task 7).
+- **Vendor rebuild procedure** (from `.claude/memory/selection-mode.md`, learned the hard way): run the package build from `vendor/excalidraw/packages/excalidraw` as `node ../../scripts/buildPackage.js` — running it from the submodule root fails. `yarn` is blocked on Node 25. `buildPackage.js` does **not** emit types; regenerate them with `node_modules/.bin/tsc -p tsconfig.json` from that same directory (it prints pre-existing upstream type errors — cornerRadius/Point noise, unrelated to our edit). Never `rm -rf dist` without regenerating types, or flow's tsc cannot resolve `@excalidraw/excalidraw`.
+- **Fork edits must be committed on the submodule's `flow` branch AND the parent gitlink bumped**, or the change is not durable (`dist/` is gitignored).
 - **Scrub geometry:** `SCRUB_TRAVEL_PX = 150`, drag threshold `3px`, Shift `×10`, Alt `×0.1`. Dragging **up** increases.
 - **Capture modes:** `EVENTUALLY` while `transient === true`, `IMMEDIATELY` otherwise. Never `NEVER` — it advances the history baseline and breaks batching.
 - **Per-field spans:** W/H/X/Y `300`, radius/padding `200`, font size `150`. Stroke width, opacity, rotation and grid size pass **no** span and inherit `max - min`.
@@ -633,21 +635,198 @@ git commit -m "feat(panels): thread a transient capture mode through the scene w
 
 ---
 
-### Task 3: `SliderInput` joins the transient protocol + the undo-batching proof
+### Task 3: The gesture-commit fork edit + `SliderInput`'s transient protocol + the undo proof
 
 **Files:**
+- Modify: `vendor/excalidraw/packages/excalidraw/components/App.tsx:3892-3943` (`updateScene`) — **the one fork edit**
+- Create: `src/lib/deferred-commit.ts` + `src/lib/deferred-commit.test.ts`
+- Modify: `src/ui/panels/useSelectionStyle.ts` (pass the new flag), `src/lib/transform.ts` (same)
 - Modify: `src/ui/panels/controls/SliderInput.tsx` (the `onChange` contract; the numeric field stays for now)
 - Modify: `src/ui/panels/controls/SliderInput.test.tsx` (update two assertions, append four)
 - Modify: `src/ui/panels/StrokePanel.tsx:203-208` (`setArrowheadSize`)
 - Test: `e2e/stroke-panel.spec.ts` (append the undo test)
 
 **Interfaces:**
-- Consumes: `setProp({ ..., transient })` from Task 2.
-- Produces: `SliderInput`'s `onChange` becomes `(value: number, transient: boolean) => void`. Every other prop — including `unit` and `hideValue` — is **unchanged**; the field is removed later, in Task 5, once nothing renders it.
+- Consumes: `setProp({ ..., transient })` and `update(..., transient)` from Task 2.
+- Produces:
+  - `updateScene({ ..., commitDeferredChanges?: boolean })` on the vendor API.
+  - `src/lib/deferred-commit.ts`: `markDeferred(): void` and `consumeDeferred(): boolean`.
+  - `SliderInput`'s `onChange` becomes `(value: number, transient: boolean) => void`. Every other prop — including `unit` and `hideValue` — is **unchanged**; the field is removed later, in Task 5, once nothing renders it.
 
-**Context:** This task is deliberately ordered before the `NumberInput` work. The arrowhead sliders are the only in-app gesture that can validate the `EVENTUALLY` batching, and the spec flags that batching as inferred from the vendor source rather than observed. Prove it here, before the pattern spreads across twelve call sites.
+**Context — read this before starting.** An earlier attempt at this task proved that capture modes *alone* cannot batch a gesture. The e2e undo proof failed with **zero** undo entries recorded, and the cause was traced to the vendor:
 
-It changes the contract **without** removing the numeric field, because `StrokePanel`'s Width row and `ColorPanel`'s opacity row still render `SliderInput` with a `unit` prop until Task 5. Stripping the field now would leave the tree failing to typecheck between tasks.
+`App.updateScene` skips its entire capture block when `captureUpdate === EVENTUALLY`, but still runs `replaceAllElements`. So intermediate writes advance the live scene while `store.snapshot` stays behind. On the closing `IMMEDIATELY` write, the payload goes through `filterUncomittedElements` (`store.ts:221`), which sees `snapshot.version < liveVersion`, reads that as "in-progress local action", and rewrites the payload back to the stale pre-gesture snapshot. `captureIncrement` then diffs the snapshot against itself, emits nothing, and that element's history baseline silently freezes.
+
+The guard is correct for its own purpose — it stops an unrelated `updateScene` from half-capturing an action still in flight. It simply cannot tell that our closing write *is* that action finishing. So we tell it.
+
+This task is still deliberately ordered before the `NumberInput` work: the arrowhead sliders are the only in-app gesture that can validate the mechanism, and it must be proven before the pattern spreads across twelve call sites.
+
+It changes the `SliderInput` contract **without** removing the numeric field, because `StrokePanel`'s Width row and `ColorPanel`'s opacity row still render `SliderInput` with a `unit` prop until Task 5. Stripping the field now would leave the tree failing to typecheck between tasks.
+
+- [ ] **Step 0a: Make the fork edit**
+
+In `vendor/excalidraw/packages/excalidraw/components/App.tsx`, add one field to `updateScene`'s inline parameter type, directly below the existing `captureUpdate` field (~line 3908):
+
+```ts
+      /**
+       * Commit changes made by preceding `EVENTUALLY` updates as part of this
+       * capture.
+       *
+       * `updateScene` normally routes the payload through
+       * `filterUncomittedElements`, which rewrites any element whose live
+       * version has run ahead of the store snapshot back to the snapshot — a
+       * guard against half-capturing a local action that is still in flight.
+       * When this write *is* that action finishing (the release ending a drag
+       * whose frames were written with `EVENTUALLY`), the payload is
+       * authoritative and must be captured whole, so the filter is skipped.
+       *
+       * Only meaningful alongside `CaptureUpdateAction.IMMEDIATELY`.
+       *
+       * @default false
+       */
+      commitDeferredChanges?: boolean;
+```
+
+Then, in the body, replace the `nextCommittedElements` assignment:
+
+```ts
+        const nextCommittedElements = sceneData.elements
+          ? sceneData.commitDeferredChanges
+            ? arrayToMap(nextElements)
+            : this.store.filterUncomittedElements(
+                this.scene.getElementsMapIncludingDeleted(), // Only used to detect uncomitted local elements
+                arrayToMap(nextElements), // We expect all (already reconciled) elements
+              )
+          : prevCommittedElements;
+```
+
+That is the **entire** fork edit: one optional field and one branch. Do not change `filterUncomittedElements`, the store, or any other vendor file. `types.ts:778` derives the public `updateScene` type from this method, so no second edit is needed to expose it.
+
+- [ ] **Step 0b: Rebuild the vendor package and regenerate its types**
+
+Follow the procedure in Global Constraints exactly — it was learned the hard way and is recorded in `.claude/memory/selection-mode.md`.
+
+```bash
+cd vendor/excalidraw/packages/excalidraw
+node ../../scripts/buildPackage.js
+node_modules/.bin/tsc -p tsconfig.json
+```
+
+`tsc` prints pre-existing upstream type errors (cornerRadius/Point noise) and still emits `.d.ts` to `dist/types/` — that is expected, and those errors are not yours. Verify afterwards that `commitDeferredChanges` appears in the generated typings:
+
+```bash
+grep -rn "commitDeferredChanges" dist/types/excalidraw/components/App.d.ts
+```
+
+If it does not appear, stop and report — flow's typecheck will not see the field and every later step is built on sand.
+
+- [ ] **Step 0c: Commit the fork edit on the submodule branch**
+
+The submodule is on branch `flow`. `dist/` is gitignored, so the edit is only durable once committed there and the parent gitlink is bumped:
+
+```bash
+cd vendor/excalidraw
+git add packages/excalidraw/components/App.tsx
+git commit -m "feat(fork): let updateScene commit deferred EVENTUALLY changes
+
+A gesture that writes intermediate frames with EVENTUALLY leaves the live
+scene ahead of the store snapshot. filterUncomittedElements then reads the
+closing IMMEDIATELY write as an in-flight local action and reverts its
+payload to the stale snapshot, so the gesture records no undo entry at all.
+
+commitDeferredChanges lets the caller declare that this write IS that action
+finishing, so the payload is authoritative and the filter is skipped."
+```
+
+Leave the parent gitlink bump to the task's final commit (Step 8), where it lands with the flow-side changes.
+
+- [ ] **Step 0d: Write `deferred-commit.ts` (test first)**
+
+Create `src/lib/deferred-commit.test.ts`:
+
+```ts
+import { describe, it, expect } from "vitest";
+import { markDeferred, consumeDeferred } from "./deferred-commit";
+
+describe("deferred-commit", () => {
+  it("reports nothing pending before any deferred write", () => {
+    expect(consumeDeferred()).toBe(false);
+  });
+
+  it("reports a pending sequence exactly once, then resets", () => {
+    markDeferred();
+    expect(consumeDeferred()).toBe(true);
+    expect(consumeDeferred()).toBe(false);
+  });
+
+  it("collapses a run of deferred writes into one pending sequence", () => {
+    markDeferred();
+    markDeferred();
+    markDeferred();
+    expect(consumeDeferred()).toBe(true);
+    expect(consumeDeferred()).toBe(false);
+  });
+});
+```
+
+Run it (`npm test -- --run src/lib/deferred-commit.test.ts`) and confirm it fails on the missing module. Then create `src/lib/deferred-commit.ts`:
+
+```ts
+/**
+ * Tracks whether transient (`EVENTUALLY`) scene writes are awaiting a commit.
+ *
+ * The vendor's `updateScene` filters out elements whose live version has run
+ * ahead of the history snapshot, which is exactly what a gesture's deferred
+ * frames look like. The write that ends the gesture has to opt out of that
+ * filter — but an ordinary panel write, with no deferred frames behind it,
+ * must keep the filter's protection. This is the one bit that tells them apart.
+ *
+ * Module-level state is safe here: only one pointer gesture can be in flight.
+ */
+let pending = false;
+
+/** Record that a transient write has deferred its history. */
+export const markDeferred = (): void => {
+  pending = true;
+};
+
+/** True if a deferred sequence is awaiting commit; resets on read. */
+export const consumeDeferred = (): boolean => {
+  const was = pending;
+  pending = false;
+  return was;
+};
+```
+
+- [ ] **Step 0e: Wire the flag into the two write paths**
+
+In `src/ui/panels/useSelectionStyle.ts`, import the pair and use it in `update`:
+
+```ts
+import { markDeferred, consumeDeferred } from "../../lib/deferred-commit";
+```
+
+```ts
+    if (transient) markDeferred();
+    api.updateScene({
+      elements: next,
+      appState: currentItems as UpdateAppState | undefined,
+      // EVENTUALLY defers without advancing the history baseline. The closing
+      // write must also tell updateScene to skip its uncommitted-element
+      // filter, which would otherwise revert this payload to the stale
+      // pre-gesture snapshot and record nothing at all.
+      captureUpdate: transient
+        ? CaptureUpdateAction.EVENTUALLY
+        : CaptureUpdateAction.IMMEDIATELY,
+      commitDeferredChanges: transient ? undefined : consumeDeferred(),
+    } as Parameters<ExcalidrawAPI["updateScene"]>[0]);
+```
+
+Apply the same two changes in `src/lib/transform.ts` — `markDeferred()` when `transient`, and `commitDeferredChanges: transient ? undefined : consumeDeferred()` on both `updateScene` calls there.
+
+If the regenerated vendor typings expose `commitDeferredChanges` correctly, the `as Parameters<...>` cast is unnecessary — drop it. Only keep a cast if the typings genuinely do not carry the field, and say so in your report.
+
+Run `npm test -- --run` and `npm run typecheck` before moving on.
 
 - [ ] **Step 1: Update two assertions and write the failing transient tests**
 
@@ -792,6 +971,9 @@ test("an arrowhead-size drag records exactly one undo entry", async ({ page }) =
 
   const size = page.getByRole("slider", { name: "End arrowhead size" });
   await expect(size).toBeEnabled();
+  // The Stroke panel can extend past the fold; raw page.mouse events are
+  // viewport-absolute, so an off-screen control silently never receives them.
+  await size.scrollIntoViewIfNeeded();
   const before = await size.inputValue();
 
   // Drag the thumb across the track in steps, so the gesture emits many
@@ -817,16 +999,31 @@ test("an arrowhead-size drag records exactly one undo entry", async ({ page }) =
 Run: `npx playwright test e2e/stroke-panel.spec.ts`
 Expected: PASS, all 4 tests.
 
-**If the undo test fails**, the `EVENTUALLY` assumption is wrong and the rest of the plan's batching depends on it. Stop and report rather than working around it — the likely causes are (a) something else triggering an `IMMEDIATELY` capture mid-drag, or (b) the appState `currentItem*` write in `setProp` capturing separately from the element write. Diagnosing that is cheaper here than after eight more call sites depend on it.
+**This test is the whole point of the task.** It already failed once, against the capture-modes-only design, recording zero undo entries. If it fails again, do not adjust the test, loosen the assertion, add waits, or change the capture mode to make it pass. Stop and report BLOCKED with: the values before the drag / after the drag / after each Ctrl+Z, how many undos were needed to get back (if any number worked), and whether `commitDeferredChanges` is present in the built vendor typings and actually reaching `updateScene` at runtime. The most likely failure now is a stale vendor build — Step 0b's `grep` is what rules that out.
+
+Ordinary e2e flakiness — a selector not resolving, the dev server not being ready — is yours to fix normally.
 
 - [ ] **Step 8: Run the full unit suite and commit**
 
+The gitlink bump is what makes the fork edit durable, so it belongs in this commit alongside the flow-side changes.
+
 ```bash
 npm test -- --run && npm run typecheck
-git add src/ui/panels/controls/SliderInput.tsx src/ui/panels/controls/SliderInput.test.tsx \
+git add vendor/excalidraw \
+        src/lib/deferred-commit.ts src/lib/deferred-commit.test.ts \
+        src/lib/transform.ts src/ui/panels/useSelectionStyle.ts \
+        src/ui/panels/controls/SliderInput.tsx src/ui/panels/controls/SliderInput.test.tsx \
         src/ui/panels/StrokePanel.tsx e2e/stroke-panel.spec.ts
-git commit -m "feat(controls): batch a slider drag into a single undo entry"
+git commit -m "feat(controls): batch a slider drag into a single undo entry
+
+Capture modes alone could not do this: updateScene's uncommitted-element
+filter reverted the closing write's payload to the pre-gesture snapshot, so
+a whole gesture recorded nothing. The vendor now accepts an explicit
+commitDeferredChanges flag, and deferred-commit.ts tracks when a write is
+actually closing a deferred sequence rather than standing alone."
 ```
+
+Confirm with `git show --stat HEAD` that the commit includes the `vendor/excalidraw` gitlink change. Without it the fork edit is invisible to a fresh clone.
 
 ---
 
