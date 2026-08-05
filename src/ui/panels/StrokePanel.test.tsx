@@ -24,14 +24,15 @@ function mockSel(over: Record<string, unknown> = {}): SelectionStyle {
 describe("StrokePanel", () => {
   it("offers a 0-10px stroke width range", () => {
     render(<StrokePanel sel={mockSel()} units="px" />);
-    const slider = screen.getByLabelText("Stroke width");
-    expect(slider).toHaveAttribute("min", "0");
-    expect(slider).toHaveAttribute("max", "10");
+    const width = screen.getByLabelText("Stroke width");
+    expect(width).toHaveAttribute("min", "0");
+    expect(width).toHaveAttribute("max", "10");
+    expect(screen.queryByRole("slider", { name: "Stroke width" })).not.toBeInTheDocument();
   });
 
   it("falls back to the 2px app default before appState is available", () => {
     render(<StrokePanel sel={mockSel()} units="px" />);
-    expect(screen.getByLabelText("Stroke width value")).toHaveValue(2);
+    expect(screen.getByLabelText("Stroke width")).toHaveValue(2);
   });
 
   it("shows the selected element's width over the fallback", () => {
@@ -41,6 +42,6 @@ describe("StrokePanel", () => {
       hasSelection: true,
     });
     render(<StrokePanel sel={sel} units="px" />);
-    expect(screen.getByLabelText("Stroke width value")).toHaveValue(7);
+    expect(screen.getByLabelText("Stroke width")).toHaveValue(7);
   });
 });

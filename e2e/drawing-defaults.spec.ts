@@ -40,14 +40,15 @@ test("the Transform panel still rounds a shape on demand", async ({ page }) => {
   await expect(radius).toHaveValue("16");
 });
 
-test("the stroke slider spans 0 to 10px", async ({ page }) => {
+test("the stroke width field spans 0 to 10px", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
   await draw(page, "Rectangle", 760, 480);
 
-  const slider = page.getByRole("slider", { name: "Stroke width" });
-  await expect(slider).toHaveAttribute("min", "0");
-  await expect(slider).toHaveAttribute("max", "10");
+  const width = page.getByLabel("Stroke width");
+  await expect(width).toHaveAttribute("min", "0");
+  await expect(width).toHaveAttribute("max", "10");
+  await expect(page.getByRole("slider", { name: "Stroke width" })).toHaveCount(0);
 });
 
 test("a zero stroke width still floors the cross-hatch fill instead of leaving the shape empty", async ({ page }) => {
@@ -70,7 +71,7 @@ test("a zero stroke width still floors the cross-hatch fill instead of leaving t
     );
   });
 
-  const width = page.getByLabel("Stroke width value");
+  const width = page.getByLabel("Stroke width");
   await width.fill("0");
   await width.blur();
   await expect(width).toHaveValue("0");

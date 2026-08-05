@@ -1,5 +1,5 @@
 import { ColorSwatch } from "./controls/ColorSwatch";
-import { SliderInput } from "./controls/SliderInput";
+import { NumberInput } from "./controls/NumberInput";
 import { MIXED, readFormValue, type SelectedElementIds } from "../../lib/selection-style";
 import { splitColorAlpha, combineColorAlpha } from "../../lib/color-alpha";
 import { DEFAULT_LASER_HEX } from "../../lib/laser-color";
@@ -25,10 +25,10 @@ interface ColorRowProps {
 
 /**
  * One "color + opacity" row. The swatch edits hue only; opacity is a separate
- * slider. They are combined into an 8-digit hex written to the element so each
- * color carries its own opacity (Excalidraw's element `opacity` is a single
- * value and can't do this). MIXED selections show an indeterminate swatch and
- * an empty opacity field.
+ * drag-to-scrub field. They are combined into an 8-digit hex written to the
+ * element so each color carries its own opacity (Excalidraw's element `opacity`
+ * is a single value and can't do this). MIXED selections show an indeterminate
+ * swatch and an empty opacity field.
  */
 function ColorRow({
   sel,
@@ -49,16 +49,16 @@ function ColorRow({
   const isTransparent = hue === "transparent";
   const currentAlpha = alpha === MIXED ? 100 : alpha;
 
-  const write = (color: string) =>
-    onWrite ? onWrite(color) : sel.setProp({ prop, value: color, currentItemKey, ids });
+  const write = (color: string, transient = false) =>
+    onWrite ? onWrite(color) : sel.setProp({ prop, value: color, currentItemKey, ids, transient });
 
   const onColor = (hex: string) => {
     if (hex === "transparent") return write("transparent");
     write(combineColorAlpha(hex, currentAlpha > 0 ? currentAlpha : 100));
   };
-  const onOpacity = (next: number) => {
+  const onOpacity = (next: number, transient: boolean) => {
     const base = hue === MIXED || isTransparent ? "#1e1e1e" : hue;
-    write(combineColorAlpha(base, next));
+    write(combineColorAlpha(base, next), transient);
   };
 
   return (
@@ -72,7 +72,7 @@ function ColorRow({
           allowTransparent={allowTransparent}
           disabled={disabled}
         />
-        <SliderInput
+        <NumberInput
           value={isTransparent ? 0 : alpha === MIXED ? null : alpha}
           min={0}
           max={100}

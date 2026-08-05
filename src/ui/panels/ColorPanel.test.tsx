@@ -30,7 +30,7 @@ describe("ColorPanel laser row", () => {
   it("renders a Laser swatch and opacity control", () => {
     render(<ColorPanel sel={makeSel()} onChangeLaserColor={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Laser color" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Laser opacity value")).toBeInTheDocument();
+    expect(screen.getByLabelText("Laser opacity")).toBeInTheDocument();
   });
 
   it("calls onChangeLaserColor with combined hex when opacity changes, not setProp", () => {
@@ -38,7 +38,7 @@ describe("ColorPanel laser row", () => {
     const sel = makeSel();
     render(<ColorPanel sel={sel} onChangeLaserColor={onChangeLaserColor} />);
 
-    const opacity = screen.getByLabelText("Laser opacity value");
+    const opacity = screen.getByLabelText("Laser opacity");
     fireEvent.change(opacity, { target: { value: "50" } });
     fireEvent.blur(opacity);
 

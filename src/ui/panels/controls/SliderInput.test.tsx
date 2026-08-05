@@ -1,42 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { SliderInput } from "./SliderInput";
-import { markDeferred, consumeDeferred } from "../../../lib/deferred-commit";
 
 describe("SliderInput", () => {
-  it("shows the current value and unit", () => {
-    render(<SliderInput value={4} min={0} max={100} unit="px" onChange={() => {}} ariaLabel="Stroke width" />);
-    expect(screen.getByLabelText("Stroke width value")).toHaveValue(4);
-    expect(screen.getByText("px")).toBeInTheDocument();
-  });
-
-  it("renders an empty field for a mixed (null) value", () => {
-    render(<SliderInput value={null} min={0} max={100} onChange={() => {}} ariaLabel="Stroke width" />);
-    expect(screen.getByLabelText("Stroke width value")).toHaveValue(null);
-  });
-
-  it("commits the numeric field only on Enter, clamped to range", async () => {
-    const onChange = vi.fn();
-    render(<SliderInput value={4} min={0} max={20} onChange={onChange} ariaLabel="Stroke width" />);
-    const field = screen.getByLabelText("Stroke width value");
-    await userEvent.clear(field);
-    await userEvent.type(field, "50");
-    expect(onChange).not.toHaveBeenCalled(); // still editing
-    await userEvent.keyboard("{Enter}");
-    expect(onChange).toHaveBeenLastCalledWith(20, false); // clamped to max
-  });
-
-  it("commits the numeric field on blur", async () => {
-    const onChange = vi.fn();
-    render(<SliderInput value={4} min={0} max={20} onChange={onChange} ariaLabel="Stroke width" />);
-    const field = screen.getByLabelText("Stroke width value");
-    await userEvent.clear(field);
-    await userEvent.type(field, "12");
-    await userEvent.tab();
-    expect(onChange).toHaveBeenLastCalledWith(12, false);
-  });
-
   it("emits transient values while dragging", () => {
     const onChange = vi.fn();
     render(<SliderInput value={4} min={0} max={100} onChange={onChange} ariaLabel="Stroke width" />);
@@ -74,30 +40,18 @@ describe("SliderInput", () => {
     expect(onChange).toHaveBeenLastCalledWith(5, false);
   });
 
-  it("releases a leaked deferred mark when the control unmounts mid-gesture", () => {
-    const onChange = vi.fn();
-    const { unmount } = render(
-      <SliderInput value={4} min={0} max={100} onChange={onChange} ariaLabel="Stroke width" />,
-    );
-    const range = screen.getByRole("slider", { name: "Stroke width" });
-    // Starts a transient gesture: the real write path (useSelectionStyle) would
-    // call markDeferred() here too, guarded by `if (transient) markDeferred()`.
-    fireEvent.change(range, { target: { value: "10" } });
-    markDeferred();
-    // No pointerup/keyup/blur follows — the panel is torn down mid-drag instead.
-    unmount();
-    expect(consumeDeferred()).toBe(false);
+  it("parks at min for a mixed (null) value", () => {
+    render(<SliderInput value={null} min={2} max={12} onChange={() => {}} ariaLabel="Stroke width" />);
+    expect(screen.getByRole("slider", { name: "Stroke width" })).toHaveValue("2");
   });
 
-  it("disables both inputs when disabled", () => {
+  it("renders no numeric field", () => {
+    render(<SliderInput value={6} min={2} max={12} onChange={() => {}} ariaLabel="Stroke width" />);
+    expect(screen.queryByLabelText("Stroke width value")).not.toBeInTheDocument();
+  });
+
+  it("disables the slider when disabled", () => {
     render(<SliderInput value={4} min={0} max={100} onChange={() => {}} ariaLabel="Stroke width" disabled />);
-    expect(screen.getByLabelText("Stroke width")).toBeDisabled();
-    expect(screen.getByLabelText("Stroke width value")).toBeDisabled();
-  });
-
-  it("hideValue renders only the range slider (no numeric field)", () => {
-    render(<SliderInput value={6} min={2} max={12} hideValue onChange={() => {}} ariaLabel="Start arrowhead size" />);
-    expect(screen.getByRole("slider", { name: "Start arrowhead size" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Start arrowhead size value")).not.toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: "Stroke width" })).toBeDisabled();
   });
 });

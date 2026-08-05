@@ -26,8 +26,8 @@ interface NumberFieldBinding {
  * Behaviour for a numeric text field that only *commits* on blur or Enter — not
  * on every keystroke — so a value doesn't churn while the user is still typing.
  * Escape reverts to the current value. While the user is not editing, the field
- * reflects external value changes. Shared by NumberInput and SliderInput's field
- * (the slider's drag stays live, since that's a deliberate gesture, not typing).
+ * reflects external value changes. Used by NumberInput's typed-entry path (its
+ * drag-to-scrub gesture stays live, since that's a deliberate gesture, not typing).
  */
 export function useNumberField({ value, min, max, step, onChange }: UseNumberFieldArgs): NumberFieldBinding {
   const [text, setText] = useState(value === null ? "" : String(value));

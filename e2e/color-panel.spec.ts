@@ -63,7 +63,7 @@ test("edits the selected element's stroke color and opacity", async ({ page }) =
   await expect(strokeSwatch).toHaveAttribute("title", "#e03131");
 
   await page.locator(".flow-pnl__title").click(); // close the picker
-  const opacity = page.getByLabel("Stroke opacity value");
+  const opacity = page.getByLabel("Stroke opacity");
   await opacity.fill("50");
   await opacity.blur();
   await expect(opacity).toHaveValue("50");
@@ -78,8 +78,8 @@ test("per-swatch opacity renders as a semi-transparent fill", async ({ page }) =
   await page.getByRole("button", { name: "Fill color", exact: true }).click();
   await page.getByRole("button", { name: "#e03131", exact: true }).click();
   await page.locator(".flow-pnl__title").click();
-  await page.getByLabel("Fill opacity value").fill("50");
-  await page.getByLabel("Fill opacity value").blur();
+  await page.getByLabel("Fill opacity").fill("50");
+  await page.getByLabel("Fill opacity").blur();
   await page.waitForTimeout(250);
 
   // #e03131 (224,49,49) at 50% over white ≈ (239,152,152). Full opacity would

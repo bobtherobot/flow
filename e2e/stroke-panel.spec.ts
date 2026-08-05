@@ -32,7 +32,7 @@ test("edits stroke width and dash style on the selected element", async ({ page 
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Rectangle", 820, 500);
 
-  const width = page.getByLabel("Stroke width value");
+  const width = page.getByLabel("Stroke width");
   await width.fill("8");
   await width.blur();
   await expect(width).toHaveValue("8");
@@ -127,4 +127,28 @@ test("an arrowhead-size drag records exactly one undo entry", async ({ page }) =
   // captured, this would step back a single increment instead.
   await page.keyboard.press("Control+z");
   await expect(size).toHaveValue(before);
+});
+
+test("scrubbing the stroke width field changes the value in one undo entry", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await drawWith(page, "Rectangle", 820, 500);
+
+  const width = page.getByLabel("Stroke width");
+  await expect(width).toHaveValue("2");
+
+  // Drag up over the field: span is the 0-10 range, so 150px sweeps the lot.
+  // Raw page.mouse events don't auto-scroll like locator actions do, so bring
+  // the field into view before reading its box (it sits at the viewport's
+  // bottom edge by default).
+  await width.scrollIntoViewIfNeeded();
+  const box = (await width.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 60, { steps: 12 });
+  await page.mouse.up();
+
+  await expect(width).toHaveValue("6");
+  await page.keyboard.press("Control+z");
+  await expect(width).toHaveValue("2");
 });

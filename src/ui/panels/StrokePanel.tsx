@@ -1,4 +1,5 @@
 import { IconToggleGroup, type IconOption } from "./controls/IconToggleGroup";
+import { NumberInput } from "./controls/NumberInput";
 import { SliderInput } from "./controls/SliderInput";
 import { MIXED, readFormValue, type SelectedElementIds } from "../../lib/selection-style";
 import { displayValue, toPx, unitStep, type Unit } from "../../lib/units";
@@ -210,15 +211,20 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
       <div className="flow-ctl-row">
         <span className="flow-ctl-row__label">Width</span>
         <div className="flow-ctl-row__control">
-          <SliderInput
+          <NumberInput
             value={widthDisplay}
             min={displayValue(MIN_STROKE_PX, units)}
             max={displayValue(MAX_STROKE_PX, units)}
             step={units === "px" ? 0.5 : unitStep(units)}
             unit={units}
             ariaLabel="Stroke width"
-            onChange={(v) =>
-              sel.setProp({ prop: "strokeWidth", value: toPx(v, units), currentItemKey: "currentItemStrokeWidth" })
+            onChange={(v, transient) =>
+              sel.setProp({
+                prop: "strokeWidth",
+                value: toPx(v, units),
+                currentItemKey: "currentItemStrokeWidth",
+                transient,
+              })
             }
           />
         </div>
@@ -267,7 +273,6 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
             min={ARROWHEAD_SIZE_MIN}
             max={ARROWHEAD_SIZE_MAX}
             step={ARROWHEAD_SIZE_STEP}
-            hideValue
             ariaLabel="Start arrowhead size"
             disabled={arrowDefaultsDisabled || startArrow === "none"}
             onChange={setArrowheadSize("startArrowheadSize", "currentItemStartArrowheadSize")}
@@ -290,7 +295,6 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
             min={ARROWHEAD_SIZE_MIN}
             max={ARROWHEAD_SIZE_MAX}
             step={ARROWHEAD_SIZE_STEP}
-            hideValue
             ariaLabel="End arrowhead size"
             disabled={arrowDefaultsDisabled || endArrow === "none"}
             onChange={setArrowheadSize("endArrowheadSize", "currentItemEndArrowheadSize")}

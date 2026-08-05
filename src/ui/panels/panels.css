@@ -405,32 +405,6 @@ body.flow-scrubbing * {
   min-width: 0;
   accent-color: var(--flow-accent);
 }
-.flow-ctl-slider__field {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-.flow-ctl-slider__num {
-  width: 46px;
-  padding: 3px 5px;
-  font: inherit;
-  font-size: 12px;
-  text-align: right;
-  border: 1px solid var(--flow-border);
-  border-radius: var(--flow-radius-sm);
-  background: #fff;
-  color: var(--flow-ink);
-}
-.flow-ctl-slider__num:focus {
-  outline: none;
-  border-color: var(--flow-accent);
-  box-shadow: 0 0 0 2px var(--flow-active);
-}
-.flow-ctl-slider__unit {
-  font-size: 11px;
-  color: var(--flow-ink-muted);
-}
 
 /* Color well + popover */
 .flow-ctl-color {
