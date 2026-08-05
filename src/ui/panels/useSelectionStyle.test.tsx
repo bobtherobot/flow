@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 
 // The hook imports CaptureUpdateAction + newElementWith from the Excalidraw
 // package; loading the real package in jsdom runs module-level UI code that
 // throws. Stub just the two exports the hook uses (newElementWith bumps version).
 vi.mock("@excalidraw/excalidraw", () => ({
-  CaptureUpdateAction: { IMMEDIATELY: "IMMEDIATELY" },
+  CaptureUpdateAction: { IMMEDIATELY: "IMMEDIATELY", EVENTUALLY: "EVENTUALLY" },
   newElementWith: (el: Record<string, unknown>, updates: Record<string, unknown>) => ({
     ...el,
     ...updates,
@@ -106,5 +106,32 @@ describe("useSelectionStyle", () => {
     );
     const { result } = renderHook(() => useSelectionStyle(api));
     expect(result.current.selectedCount).toBe(2);
+  });
+
+  it("records setProp immediately by default", () => {
+    const api = makeApi([rect("r")], { r: true });
+    const { result } = renderHook(() => useSelectionStyle(api));
+    act(() => result.current.setProp({ prop: "strokeColor", value: "#f00" }));
+    expect(api.updateScene).toHaveBeenCalledWith(
+      expect.objectContaining({ captureUpdate: "IMMEDIATELY" }),
+    );
+  });
+
+  it("defers a transient setProp so a gesture becomes one undo entry", () => {
+    const api = makeApi([rect("r")], { r: true });
+    const { result } = renderHook(() => useSelectionStyle(api));
+    act(() => result.current.setProp({ prop: "strokeColor", value: "#f00", transient: true }));
+    expect(api.updateScene).toHaveBeenCalledWith(
+      expect.objectContaining({ captureUpdate: "EVENTUALLY" }),
+    );
+  });
+
+  it("passes the transient flag through update()", () => {
+    const api = makeApi([rect("r")], { r: true });
+    const { result } = renderHook(() => useSelectionStyle(api));
+    act(() => result.current.update({ r: true }, () => ({ x: 5 }), undefined, true));
+    expect(api.updateScene).toHaveBeenCalledWith(
+      expect.objectContaining({ captureUpdate: "EVENTUALLY" }),
+    );
   });
 });

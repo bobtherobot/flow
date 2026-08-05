@@ -20,6 +20,8 @@ interface SetPropArgs {
   currentItemKey?: string;
   /** Restrict the write to these ids (defaults to the selection). */
   ids?: SelectedElementIds;
+  /** Mid-gesture write: defer history so the whole drag is one undo entry. */
+  transient?: boolean;
 }
 
 export interface SelectionStyle {
@@ -36,7 +38,8 @@ export interface SelectionStyle {
   /** Whether the selection contains a linear element (arrow or line). */
   hasLinear: boolean;
   /** Apply a single property to the selection (or a custom id set) and set its
-   *  default, recording one undo step. */
+   *  default. Records one undo step unless `transient`, which defers history to
+   *  the next non-transient write. */
   setProp: (args: SetPropArgs) => void;
   /** Apply a computed, possibly multi-property update to the given ids (e.g.
    *  arrow type), optionally setting currentItem* defaults. One undo step. */
@@ -44,6 +47,7 @@ export interface SelectionStyle {
     ids: SelectedElementIds,
     updater: (el: SceneElement) => ElementUpdate,
     currentItems?: Record<string, unknown>,
+    transient?: boolean,
   ) => void;
   /** Dispatch a registered Excalidraw action by name against the selection
    *  (reuses its correct perform + history — e.g. "changeArrowType"). */
@@ -79,7 +83,7 @@ export function useSelectionStyle(api: ExcalidrawAPI | null): SelectionStyle {
     (el) => selectedIds[el.id] === true && (el.type === "arrow" || el.type === "line"),
   );
 
-  const update: SelectionStyle["update"] = (ids, updater, currentItems) => {
+  const update: SelectionStyle["update"] = (ids, updater, currentItems, transient = false) => {
     if (!api) return;
     // `newElementWith` bumps version/versionNonce so Excalidraw records the edit
     // in history (raw spreads read back fine but are never captured for undo).
@@ -91,15 +95,21 @@ export function useSelectionStyle(api: ExcalidrawAPI | null): SelectionStyle {
     api.updateScene({
       elements: next,
       appState: currentItems as UpdateAppState | undefined,
-      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      // EVENTUALLY defers without advancing the history baseline, so the next
+      // IMMEDIATELY diffs against the pre-gesture state. NEVER would *update*
+      // the baseline and collapse undo to the last intermediate step.
+      captureUpdate: transient
+        ? CaptureUpdateAction.EVENTUALLY
+        : CaptureUpdateAction.IMMEDIATELY,
     });
   };
 
-  const setProp = ({ prop, value, currentItemKey, ids }: SetPropArgs) =>
+  const setProp = ({ prop, value, currentItemKey, ids, transient }: SetPropArgs) =>
     update(
       ids ?? selectedIds,
       (el) => ((el as Record<string, unknown>)[prop] === value ? null : { [prop]: value }),
       currentItemKey ? { [currentItemKey]: value } : undefined,
+      transient,
     );
 
   const executeAction = (name: string, value?: unknown) => api?.executeAction(name, value);

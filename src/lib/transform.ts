@@ -6,12 +6,16 @@ type SceneElement = ReturnType<ExcalidrawAPI["getSceneElements"]>[number];
 /** Smallest width/height a resize may produce (matches Excalidraw's floor). */
 export const MIN_ELEMENT_SIZE = 1;
 
+/** Mid-gesture writes defer history so a whole scrub is one undo entry. */
+const captureFor = (transient: boolean) =>
+  transient ? CaptureUpdateAction.EVENTUALLY : CaptureUpdateAction.IMMEDIATELY;
+
 /**
  * Resize a single element to an exact width or height, reusing Excalidraw's own
  * resize routine (linear-point scaling, bound-text reflow/rescale, roundness) so
  * a numeric edit behaves exactly like dragging a handle. Anchors the top-left
  * corner ("e" grows east for width, "s" grows south for height). Commits through
- * the public `updateScene` as a single undo step.
+ * the public `updateScene` as a single undo step (deferred to the next non-transient write when `transient`).
  *
  * The scene elements are frozen, so we resize on shallow clones: `map` is
  * mutated in place by `resizeSingleElement`, `origMap` stays the pre-resize
@@ -22,6 +26,7 @@ export function resizeElementDimension(
   id: string,
   dimension: "width" | "height",
   value: number,
+  transient = false,
 ): void {
   const elements = api.getSceneElements();
   const map = new Map<string, SceneElement>(elements.map((el) => [el.id, { ...el }]));
@@ -44,16 +49,21 @@ export function resizeElementDimension(
   );
 
   const next = elements.map((el) => map.get(el.id) ?? el);
-  api.updateScene({ elements: next, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
+  api.updateScene({ elements: next, captureUpdate: captureFor(transient) });
 }
 
 /**
  * Set a container's text padding (gap before the bound text wraps). Because
  * wrapping is precomputed and stored on the text element, we set the padding on
  * a clone then run a same-size `resizeSingleElement`, whose `handleBindTextResize`
- * step rewraps the bound text against the new padding. One undo step.
+ * step rewraps the bound text against the new padding. One undo step (deferred to the next non-transient write when `transient`).
  */
-export function setContainerPadding(api: ExcalidrawAPI, id: string, value: number): void {
+export function setContainerPadding(
+  api: ExcalidrawAPI,
+  id: string,
+  value: number,
+  transient = false,
+): void {
   const elements = api.getSceneElements();
   const map = new Map<string, SceneElement>(elements.map((el) => [el.id, { ...el }]));
   const origMap = new Map<string, SceneElement>(elements.map((el) => [el.id, { ...el }]));
@@ -65,5 +75,5 @@ export function setContainerPadding(api: ExcalidrawAPI, id: string, value: numbe
   resizeSingleElement(latest.width, latest.height, latest, orig, map, origMap, "e");
 
   const next = elements.map((el) => map.get(el.id) ?? el);
-  api.updateScene({ elements: next, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
+  api.updateScene({ elements: next, captureUpdate: captureFor(transient) });
 }
