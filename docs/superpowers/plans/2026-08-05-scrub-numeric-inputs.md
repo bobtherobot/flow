@@ -166,6 +166,19 @@ describe("useScrubDrag", () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
+  it("cancels an armed press on Escape without committing or clicking", () => {
+    const onScrub = vi.fn();
+    const onClick = vi.fn();
+    render(<Harness value={50} min={0} max={100} span={100} onScrub={onScrub} onClick={onClick} />);
+    fireEvent.pointerDown(screen.getByTestId("grip"), { clientY: 300, button: 0 });
+    fireEvent.keyDown(window, { key: "Escape" }); // still under the 3px threshold
+    expect(onScrub).not.toHaveBeenCalled();
+    expect(onClick).not.toHaveBeenCalled();
+    // The gesture is over: a later release must not resurrect the click.
+    fireEvent.pointerUp(window, { clientY: 300 });
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   it("reverts to the gesture's start value on Escape", () => {
     const onScrub = vi.fn();
     render(<Harness value={50} min={0} max={100} span={100} onScrub={onScrub} />);
@@ -348,12 +361,21 @@ export function useScrubDrag({
       end(g?.dragging ? g.last : null);
     };
 
+    // Escape before the drag threshold cancels outright: no commit, and no
+    // click either — the press never became either gesture.
+    const cancel = () => {
+      gesture.current = null;
+      setActive(false);
+      setIsDragging(false);
+    };
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       const g = gesture.current;
       // Intermediates were never captured, so re-committing the start value
       // produces a no-op diff and leaves no undo entry behind.
-      end(g?.dragging ? g.startValue : null);
+      if (g?.dragging) end(g.startValue);
+      else cancel();
     };
 
     window.addEventListener("pointermove", onMove);

@@ -64,7 +64,7 @@ every intermediate value and `false` once, on release.
 | `pointerdown` | Ignore when `disabled`, `value === null`, or the button isn't primary. `preventDefault` to suppress native focus, record `anchorY` + `anchorValue`, subscribe `pointermove`/`pointerup`/`keydown` on `window`, enter *armed* (not yet dragging). |
 | `pointermove` | Below a 3px threshold, stay armed. Past it, enter *dragging* and emit on every move. |
 | `pointerup` | Dragging → emit the final value with `transient: false`, leave the field unfocused. Still armed → treat as a click: focus the input and select all, ready to type. |
-| `Escape` | Emit the gesture's *start* value (not the anchor, which moves when a modifier changes) with `transient: false` and end. Since intermediates were never captured, this commits a no-op diff and leaves no undo entry. |
+| `Escape` | While dragging: emit the gesture's *start* value (not the anchor, which moves when a modifier changes) with `transient: false` and end. Since intermediates were never captured, this commits a no-op diff and leaves no undo entry. While merely armed (still under the threshold): cancel outright — neither a commit nor a click, because the press became neither gesture. |
 
 Listeners live on `window` rather than using `setPointerCapture`, so a drag that
 leaves the field keeps tracking. jsdom implements neither pointer capture nor
