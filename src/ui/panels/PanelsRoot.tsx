@@ -3,6 +3,7 @@ import { PanelDock } from "./dock/PanelDock";
 import type { PanelDef } from "./dock/panel-types";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { Unit } from "../../lib/units";
+import { historyShortcutFor, isTextEntry } from "../../lib/history-shortcuts";
 import { useSelectionStyle } from "./useSelectionStyle";
 import { TransformPanel } from "./TransformPanel";
 import { ColorPanel } from "./ColorPanel";
@@ -49,5 +50,21 @@ export function PanelsRoot({ api, units, search, onChangeLaserColor }: PanelsRoo
     { id: "layers", label: "Layers", render: () => <LayersPlaceholder /> },
   ];
 
-  return <PanelDock defs={defs} topOffset={MENUBAR_H} openPanel={{ id: "search", nonce: search.nonce }} />;
+  return (
+    <div
+      onKeyDown={(e) => {
+        // flow's panels are a DOM sibling of <Excalidraw>, which binds keydown
+        // on its own container — so history shortcuts pressed with a panel
+        // control focused never reach the canvas. Forward just those two;
+        // text entry keeps the browser's own undo.
+        if (isTextEntry(e.target)) return;
+        const action = historyShortcutFor(e);
+        if (!action) return;
+        e.preventDefault();
+        api?.executeAction(action);
+      }}
+    >
+      <PanelDock defs={defs} topOffset={MENUBAR_H} openPanel={{ id: "search", nonce: search.nonce }} />
+    </div>
+  );
 }

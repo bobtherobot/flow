@@ -1,5 +1,6 @@
 import { CaptureUpdateAction, resizeSingleElement } from "@excalidraw/excalidraw";
 import type { ExcalidrawAPI } from "./excalidraw-scene";
+import { markDeferred, consumeDeferred } from "./deferred-commit";
 
 type SceneElement = ReturnType<ExcalidrawAPI["getSceneElements"]>[number];
 
@@ -49,7 +50,12 @@ export function resizeElementDimension(
   );
 
   const next = elements.map((el) => map.get(el.id) ?? el);
-  api.updateScene({ elements: next, captureUpdate: captureFor(transient) });
+  if (transient) markDeferred();
+  api.updateScene({
+    elements: next,
+    captureUpdate: captureFor(transient),
+    commitDeferredChanges: transient ? undefined : consumeDeferred(),
+  });
 }
 
 /**
@@ -75,5 +81,10 @@ export function setContainerPadding(
   resizeSingleElement(latest.width, latest.height, latest, orig, map, origMap, "e");
 
   const next = elements.map((el) => map.get(el.id) ?? el);
-  api.updateScene({ elements: next, captureUpdate: captureFor(transient) });
+  if (transient) markDeferred();
+  api.updateScene({
+    elements: next,
+    captureUpdate: captureFor(transient),
+    commitDeferredChanges: transient ? undefined : consumeDeferred(),
+  });
 }

@@ -99,3 +99,32 @@ test("arrowhead size is a new-arrow tool default", async ({ page }) => {
   await drawWith(page, "Arrow", 860, 320);
   await expect(page.getByRole("slider", { name: "End arrowhead size" })).toHaveValue("10");
 });
+
+test("an arrowhead-size drag records exactly one undo entry", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await drawWith(page, "Arrow", 860, 320);
+
+  const size = page.getByRole("slider", { name: "End arrowhead size" });
+  await expect(size).toBeEnabled();
+  const before = await size.inputValue();
+
+  // Drag the thumb across the track in steps, so the gesture emits many
+  // intermediate values rather than a single jump. Raw page.mouse events
+  // (unlike locator actions such as .click()/.fill()) don't auto-scroll, so
+  // bring the slider into view before reading its box.
+  await size.scrollIntoViewIfNeeded();
+  const box = (await size.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.95, box.y + box.height / 2, { steps: 20 });
+  await page.mouse.up();
+
+  const after = await size.inputValue();
+  expect(Number(after)).toBeGreaterThan(Number(before));
+
+  // One undo must restore the pre-drag value: if the intermediates were each
+  // captured, this would step back a single increment instead.
+  await page.keyboard.press("Control+z");
+  await expect(size).toHaveValue(before);
+});

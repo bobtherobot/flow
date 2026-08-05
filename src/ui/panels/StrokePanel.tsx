@@ -202,8 +202,8 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
     which: "startArrowheadSize" | "endArrowheadSize",
     currentItemKey: string,
   ) =>
-    (value: number) =>
-      sel.setProp({ prop: which, value, currentItemKey, ids: linearIds });
+    (value: number, transient: boolean) =>
+      sel.setProp({ prop: which, value, currentItemKey, ids: linearIds, transient });
 
   return (
     <div className="flow-stroke-panel">

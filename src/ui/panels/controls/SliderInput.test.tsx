@@ -23,7 +23,7 @@ describe("SliderInput", () => {
     await userEvent.type(field, "50");
     expect(onChange).not.toHaveBeenCalled(); // still editing
     await userEvent.keyboard("{Enter}");
-    expect(onChange).toHaveBeenLastCalledWith(20); // clamped to max
+    expect(onChange).toHaveBeenLastCalledWith(20, false); // clamped to max
   });
 
   it("commits the numeric field on blur", async () => {
@@ -33,15 +33,44 @@ describe("SliderInput", () => {
     await userEvent.clear(field);
     await userEvent.type(field, "12");
     await userEvent.tab();
-    expect(onChange).toHaveBeenLastCalledWith(12);
+    expect(onChange).toHaveBeenLastCalledWith(12, false);
   });
 
-  it("commits live when the range slider moves", () => {
+  it("emits transient values while dragging", () => {
     const onChange = vi.fn();
     render(<SliderInput value={4} min={0} max={100} onChange={onChange} ariaLabel="Stroke width" />);
     const range = screen.getByRole("slider", { name: "Stroke width" });
     fireEvent.change(range, { target: { value: "10" } });
-    expect(onChange).toHaveBeenCalledWith(10);
+    expect(onChange).toHaveBeenCalledWith(10, true);
+  });
+
+  it("commits once on pointer release", () => {
+    const onChange = vi.fn();
+    render(<SliderInput value={4} min={0} max={100} onChange={onChange} ariaLabel="Stroke width" />);
+    const range = screen.getByRole("slider", { name: "Stroke width" });
+    fireEvent.change(range, { target: { value: "10" } });
+    fireEvent.pointerUp(range);
+    expect(onChange).toHaveBeenLastCalledWith(10, false);
+    expect(onChange.mock.calls.filter(([, t]) => t === false)).toHaveLength(1);
+  });
+
+  it("does not commit again when blur follows pointer release", () => {
+    const onChange = vi.fn();
+    render(<SliderInput value={4} min={0} max={100} onChange={onChange} ariaLabel="Stroke width" />);
+    const range = screen.getByRole("slider", { name: "Stroke width" });
+    fireEvent.change(range, { target: { value: "10" } });
+    fireEvent.pointerUp(range);
+    fireEvent.blur(range);
+    expect(onChange.mock.calls.filter(([, t]) => t === false)).toHaveLength(1);
+  });
+
+  it("commits after a keyboard adjustment", () => {
+    const onChange = vi.fn();
+    render(<SliderInput value={4} min={0} max={100} onChange={onChange} ariaLabel="Stroke width" />);
+    const range = screen.getByRole("slider", { name: "Stroke width" });
+    fireEvent.change(range, { target: { value: "5" } });
+    fireEvent.keyUp(range, { key: "ArrowUp" });
+    expect(onChange).toHaveBeenLastCalledWith(5, false);
   });
 
   it("disables both inputs when disabled", () => {

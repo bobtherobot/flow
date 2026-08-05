@@ -1,6 +1,7 @@
 import { useEffect, useReducer } from "react";
 import { CaptureUpdateAction, newElementWith } from "@excalidraw/excalidraw";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
+import { markDeferred, consumeDeferred } from "../../lib/deferred-commit";
 import {
   updateSelected,
   resolveTextTargetIds,
@@ -93,15 +94,18 @@ export function useSelectionStyle(api: ExcalidrawAPI | null): SelectionStyle {
     );
     // The dynamic currentItem* keys can't be statically typed here; the cast is
     // localized to this scene-write boundary.
+    if (transient) markDeferred();
     api.updateScene({
       elements: next,
       appState: currentItems as UpdateAppState | undefined,
-      // EVENTUALLY defers without advancing the history baseline, so the next
-      // IMMEDIATELY diffs against the pre-gesture state. NEVER would *update*
-      // the baseline and collapse undo to the last intermediate step.
+      // EVENTUALLY defers without advancing the history baseline. The closing
+      // write must also tell updateScene to skip its uncommitted-element
+      // filter, which would otherwise revert this payload to the stale
+      // pre-gesture snapshot and record nothing at all.
       captureUpdate: transient
         ? CaptureUpdateAction.EVENTUALLY
         : CaptureUpdateAction.IMMEDIATELY,
+      commitDeferredChanges: transient ? undefined : consumeDeferred(),
     });
   };
 
