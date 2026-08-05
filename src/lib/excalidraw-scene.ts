@@ -7,6 +7,7 @@ import {
 import type { ComponentProps } from "react";
 import type { Excalidraw } from "@excalidraw/excalidraw";
 import { normalizeRoughness, DEFAULT_SLOPPINESS, type Sloppiness } from "./roughness";
+import { withoutFlowGlobals } from "./flow-app-state";
 
 export { ARCHITECT_ROUGHNESS, normalizeRoughness } from "./roughness";
 
@@ -39,7 +40,9 @@ export function serializeScene(api: ExcalidrawAPI): string {
 }
 
 /** Load a `.excalidraw` JSON string onto the canvas, replacing current content.
- *  Imported elements are normalized to the app-wide sloppiness `target`. */
+ *  Imported elements are normalized to the app-wide sloppiness `target`, and the
+ *  scene's copy of flow's app-wide preferences is dropped so opening a doc
+ *  authored elsewhere can't override them (see `flow-app-state`). */
 export async function applyContentsToScene(
   api: ExcalidrawAPI,
   contents: string,
@@ -49,7 +52,7 @@ export async function applyContentsToScene(
   const scene = await loadFromBlob(blob, null, null);
   api.updateScene({
     elements: normalizeRoughness(scene.elements, target),
-    appState: { ...scene.appState, currentItemRoughness: target },
+    appState: { ...withoutFlowGlobals(scene.appState), currentItemRoughness: target },
   });
   if (scene.files) {
     api.addFiles(Object.values(scene.files));
