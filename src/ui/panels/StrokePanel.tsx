@@ -4,9 +4,14 @@ import { MIXED, readFormValue, type SelectedElementIds } from "../../lib/selecti
 import { displayValue, toPx, unitStep, type Unit } from "../../lib/units";
 import type { SelectionStyle } from "./useSelectionStyle";
 
-/** Stroke width bounds, in canvas pixels. */
-const MIN_STROKE_PX = 0.5;
-const MAX_STROKE_PX = 32;
+/** Stroke width bounds, in canvas pixels. 0 means "no outline" — the fork's
+ *  generateRoughOptions maps a 0 width to a transparent stroke and floors the
+ *  fill maths at 1px so hachure fills can't degenerate. */
+const MIN_STROKE_PX = 0;
+const MAX_STROKE_PX = 10;
+/** Matches DEFAULT_ELEMENT_PROPS.strokeWidth, the value appState seeds into
+ *  currentItemStrokeWidth. Only shown before the Excalidraw API is ready. */
+const DEFAULT_STROKE_PX = 2;
 
 /** Arrowhead size is a multiple of stroke width (a relative factor, no absolute
  *  value shown). Bounds keep it from getting silly; the default MUST match the
@@ -132,7 +137,7 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
     sel.elements,
     sel.selectedIds,
     (el) => el.strokeWidth,
-    a?.currentItemStrokeWidth ?? 1,
+    a?.currentItemStrokeWidth ?? DEFAULT_STROKE_PX,
   );
   const widthDisplay = widthPx === MIXED ? null : displayValue(widthPx, units);
 

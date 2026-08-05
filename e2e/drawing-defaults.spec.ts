@@ -39,3 +39,31 @@ test("the Transform panel still rounds a shape on demand", async ({ page }) => {
   await radius.blur();
   await expect(radius).toHaveValue("16");
 });
+
+test("the stroke slider spans 0 to 10px", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await draw(page, "Rectangle", 760, 480);
+
+  const slider = page.getByRole("slider", { name: "Stroke width" });
+  await expect(slider).toHaveAttribute("min", "0");
+  await expect(slider).toHaveAttribute("max", "10");
+});
+
+test("a zero stroke width applies without hanging the canvas", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await draw(page, "Rectangle", 760, 480);
+
+  const width = page.getByLabel("Stroke width value");
+  await width.fill("0");
+  await width.blur();
+  await expect(width).toHaveValue("0");
+
+  // The canvas must still be responsive: a degenerate fill would peg the main
+  // thread and starve this second interaction.
+  const radius = page.getByLabel("Corner radius", { exact: true });
+  await radius.fill("8");
+  await radius.blur();
+  await expect(radius).toHaveValue("8", { timeout: 5000 });
+});
