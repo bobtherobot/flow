@@ -298,6 +298,24 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  /* A vertical scrub must not scroll the panel on touch. */
+  touch-action: none;
+}
+.flow-ctl-num__grip {
+  display: inline-flex;
+  align-items: center;
+  color: var(--flow-ink-muted);
+  opacity: 0.45;
+  cursor: ns-resize;
+  /* The stylesheet has no duration token; 120ms matches its other hovers. */
+  transition: opacity 120ms ease;
+}
+.flow-ctl-num:hover .flow-ctl-num__grip {
+  opacity: 0.9;
+}
+.flow-ctl-num[aria-disabled] .flow-ctl-num__grip {
+  opacity: 0.25;
+  cursor: default;
 }
 .flow-ctl-num__input {
   width: 56px;
@@ -309,15 +327,36 @@
   border-radius: var(--flow-radius-sm);
   background: #fff;
   color: var(--flow-ink);
+  cursor: ns-resize;
 }
+/* Editing, not scrubbing. */
 .flow-ctl-num__input:focus {
   outline: none;
   border-color: var(--flow-accent);
   box-shadow: 0 0 0 2px var(--flow-active);
+  cursor: text;
+}
+.flow-ctl-num__input:disabled {
+  cursor: default;
+}
+/* The grip is the affordance now — the spinners only steal width. */
+.flow-ctl-num__input::-webkit-outer-spin-button,
+.flow-ctl-num__input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.flow-ctl-num__input[type="number"] {
+  appearance: textfield;
 }
 .flow-ctl-num__unit {
   font-size: 11px;
   color: var(--flow-ink-muted);
+}
+/* Set for the duration of a drag, so the cursor holds while the pointer
+   travels outside the field. */
+body.flow-scrubbing,
+body.flow-scrubbing * {
+  cursor: ns-resize !important;
 }
 
 /* Segmented icon group */

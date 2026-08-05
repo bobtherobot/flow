@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NumberInput } from "./NumberInput";
+import { markDeferred, consumeDeferred } from "../../../lib/deferred-commit";
 
 describe("NumberInput", () => {
   it("shows the current value and unit", () => {
@@ -24,7 +25,7 @@ describe("NumberInput", () => {
     expect(onChange).not.toHaveBeenCalled(); // still editing
     await userEvent.keyboard("{Enter}");
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange).toHaveBeenCalledWith(24);
+    expect(onChange).toHaveBeenCalledWith(24, false);
   });
 
   it("commits on blur", async () => {
@@ -34,7 +35,7 @@ describe("NumberInput", () => {
     await userEvent.clear(field);
     await userEvent.type(field, "24");
     await userEvent.tab();
-    expect(onChange).toHaveBeenLastCalledWith(24);
+    expect(onChange).toHaveBeenLastCalledWith(24, false);
   });
 
   it("clamps below the minimum on commit", async () => {
@@ -43,7 +44,7 @@ describe("NumberInput", () => {
     const field = screen.getByLabelText("Font size value");
     await userEvent.clear(field);
     await userEvent.type(field, "0{Enter}");
-    expect(onChange).toHaveBeenLastCalledWith(1);
+    expect(onChange).toHaveBeenLastCalledWith(1, false);
   });
 
   it("reverts to the current value on Escape without committing", async () => {
@@ -65,5 +66,116 @@ describe("NumberInput", () => {
   it("disables the input when disabled", () => {
     render(<NumberInput value={20} onChange={() => {}} ariaLabel="Font size value" disabled />);
     expect(screen.getByLabelText("Font size value")).toBeDisabled();
+  });
+
+  it("renders a scrub grip when the bounds give it a span", () => {
+    const { container } = render(
+      <NumberInput value={20} min={0} max={100} onChange={() => {}} ariaLabel="Opacity" />,
+    );
+    const grip = container.querySelector(".flow-ctl-num__grip");
+    expect(grip).toBeInTheDocument();
+    // The input is the accessible control; the grip is decoration.
+    expect(grip).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("renders no grip when the bounds are infinite and no span is given", () => {
+    const { container } = render(
+      <NumberInput value={20} onChange={() => {}} ariaLabel="Opacity" />,
+    );
+    expect(container.querySelector(".flow-ctl-num__grip")).not.toBeInTheDocument();
+  });
+
+  it("scrubs from the grip, emitting transient values then one commit", () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <NumberInput value={50} min={0} max={100} onChange={onChange} ariaLabel="Opacity" />,
+    );
+    const grip = container.querySelector(".flow-ctl-num__grip")!;
+    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 285 });
+    fireEvent.pointerUp(window, { clientY: 285 });
+    // span defaults to max-min = 100 → 15px of a 150px travel = +10.
+    expect(onChange).toHaveBeenLastCalledWith(60, false);
+    expect(onChange.mock.calls.filter(([, t]) => t === true).length).toBeGreaterThan(0);
+  });
+
+  it("honours an explicit scrubSpan over the min/max range", () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <NumberInput value={0} min={-1e6} max={1e6} scrubSpan={300} onChange={onChange} ariaLabel="X position" />,
+    );
+    const grip = container.querySelector(".flow-ctl-num__grip")!;
+    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 250 });   // 50px → 300/150 × 50 = 100
+    fireEvent.pointerUp(window, { clientY: 250 });
+    expect(onChange).toHaveBeenLastCalledWith(100, false);
+  });
+
+  it("scrubs from the field body while it is unfocused", () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={50} min={0} max={100} onChange={onChange} ariaLabel="Opacity" />);
+    const field = screen.getByLabelText("Opacity");
+    fireEvent.pointerDown(field, { clientY: 300, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 285 });
+    fireEvent.pointerUp(window, { clientY: 285 });
+    expect(onChange).toHaveBeenLastCalledWith(60, false);
+  });
+
+  it("yields the field body to text selection once focused", () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={50} min={0} max={100} onChange={onChange} ariaLabel="Opacity" />);
+    const field = screen.getByLabelText("Opacity") as HTMLInputElement;
+    field.focus();
+    fireEvent.pointerDown(field, { clientY: 300, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 285 });
+    fireEvent.pointerUp(window, { clientY: 285 });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("focuses and selects the field for a press that never became a drag", () => {
+    render(<NumberInput value={50} min={0} max={100} onChange={() => {}} ariaLabel="Opacity" />);
+    const field = screen.getByLabelText("Opacity") as HTMLInputElement;
+    // `type="number"` inputs don't expose selectionStart/End — spy on select()
+    // rather than asserting a selection range that throws for this input type.
+    const select = vi.spyOn(field, "select");
+    fireEvent.pointerDown(field, { clientY: 300, button: 0 });
+    fireEvent.pointerUp(window, { clientY: 300 });
+    expect(field).toHaveFocus();
+    expect(select).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases the deferred-commit bit if it unmounts mid-scrub", () => {
+    const { container, unmount } = render(
+      <NumberInput value={50} min={0} max={100} onChange={() => {}} ariaLabel="Opacity" />,
+    );
+    const grip = container.querySelector(".flow-ctl-num__grip")!;
+    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 285 }); // a transient write is now outstanding
+    markDeferred();
+    unmount();
+    // Without the cleanup this stays true and the next unrelated panel write
+    // would skip the vendor's uncommitted-element filter.
+    expect(consumeDeferred()).toBe(false);
+  });
+
+  it("does not scrub when disabled", () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <NumberInput value={50} min={0} max={100} onChange={onChange} ariaLabel="Opacity" disabled />,
+    );
+    const grip = container.querySelector(".flow-ctl-num__grip")!;
+    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 285 });
+    fireEvent.pointerUp(window, { clientY: 285 });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("applies an external id and className", () => {
+    const { container } = render(
+      <NumberInput value={20} min={5} max={100} id="grid-size" className="flow-num__control"
+                   onChange={() => {}} ariaLabel="Grid size" />,
+    );
+    expect(screen.getByLabelText("Grid size")).toHaveAttribute("id", "grid-size");
+    expect(container.querySelector(".flow-ctl-num")).toHaveClass("flow-num__control");
   });
 });
