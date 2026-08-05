@@ -64,3 +64,42 @@ test("setting a palette default updates a color picker live", async ({ page }) =
   await colors.getByRole("button", { name: "Stroke color", exact: true }).click();
   await expect(page.getByRole("button", { name: "#0a0b0c", exact: true })).toBeVisible();
 });
+
+test("upgrading an older install refreshes the builtins and keeps custom palettes", async ({
+  page,
+}) => {
+  // A pre-seed-version install: stale builtins plus a palette the user made,
+  // with the default pointing at the old "Default" set.
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "flow.colorPalettes",
+      JSON.stringify([
+        { id: "d1", name: "Default", colors: ["#000000"] },
+        { id: "p1", name: "Pastel", colors: ["#ffd6e0"] },
+        { id: "u1", name: "Mine", colors: ["#123456"] },
+      ]),
+    );
+    localStorage.setItem("flow.defaultPaletteId", "d1");
+  });
+
+  await page.goto("/");
+  const panel = await swPanel(page);
+  const select = panel.getByRole("combobox", { name: "Palette" });
+
+  // Builtins in seed order, the user's palette carried over at the end.
+  await expect(select.locator("option")).toHaveText([
+    "Pastel", "Vibrant", "Pastel & Vibrant", "Earth", "Ocean", "Sunset",
+    "Grayscale", "Default", "Mine",
+  ]);
+
+  // The panel opens on the default palette — now Pastel, refreshed to 20.
+  await expect(
+    select.locator("option:checked"),
+  ).toHaveText("Pastel");
+  await expect(panel.getByRole("button", { name: /^Swatch #/ })).toHaveCount(20);
+
+  // The user's own palette is untouched.
+  await select.selectOption({ label: "Mine" });
+  await expect(panel.getByRole("button", { name: "Swatch #123456" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: /^Swatch #/ })).toHaveCount(1);
+});

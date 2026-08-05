@@ -1,0 +1,26 @@
+---
+name: flow-fork-strategy
+description: "How flow customizes Excalidraw — fork strategy, upstream relationship, and the per-change decision rule"
+metadata:
+  node_type: memory
+  type: project
+  originSessionId: 687369f5-142d-41f6-a8fd-6cdef9cf7127
+---
+
+flow is a standalone app built on Excalidraw (`@excalidraw/excalidraw` v0.18.1, consumed prebuilt today). As of 2026-07-04 we decided to **fork Excalidraw** to enable deep customization, because the public API can't reach the left properties panel or its `ColorPicker` (both are bundled, non-importable; only `MainMenu`/`Footer`/`Sidebar`/`renderTopRightUI` are public slots).
+
+**Integration approach (LIVE as of 2026-07-04):** git **submodule** at `vendor/excalidraw` → fork `bobtherobot/excalidraw`, tracking long-lived branch **`flow`** (renamed from `wimp` during the 2026-07-07 project rename; based on tag `v0.18.1`, commit a2ec2889). Fetch is HTTPS (portable); push URL is SSH. Build the fork with `npm run build:excalidraw` (= `yarn install --frozen-lockfile && yarn build:package` inside the submodule) → `packages/excalidraw/dist`. flow consumes it via a **`file:` dependency** (`package.json`: `"@excalidraw/excalidraw": "file:vendor/excalidraw/packages/excalidraw"`) which npm symlinks into `node_modules`, so Vite/tsc/vitest/the fonts script all resolve through the package's own export map — no aliases or tsconfig paths needed. Chosen over source-alias+HMR for a clean seam; can graduate later.
+
+**Build gotcha:** the fork builds only under **node 20–22** (upstream engine cap; the repo's default node 25 fails on `marked@16`). `.nvmrc` pins node 22; node 22 was installed via nvm. flow's own tooling runs fine on node 25. The fork's `dist/` is git-ignored, so fresh clones must `git submodule update --init` then `npm run build:excalidraw`. `vitest.config.ts` excludes `vendor/**` so the vendored suite isn't run.
+
+**First feature landed (2026-07-04):** independent Text color control (fork commit eeabe54f) — a new `actionChangeTextColor` + `currentItemTextColor` appState + panel gating, with Stroke rescoped off text. Verified via Playwright (Text row shows for text, Stroke for shapes). Textbook additive diff (8 files, no schema/format change). This is the template for future fork changes.
+
+**flow's own primary repo (set up 2026-07-08):** `https://github.com/bobtherobot/flow` — this is the repo flow publishes to going forward. Git `origin` on the flow repo: fetch HTTPS `https://github.com/bobtherobot/flow.git`, push SSH `git@github.com:bobtherobot/flow.git` (same HTTPS-fetch/SSH-push convention as the vendored submodule). Real repo URLs now live in `src/lib/links.ts` (`FLOW_REPO_URL`/`FLOW_DOCS_URL`/`FLOW_ISSUES_URL` → `bobtherobot/flow`; the old `REPLACE-ME` placeholders are gone).
+
+**Upstream relationship: RIDE UPSTREAM (pull only).** We want Excalidraw's future features/fixes, pulling them into the `vendor/excalidraw` fork regularly. We will **NOT open merge requests back into upstream Excalidraw** — the fork exists solely to serve flow. Therefore keep the fork diff **lean and additive** (easy to rebase on upstream), but there is no upstream-contribution constraint on style.
+
+**Per-change decision rule** (apply to every customization):
+1. Can the public API do it cleanly? → keep it in **flow** (survives upgrades free; e.g. storage, dialogs, custom menu — these are correct API usage, NOT hacks, leave them in flow).
+2. Needs source edits? Prefer **additive** (new files, new actions, one-liners in cold config) over **invasive** (surgery inside hot churny files like `packages/excalidraw/components/App.tsx`, ~7k lines). Additive rarely conflicts on merge; invasive means manual conflict resolution every upgrade.
+
+Concrete: the roughness/sloppiness lock (see [[flow-sloppiness-global]]) currently lives in flow as a hack (onChange normalizer + CSS `:has()` + import normalize) and is a candidate to move into the fork cleanly. Text-color row must be in the fork.

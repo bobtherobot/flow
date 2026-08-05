@@ -216,6 +216,29 @@ export function setColorPalettes(value: ColorPalette[]): void {
   writeJson(COLOR_PALETTES_KEY, value);
 }
 
+const PALETTE_SEED_VERSION_KEY = "flow.paletteSeedVersion";
+
+/** Read the seed version the stored palettes were written at (0 on miss —
+ *  pre-versioning installs, which predate the 20-color builtins). */
+export function getPaletteSeedVersion(): number {
+  try {
+    const raw = localStorage.getItem(PALETTE_SEED_VERSION_KEY);
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Persist the seed version the stored palettes were written at. */
+export function setPaletteSeedVersion(value: number): void {
+  try {
+    localStorage.setItem(PALETTE_SEED_VERSION_KEY, String(value));
+  } catch {
+    // Quota / disabled storage: preference simply won't persist this session.
+  }
+}
+
 /** Read the id of the default palette (null on miss). */
 export function getDefaultPaletteId(): string | null {
   try {

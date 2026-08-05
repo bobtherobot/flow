@@ -5,6 +5,10 @@ node_modules
 working/
 test-results/
 playwright-report/
-.claude/
+# .claude/ is private except memory/, which is repo-local by design (CLAUDE.md)
+# and must travel with the repo. Needs the /* + negation form: git cannot
+# re-include a path whose parent directory is excluded.
+.claude/*
+!.claude/memory/
 .superpowers/
 CLAUDE.md

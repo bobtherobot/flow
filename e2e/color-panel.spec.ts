@@ -1,4 +1,27 @@
 import { test, expect, type Page } from "@playwright/test";
+import { SEED_VERSION } from "../src/lib/color-palettes";
+
+/**
+ * Pin the picker's presets to a fixed set before the app boots.
+ *
+ * These tests assert on exact colors (title attributes, sampled canvas pixels),
+ * so they must not depend on which colors the shipped default palette happens
+ * to contain — that is a product decision that changes. The stamped seed
+ * version keeps `palette-store` from migrating this fixture back to the
+ * builtins on load.
+ */
+async function pinPresets(page: Page) {
+  await page.addInitScript((version: string) => {
+    localStorage.setItem(
+      "flow.colorPalettes",
+      JSON.stringify([
+        { id: "e2e", name: "E2E", colors: ["#e03131", "#2f9e44", "#1971c2"] },
+      ]),
+    );
+    localStorage.setItem("flow.defaultPaletteId", "e2e");
+    localStorage.setItem("flow.paletteSeedVersion", version);
+  }, String(SEED_VERSION));
+}
 
 /** Draw a rectangle (right of the docked panel) — leaves it selected. Clicks
  *  flow's tool rail button (the native tool island is hidden via CSS). */
@@ -27,6 +50,7 @@ async function pixelAt(page: Page, x: number, y: number): Promise<number[]> {
 }
 
 test("edits the selected element's stroke color and opacity", async ({ page }) => {
+  await pinPresets(page);
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
   await drawRectangle(page);
@@ -46,6 +70,7 @@ test("edits the selected element's stroke color and opacity", async ({ page }) =
 });
 
 test("per-swatch opacity renders as a semi-transparent fill", async ({ page }) => {
+  await pinPresets(page);
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
   await drawRectangle(page);
@@ -67,6 +92,7 @@ test("per-swatch opacity renders as a semi-transparent fill", async ({ page }) =
 });
 
 test("text color is disabled without text in the selection", async ({ page }) => {
+  await pinPresets(page);
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
   await drawRectangle(page); // a rectangle, no text
@@ -74,6 +100,7 @@ test("text color is disabled without text in the selection", async ({ page }) =>
 });
 
 test("a color edit is undoable via Excalidraw's history", async ({ page }) => {
+  await pinPresets(page);
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
 
@@ -98,6 +125,7 @@ test("a color edit is undoable via Excalidraw's history", async ({ page }) => {
 });
 
 test("laser color round-trips through the global swatch", async ({ page }) => {
+  await pinPresets(page);
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
 
@@ -111,6 +139,7 @@ test("laser color round-trips through the global swatch", async ({ page }) => {
 });
 
 test("the laser trail renders in the chosen color", async ({ page }) => {
+  await pinPresets(page);
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
 

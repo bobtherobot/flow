@@ -3,7 +3,13 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ColorSwatch } from "./ColorSwatch";
 import { MIXED } from "../../../lib/selection-style";
-import { reloadPaletteStore, setDefaultPalette, addPalette, addSwatch } from "../../../lib/palette-store";
+import {
+  reloadPaletteStore,
+  setDefaultPalette,
+  addPalette,
+  addSwatch,
+  getDefaultPaletteColors,
+} from "../../../lib/palette-store";
 
 // jsdom/Node's native `localStorage` global does not implement a usable
 // Storage in this project's vitest setup (see src/app/preferences.test.ts and
@@ -39,10 +45,13 @@ vi.stubGlobal("localStorage", mockLocalStorage);
 describe("ColorSwatch", () => {
   it("opens the picker and reports a preset choice", async () => {
     const onChange = vi.fn();
+    // Read the preset from the store rather than hardcoding a hex — the default
+    // palette's contents are a product decision that changes.
+    const preset = getDefaultPaletteColors()[0];
     render(<ColorSwatch value="#1971c2" onChange={onChange} ariaLabel="Stroke color" />);
     await userEvent.click(screen.getByRole("button", { name: "Stroke color" }));
-    await userEvent.click(screen.getByRole("button", { name: "#e03131" }));
-    expect(onChange).toHaveBeenCalledWith("#e03131");
+    await userEvent.click(screen.getByRole("button", { name: preset }));
+    expect(onChange).toHaveBeenCalledWith(preset);
   });
 
   it("commits a valid hex typed into the field", async () => {
@@ -95,19 +104,22 @@ describe("ColorSwatch presets come from the default palette", () => {
   });
 
   it("renders the default palette's colors as presets", () => {
+    const seeded = getDefaultPaletteColors();
     render(<ColorSwatch value="#111111" onChange={vi.fn()} ariaLabel="Fill" />);
     fireEvent.click(screen.getByRole("button", { name: "Fill" })); // open popover
-    // "Default" seed includes #e03131
-    expect(screen.getByRole("button", { name: "#e03131" })).toBeInTheDocument();
+    for (const color of seeded) {
+      expect(screen.getByRole("button", { name: color })).toBeInTheDocument();
+    }
   });
 
   it("reflects a new default palette live", () => {
+    const wasDefault = getDefaultPaletteColors()[0];
     const p = addPalette();
     addSwatch(p.id, "#0a0b0c");
     setDefaultPalette(p.id);
     render(<ColorSwatch value="#111111" onChange={vi.fn()} ariaLabel="Fill" />);
     fireEvent.click(screen.getByRole("button", { name: "Fill" }));
     expect(screen.getByRole("button", { name: "#0a0b0c" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "#e03131" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: wasDefault })).not.toBeInTheDocument();
   });
 });

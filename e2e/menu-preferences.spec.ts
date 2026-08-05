@@ -43,7 +43,9 @@ test.describe("desktop menu bar + preferences", () => {
     await page.getByRole("menuitem", { name: "Help" }).click();
     await page.getByRole("menuitem", { name: "About flow…" }).click();
     await expect(page.getByRole("link", { name: /flow repository/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /excalidraw fork/i })).toBeVisible();
+    // The upstream link renders as plain "Excalidraw" (AboutDialog.tsx); `exact`
+    // keeps it from also matching a future differently-worded Excalidraw link.
+    await expect(page.getByRole("link", { name: "Excalidraw", exact: true })).toBeVisible();
   });
 
   test("library trigger and footer help icon are hidden", async ({ page }) => {

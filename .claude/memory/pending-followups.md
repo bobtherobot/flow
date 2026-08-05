@@ -24,19 +24,7 @@ contain the removed files) are dropped locally:
 Precondition: only after verifying the GitHub repo's history is clean and correct.
 Other rewritten local branches (`master`, `feat/*`) are local-only and harmless.
 
-## Fix stale `e2e/menu-preferences.spec.ts` "About shows both repo links" (added 2026-07-10)
-Deterministic pre-existing failure (predates the grid-size/view-menu branch base).
-`AboutDialog.tsx` renders the upstream link as plain "Excalidraw" since commit
-`06e568e`, but the test still asserts a link named `/excalidraw fork/i`. One-line
-fix: update the test's assertion to the current link text (or rename the link).
-This is the only red test in the suite; fixing it makes the full e2e green.
-
-## Consolidated fix: global appState prefs overridden on doc open (added 2026-07-10)
-`applyContentsToScene` (`src/lib/excalidraw-scene.ts:50-53`) spreads a saved
-scene's full `appState` back on document open, so opening a `.excalidraw` authored
-with different values overrides flow's global prefs — `gridSize`,
-`objectsSnapModeEnabled`, `selectionMode`, `laserColor`, `bindingMode` — until the
-user re-touches them. Systemic (affects all five identically), not a regression.
-Fix once for all: strip flow-owned global appState keys in `applyContentsToScene`,
-or re-assert them from flow state after load. Surfaced in the grid-size and
-view-menu final reviews. See [[grid-size-preference]], [[view-menu-toggles]].
+_(Both stale e2e tests were fixed 2026-08-04: `menu-preferences.spec.ts` now
+asserts the About dialog's actual link text ("Excalidraw", `exact`), and
+`bottombar.spec.ts` pins its presets — see [[color-swatches]]. The full e2e suite
+is green as of that date: 87 e2e + 448 unit.)_

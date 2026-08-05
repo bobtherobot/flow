@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { SEED_VERSION } from "../src/lib/color-palettes";
 
 test.describe("bottom bar", () => {
   test("renders docked at the bottom-left", async ({ page }) => {
@@ -49,10 +50,21 @@ test.describe("bottom bar", () => {
   });
 
   test("changing the canvas background updates the swatch", async ({ page }) => {
+    // Pin the presets: this test asserts an exact color, so it must not depend
+    // on the shipped default palette's contents (a product decision).
+    await page.addInitScript((version: string) => {
+      localStorage.setItem(
+        "flow.colorPalettes",
+        JSON.stringify([{ id: "e2e", name: "E2E", colors: ["#e03131", "#2f9e44"] }]),
+      );
+      localStorage.setItem("flow.defaultPaletteId", "e2e");
+      localStorage.setItem("flow.paletteSeedVersion", version);
+    }, String(SEED_VERSION));
     await page.goto("/");
     await page.getByRole("button", { name: "Canvas background" }).click();
-    // Pick a preset from the popover (ColorSwatch grid).
-    await page.getByRole("button", { name: "#e03131" }).first().click();
+    // Pick a preset from the popover (ColorSwatch grid). `exact` matters: the
+    // Swatches panel's tiles are named "Swatch #hex", which substring-matches.
+    await page.getByRole("button", { name: "#e03131", exact: true }).click();
     // Swatch reflects the chosen color.
     await expect(page.getByRole("button", { name: "Canvas background" })).toHaveAttribute(
       "title",
