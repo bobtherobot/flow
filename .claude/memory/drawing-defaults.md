@@ -37,17 +37,20 @@ Shipped 2026-08-04. Four asks, one of which turned out to be a no-op.
   hachure/cross-hatch elements from opened docs; and map a 0 width to
   `stroke: "none"`, because canvas ignores a non-positive `lineWidth` and keeps
   the previous draw's value.
-- **KNOWN REGRESSION, still open — locked-aspect corner resize is lost on some linear
-  elements.** With the linear margin zeroed, a corner resize handle whose position
-  coincides with an extremal vertex (a vertex that is the max on BOTH axes) is rendered
-  but unreachable: hover gives point-drag priority, so clicking it moves the vertex
-  instead of resizing. This is not merely cosmetic — the vendor test
-  `resize.test.tsx > line element > resizes with locked aspect ratio` fails on it
-  (scaleHeight 1.26 vs scaleWidth 2.10, i.e. the aspect lock never applies), and that
-  test is a **true positive left deliberately red**. It is the only vendor test this
-  work leaves failing. Fixes if it bites: omit corner handles that coincide with a
-  vertex, or restore a small linear-only margin (partially reversing "zero it
-  everywhere" for arrows/lines).
+- **Linear elements are the ONE exception to the tight chrome — deliberately.**
+  `LINEAR_SELECTION_SPACING = 10` (fixed 2026-08-05). A linear element's bounding-box
+  corners often ARE its vertices (always so for a 2-point line), and a vertex wins the
+  hit test within `LinearElementEditor.POINT_HANDLE_SIZE + 1` = 11px
+  (`getPointIndexUnderCursor`). With the margin at 0 the corner handle rendered but was
+  unclickable, and a corner drag silently became a point drag — which ignores locked
+  aspect ratio. That was a real capability loss, caught by
+  `resize.test.tsx > line element > resizes with locked aspect ratio`
+  (scaleHeight 1.26 vs scaleWidth 2.10). A corner handle offset by `m` sits `m*√2` from
+  the vertex, so **m must exceed ~7.8**; 10 gives ~14.1px clearance. Do not lower it
+  without re-checking `margin * Math.SQRT2 > POINT_HANDLE_SIZE + 1`. The drawn border
+  uses the same value (`interactiveScene.ts`) so handles don't float outside it.
+  Visual cost is small: a selected 2-point arrow shows the linear editor's point
+  handles, not a bbox, so only multi-point lines display the 10px box.
 - **The vendor test harness was fixed on 2026-08-05** (fork commit `aa8bc5e7`) — do not
   re-derive this. It had drifted from production in two ways, which together accounted
   for 18 of the 19 `resize.test.tsx`/`binding.test.tsx` failures this work first caused:
@@ -74,8 +77,9 @@ tests at fork commit `0759a501`, i.e. before any of this. Never read a raw failu
 as a verdict; always diff the failing *names* against a baseline. Capture with
 `yarn test:app --watch=false 2>&1 | grep '^ FAIL ' | sort -u` and `comm` the two lists.
 
-This work added 26 failures, of which the harness fix cleared 25 (18 resize/binding +
-7 linear-editor snapshot tests). **The 1 remaining is the locked-aspect regression
-above** — genuinely broken behavior, not noise.
+This work added 26 failures; all 26 are now cleared (18 by the harness fix, 7 by
+re-recorded render-count snapshots, 1 by `LINEAR_SELECTION_SPACING`). The failing-name
+set is once again **exactly equal** to the 169-test pre-branch baseline, so this work
+leaves zero vendor test debt.
 
 See [[flow-fork-strategy]], [[transform-panel]], [[arrowhead-size]].
