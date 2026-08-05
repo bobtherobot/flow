@@ -1,4 +1,5 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { resetDeferred } from "../../../lib/deferred-commit";
 
 interface SliderInputProps {
   /** Current value, or null when the selection is mixed. */
@@ -41,6 +42,18 @@ export function SliderInput({
     pending.current = null;
     onChange(next, false);
   };
+
+  // A drag that never reaches its commit — this slider unmounting mid-gesture —
+  // would leave the deferred-commit bit set, and the next unrelated panel write
+  // would inherit authority to skip the vendor's uncommitted-element filter.
+  // Gated on this instance's own pending ref, so an unrelated slider's unmount
+  // can never clear a live gesture's bit.
+  useEffect(
+    () => () => {
+      if (pending.current !== null) resetDeferred();
+    },
+    [],
+  );
 
   return (
     <div className="flow-ctl-slider" aria-disabled={disabled || undefined}>
