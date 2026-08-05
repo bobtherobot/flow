@@ -17,9 +17,10 @@ used everywhere" = whichever palette is `defaultPaletteId`.
 - `lib/color-palettes.ts` — `ColorPalette {id,name,colors[]}`, `scrubHex` (forgiving
   hex: kind to missing `#`, expands 3-char shorthand, strips 8-char alpha, REJECTS
   non-hex → null; note "bad"/"abc" ARE valid 3-char hex), `isHexColor`,
-  `BUILTIN_FALLBACK` (the legacy 16), `makeBuiltinPalettes()` (7 seeds: Default,
-  Pastel, Vibrant, Earth, Ocean, Sunset, Grayscale), `makeDefaultPalette()`,
-  `normalizePalettes`, `nextSetName`, `generatePaletteId`.
+  `BUILTIN_FALLBACK`, `makeBuiltinPalettes()`, `makeDefaultPalette()`,
+  `normalizePalettes`, `nextSetName`, `generatePaletteId`, plus the seed contract:
+  `SEED_VERSION`, `DEFAULT_SEED_PALETTE_NAME`, `BUILTIN_PALETTE_NAMES`,
+  `builtinColors(name)`. See "Seeds" below.
 - `lib/palette-store.ts` — module-singleton external store via `useSyncExternalStore`.
   `getSnapshot()` returns a STABLE ref (only reassigned in `commit()`);
   `getDefaultPaletteColors()` caches keyed to state ref (`colorsCache.forState===state`)
@@ -48,6 +49,31 @@ used everywhere" = whichever palette is `defaultPaletteId`.
   (`--flow-panel-bg/ink/border/hover/accent/radius-*`) — NOT hardcoded hex, so
   dark mode is correct. (`--flow-surface` does not exist; use `--flow-panel-bg`.)
 
+## Seeds (reworked 2026-08-04)
+- **8 builtins, 20 colors each, in panel order:** Pastel, Vibrant,
+  Pastel & Vibrant, Earth, Ocean, Sunset, Grayscale, Default.
+- **Pastel is the default palette** (`DEFAULT_SEED_PALETTE_NAME`), so it drives
+  every picker's presets. `makeBuiltinPalettes()` returns it FIRST — `load()`'s
+  repair path falls back to `palettes[0]`, so first-ness and default-ness must
+  stay in sync.
+- **Pastel & Vibrant** is ordered in pairs: `[pastel, its saturated darker twin]`
+  ×10, drawn from Open Color (shade 2/3 next to shade 8/9), so each pastel sits
+  beside the same hue. `color-palettes.test.ts` enforces the invariant by
+  luminance + hue gap ≤20°, not by a hardcoded list.
+- `BUILTIN_FALLBACK` (the empty-palette safety net) is also 20 now and is the
+  `Default` palette's contents.
+- **Adding/changing seed colors requires bumping `SEED_VERSION`**, or existing
+  installs never see it: `load()` only seeds when storage is EMPTY.
+
+## Seed migration (`palette-store.load()`)
+On `getPaletteSeedVersion() < SEED_VERSION`, `migrateBuiltins()` runs:
+builtins are refreshed **in place by name** (id preserved, so `defaultPaletteId`
+and any other reference still resolves), missing builtins are appended,
+user-created palettes are carried over untouched after them, and the default
+moves to Pastel. Matching is by NAME because ids are generated per install — so
+a user palette named e.g. "Ocean" WILL be treated as a builtin and reseeded.
+Version is stamped on every persist path (`persist()`), including first run.
+
 ## Test gotchas
 - Store-backed vitest files MUST install the `mockLocalStorage`+`vi.stubGlobal`
   shim (jsdom's native localStorage is non-functional here) — copy from
@@ -55,8 +81,14 @@ used everywhere" = whichever palette is `defaultPaletteId`.
 - tsconfig targets **ES2020** → no `Array.prototype.at()` in tests/code.
 - e2e selector collision: swatch tiles are `"Swatch #hex"`, ColorSwatch presets are
   `"#hex"`. Playwright default name match is substring → use `{ exact:true }` when
-  selecting a preset button (fixed 5 sites in `e2e/color-panel.spec.ts`). Any NEW
-  test picking a preset color must do the same.
+  selecting a preset button. Any NEW test picking a preset color must do the same.
+- **Never hardcode a preset hex in a test.** The default palette's contents are a
+  product decision (they changed 2026-08-04 and broke 7 tests). Instead:
+  - unit: read `getDefaultPaletteColors()` (see `ColorSwatch.test.tsx`);
+  - e2e: pin a fixture palette via `page.addInitScript` writing
+    `flow.colorPalettes` + `flow.defaultPaletteId` + `flow.paletteSeedVersion`
+    (`String(SEED_VERSION)` — omit it and the migration overwrites your fixture).
+    Helper: `pinPresets()` in `e2e/color-panel.spec.ts`.
 - e2e `e2e/color-swatches.spec.ts` proves persistence-across-reload + default-change
   updates a picker live. e2e runs on `npm run dev` (Vite); no vendor rebuild needed.
 

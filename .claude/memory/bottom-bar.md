@@ -24,6 +24,8 @@ Bar. Spec: `docs/superpowers/specs/2026-07-08-bottom-bar-design.md`. Shipped
   Bottom Bar.
 - `index.css`: hides native `.App-menu_bottom` (zoom relocated); and the
   library-hide rule now scoped with `:has()` (see gotcha).
+- `index.css`: also hides `.App-bottom-bar` — Excalidraw's **mobile** bottom
+  chrome (see gotcha below, added 2026-08-04).
 
 ## Key facts / gotchas
 - **ZERO fork edits.** Toggles via `executeAction("gridMode"|"zenMode")`; zoom
@@ -43,6 +45,17 @@ Bar. Spec: `docs/superpowers/specs/2026-07-08-bottom-bar-design.md`. Shipped
   right panel). Fix: pin it as a FIXED overlay when showing search —
   `.default-sidebar:has(.layer-ui__search-inputWrapper){ position:fixed; top:var(--flow-menubar-h); right:var(--flow-panel-reserved); bottom:0; z-index:150 }`
   so it sits just left of flow's controls panel, never clipped. Verified by screenshot.
+- **Excalidraw has TWO bottom chromes; `.App-menu_bottom` is only the desktop
+  one** (fixed 2026-08-04). Below ~1024px of *editor* width the vendor swaps in
+  `MobileMenu.tsx`, which renders `.App-bottom-bar` → Island → `footer.App-toolbar`
+  + mobile selected-shape actions. With the children already hidden individually
+  it showed as an empty white slab behind flow's bottom bar. Now hidden at the
+  wrapper: `.excalidraw .App-bottom-bar { display:none }`. It is also an
+  `inset:0` overlay, so the hide removes it from canvas hit-testing.
+  Regression test: `e2e/native-chrome.spec.ts` (asserts at 1440 **and** 900 —
+  a desktop-only viewport cannot catch this class of bug).
+  Still native at narrow widths: the HintViewer text along the top (desktop
+  hides it as a child of `.App-toolbar-container`). Left alone deliberately.
 - **Library TAB (in the search sidebar's tab strip) hidden** via the stable Radix
   suffix selector `.sidebar-tab-trigger[aria-controls$="-content-library"]` (the
   id prefix is auto-generated). Only the search tab remains.
