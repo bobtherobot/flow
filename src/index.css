@@ -94,3 +94,18 @@ body,
 .excalidraw .App-menu_bottom {
   display: none;
 }
+
+/*
+ * The rule above only covers the desktop footer. Below ~1024px of editor width
+ * Excalidraw swaps in its mobile layout (vendor MobileMenu.tsx), which renders a
+ * separate bottom chrome: `.App-bottom-bar` wrapping an Island that holds
+ * `footer.App-toolbar` (menu trigger, scroll-back-to-content) and the mobile
+ * selected-shape actions. flow owns all three surfaces, and with the individual
+ * children already hidden the island rendered as an empty white slab behind
+ * flow's own bottom bar. Hiding the wrapper takes the whole mobile cluster --
+ * one rule, same graceful degradation as the desktop hide. `.App-bottom-bar` is
+ * also an inset:0 overlay, so this removes it from hit-testing over the canvas.
+ */
+.excalidraw .App-bottom-bar {
+  display: none;
+}
