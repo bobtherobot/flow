@@ -56,26 +56,28 @@ export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: Excalid
 
   const num = (v: number | undefined) => (el ? round(v ?? 0) : null);
 
-  const setDimension = (dimension: "width" | "height", value: number) => {
-    if (el && api) resizeElementDimension(api, el.id, dimension, value);
+  const setDimension = (dimension: "width" | "height", value: number, transient: boolean) => {
+    if (el && api) resizeElementDimension(api, el.id, dimension, value, transient);
   };
-  const setCoord = (prop: "x" | "y", value: number) => {
-    if (el) sel.update({ [el.id]: true }, () => ({ [prop]: value }));
+  const setCoord = (prop: "x" | "y", value: number, transient: boolean) => {
+    if (el) sel.update({ [el.id]: true }, () => ({ [prop]: value }), undefined, transient);
   };
-  const setAngle = (deg: number) => {
+  const setAngle = (deg: number, transient: boolean) => {
     if (!el) return;
     // The bound text (if any) carries its own angle, so rotate it in lockstep.
     const boundTextId = sel.elements.find(
       (e) => e.type === "text" && (e as { containerId?: string }).containerId === el.id,
     )?.id;
     const ids = boundTextId ? { [el.id]: true, [boundTextId]: true } : { [el.id]: true };
-    sel.update(ids, () => ({ angle: degToRad(deg) }));
+    sel.update(ids, () => ({ angle: degToRad(deg) }), undefined, transient);
   };
-  const setRadius = (value: number) => {
-    if (radiusEl) sel.update({ [radiusEl.id]: true }, () => cornerRadiusUpdate(radiusEl, value));
+  const setRadius = (value: number, transient: boolean) => {
+    if (radiusEl) {
+      sel.update({ [radiusEl.id]: true }, () => cornerRadiusUpdate(radiusEl, value), undefined, transient);
+    }
   };
-  const setPadding = (value: number) => {
-    if (el && api) setContainerPadding(api, el.id, value);
+  const setPadding = (value: number, transient: boolean) => {
+    if (el && api) setContainerPadding(api, el.id, value, transient);
   };
 
   return (
@@ -89,9 +91,10 @@ export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: Excalid
               value={num(el?.width)}
               min={MIN_ELEMENT_SIZE}
               max={MAX_SIZE}
+              scrubSpan={300}
               ariaLabel="Width"
               disabled={sizeDisabled}
-              onChange={(n) => setDimension("width", n)}
+              onChange={(n, transient) => setDimension("width", n, transient)}
             />
           </span>
           <span className="flow-ctl-axis">
@@ -100,9 +103,10 @@ export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: Excalid
               value={num(el?.height)}
               min={MIN_ELEMENT_SIZE}
               max={MAX_SIZE}
+              scrubSpan={300}
               ariaLabel="Height"
               disabled={sizeDisabled}
-              onChange={(n) => setDimension("height", n)}
+              onChange={(n, transient) => setDimension("height", n, transient)}
             />
           </span>
         </div>
@@ -117,9 +121,10 @@ export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: Excalid
               value={num(el?.x)}
               min={-MAX_COORD}
               max={MAX_COORD}
+              scrubSpan={300}
               ariaLabel="X position"
               disabled={disabled}
-              onChange={(n) => setCoord("x", n)}
+              onChange={(n, transient) => setCoord("x", n, transient)}
             />
           </span>
           <span className="flow-ctl-axis">
@@ -128,9 +133,10 @@ export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: Excalid
               value={num(el?.y)}
               min={-MAX_COORD}
               max={MAX_COORD}
+              scrubSpan={300}
               ariaLabel="Y position"
               disabled={disabled}
-              onChange={(n) => setCoord("y", n)}
+              onChange={(n, transient) => setCoord("y", n, transient)}
             />
           </span>
         </div>
@@ -158,6 +164,7 @@ export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: Excalid
             value={radiusValue}
             min={0}
             max={MAX_SIZE}
+            scrubSpan={200}
             unit="px"
             ariaLabel="Corner radius"
             disabled={radiusDisabled}
@@ -173,6 +180,7 @@ export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: Excalid
             value={paddingValue}
             min={0}
             max={MAX_SIZE}
+            scrubSpan={200}
             unit="px"
             ariaLabel="Padding"
             disabled={paddingDisabled}

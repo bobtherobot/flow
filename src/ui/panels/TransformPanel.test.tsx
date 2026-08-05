@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // The real resize helper imports Excalidraw runtime that can't load under jsdom;
@@ -11,6 +11,7 @@ vi.mock("../../lib/transform", () => ({
 }));
 
 import { TransformPanel } from "./TransformPanel";
+import { resizeElementDimension } from "../../lib/transform";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { SelectionStyle } from "./useSelectionStyle";
 
@@ -36,6 +37,10 @@ function mockSel(elements: El[], selectedIds: Record<string, boolean>) {
 const api = {} as unknown as ExcalidrawAPI;
 
 describe("TransformPanel", () => {
+  beforeEach(() => {
+    vi.mocked(resizeElementDimension).mockClear();
+  });
+
   it("shows the selected element's dimensions, position and rotation", () => {
     const { sel } = mockSel([rect({ angle: Math.PI / 2 })], { a: true });
     render(<TransformPanel sel={sel} api={api} />);
@@ -138,5 +143,53 @@ describe("TransformPanel", () => {
     const [ids, updater] = update.mock.lastCall!;
     expect(ids).toEqual({ a: true, t: true });
     expect((updater() as { angle: number }).angle).toBeCloseTo(Math.PI / 2);
+  });
+
+  // Field order in the panel: W, H, X, Y, Rotation, Radius, Padding — every one
+  // has finite bounds, so every one renders a grip.
+  const gripAt = (container: HTMLElement, index: number) =>
+    container.querySelectorAll(".flow-ctl-num__grip")[index];
+
+  const scrub = (grip: Element, dy: number) => {
+    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 300 - dy });
+    fireEvent.pointerUp(window, { clientY: 300 - dy });
+  };
+
+  it("scrubs X with a 300-unit span, deferring history until release", () => {
+    const { sel, update } = mockSel([rect()], { a: true });
+    const { container } = render(<TransformPanel sel={sel} api={api} />);
+
+    scrub(gripAt(container, 2), 15); // 15px × (300/150) = +30, from x=10
+
+    const flags = update.mock.calls.map((call) => call[3]);
+    expect(flags.length).toBeGreaterThan(1);
+    expect(flags.slice(0, -1).every((f) => f === true)).toBe(true);
+    expect(flags.at(-1)).toBe(false);
+
+    // The last call's updater carries the committed value.
+    const updater = update.mock.calls.at(-1)![1] as (el: El) => Record<string, number>;
+    expect(updater(rect())).toEqual({ x: 40 });
+  });
+
+  it("scrubs width through the resize helper with the transient flag", () => {
+    const { sel } = mockSel([rect()], { a: true });
+    const { container } = render(<TransformPanel sel={sel} api={api} />);
+
+    scrub(gripAt(container, 0), 15); // +30, from width=100
+
+    const calls = vi.mocked(resizeElementDimension).mock.calls;
+    expect(calls.at(-1)).toEqual([api, "a", "width", 130, false]);
+    expect(calls.slice(0, -1).every((c) => c[4] === true)).toBe(true);
+  });
+
+  it("gives rotation no explicit span, sweeping its full 0-360 range", () => {
+    const { sel, update } = mockSel([rect()], { a: true });
+    const { container } = render(<TransformPanel sel={sel} api={api} />);
+
+    scrub(gripAt(container, 4), 75); // half the travel → half of 360 = +180
+
+    const updater = update.mock.calls.at(-1)![1] as (el: El) => { angle: number };
+    expect(updater(rect()).angle).toBeCloseTo(Math.PI, 5);
   });
 });
