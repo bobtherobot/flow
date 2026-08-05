@@ -11,7 +11,7 @@ vi.mock("../../lib/transform", () => ({
 }));
 
 import { TransformPanel } from "./TransformPanel";
-import { resizeElementDimension } from "../../lib/transform";
+import { resizeElementDimension, setContainerPadding } from "../../lib/transform";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { SelectionStyle } from "./useSelectionStyle";
 
@@ -39,6 +39,7 @@ const api = {} as unknown as ExcalidrawAPI;
 describe("TransformPanel", () => {
   beforeEach(() => {
     vi.mocked(resizeElementDimension).mockClear();
+    vi.mocked(setContainerPadding).mockClear();
   });
 
   it("shows the selected element's dimensions, position and rotation", () => {
@@ -165,10 +166,12 @@ describe("TransformPanel", () => {
     const flags = update.mock.calls.map((call) => call[3]);
     expect(flags.length).toBeGreaterThan(1);
     expect(flags.slice(0, -1).every((f) => f === true)).toBe(true);
-    expect(flags.at(-1)).toBe(false);
+    expect(flags[flags.length - 1]).toBe(false);
 
     // The last call's updater carries the committed value.
-    const updater = update.mock.calls.at(-1)![1] as (el: El) => Record<string, number>;
+    const updater = update.mock.calls[update.mock.calls.length - 1][1] as (
+      el: El,
+    ) => Record<string, number>;
     expect(updater(rect())).toEqual({ x: 40 });
   });
 
@@ -179,17 +182,55 @@ describe("TransformPanel", () => {
     scrub(gripAt(container, 0), 15); // +30, from width=100
 
     const calls = vi.mocked(resizeElementDimension).mock.calls;
-    expect(calls.at(-1)).toEqual([api, "a", "width", 130, false]);
+    expect(calls[calls.length - 1]).toEqual([api, "a", "width", 130, false]);
     expect(calls.slice(0, -1).every((c) => c[4] === true)).toBe(true);
   });
 
-  it("gives rotation no explicit span, sweeping its full 0-360 range", () => {
+  it("gives rotation no explicit span, sweeping its full 0-360 range, deferring history until release", () => {
     const { sel, update } = mockSel([rect()], { a: true });
     const { container } = render(<TransformPanel sel={sel} api={api} />);
 
     scrub(gripAt(container, 4), 75); // half the travel → half of 360 = +180
 
-    const updater = update.mock.calls.at(-1)![1] as (el: El) => { angle: number };
+    const flags = update.mock.calls.map((call) => call[3]);
+    expect(flags.length).toBeGreaterThan(1);
+    expect(flags.slice(0, -1).every((f) => f === true)).toBe(true);
+    expect(flags[flags.length - 1]).toBe(false);
+
+    const updater = update.mock.calls[update.mock.calls.length - 1][1] as (el: El) => {
+      angle: number;
+    };
     expect(updater(rect()).angle).toBeCloseTo(Math.PI, 5);
+  });
+
+  it("scrubs corner radius with a 200-unit span, deferring history until release", () => {
+    const { sel, update } = mockSel([rect()], { a: true });
+    const { container } = render(<TransformPanel sel={sel} api={api} />);
+
+    scrub(gripAt(container, 5), 15); // 15px × (200/150) = +20, from radius=0
+
+    const flags = update.mock.calls.map((call) => call[3]);
+    expect(flags.length).toBeGreaterThan(1);
+    expect(flags.slice(0, -1).every((f) => f === true)).toBe(true);
+    expect(flags[flags.length - 1]).toBe(false);
+
+    const updater = update.mock.calls[update.mock.calls.length - 1][1] as (
+      el: El,
+    ) => Record<string, unknown>;
+    expect(updater(rect())).toEqual({ cornerRadius: 20, roundness: { type: 2 } });
+  });
+
+  it("scrubs padding through the container-padding helper with the transient flag", () => {
+    const { sel } = mockSel(
+      [rect(), { id: "t", type: "text", containerId: "a" }],
+      { a: true },
+    );
+    const { container } = render(<TransformPanel sel={sel} api={api} />);
+
+    scrub(gripAt(container, 6), 15); // 15px × (200/150) = +20, from padding=5 (default)
+
+    const calls = vi.mocked(setContainerPadding).mock.calls;
+    expect(calls[calls.length - 1]).toEqual([api, "a", 25, false]);
+    expect(calls.slice(0, -1).every((c) => c[3] === true)).toBe(true);
   });
 });
