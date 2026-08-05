@@ -42,7 +42,8 @@ export interface SelectionStyle {
    *  the next non-transient write. */
   setProp: (args: SetPropArgs) => void;
   /** Apply a computed, possibly multi-property update to the given ids (e.g.
-   *  arrow type), optionally setting currentItem* defaults. One undo step. */
+   *  arrow type), optionally setting currentItem* defaults. Records one undo step
+   *  unless `transient`, which defers history to the next non-transient write. */
   update: (
     ids: SelectedElementIds,
     updater: (el: SceneElement) => ElementUpdate,
