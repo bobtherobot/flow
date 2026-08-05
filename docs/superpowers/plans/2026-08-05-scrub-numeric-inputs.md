@@ -1169,7 +1169,7 @@ In `src/ui/panels/controls/NumberInput.test.tsx`, the four `onChange` assertions
 - line 37: `expect(onChange).toHaveBeenLastCalledWith(24);` → `expect(onChange).toHaveBeenLastCalledWith(24, false);`
 - line 46: `expect(onChange).toHaveBeenLastCalledWith(1);` → `expect(onChange).toHaveBeenLastCalledWith(1, false);`
 
-Add `fireEvent` to the RTL import, then append these tests inside the `describe`:
+Add `fireEvent` to the RTL import, add `import { markDeferred, consumeDeferred } from "../../../lib/deferred-commit";`, and append these tests inside the `describe`:
 
 ```tsx
   it("renders a scrub grip when the bounds give it a span", () => {
@@ -1248,6 +1248,20 @@ Add `fireEvent` to the RTL import, then append these tests inside the `describe`
     expect(select).toHaveBeenCalledTimes(1);
   });
 
+  it("releases the deferred-commit bit if it unmounts mid-scrub", () => {
+    const { container, unmount } = render(
+      <NumberInput value={50} min={0} max={100} onChange={() => {}} ariaLabel="Opacity" />,
+    );
+    const grip = container.querySelector(".flow-ctl-num__grip")!;
+    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 285 }); // a transient write is now outstanding
+    markDeferred();
+    unmount();
+    // Without the cleanup this stays true and the next unrelated panel write
+    // would skip the vendor's uncommitted-element filter.
+    expect(consumeDeferred()).toBe(false);
+  });
+
   it("does not scrub when disabled", () => {
     const onChange = vi.fn();
     const { container } = render(
@@ -1285,6 +1299,7 @@ Replace the whole of `src/ui/panels/controls/NumberInput.tsx`:
 import { useEffect, useRef } from "react";
 import { useNumberField } from "./useNumberField";
 import { useScrubDrag } from "./useScrubDrag";
+import { resetDeferred } from "../../../lib/deferred-commit";
 
 interface NumberInputProps {
   /** Current value, or null when the selection is mixed (renders empty). */
@@ -1355,10 +1370,19 @@ export function NumberInput({
   });
 
   // Hold the resize cursor while the pointer is outside the field mid-drag.
+  // The cleanup also releases the deferred-commit bit: a scrub that never
+  // reaches its commit (this field unmounting mid-drag — a panel collapsing, a
+  // layout being applied) would otherwise leave the bit set, and the next
+  // unrelated panel write would inherit authority to skip the vendor's
+  // uncommitted-element filter. On a normal drag end the commit has already
+  // consumed the bit by the time this runs, so the release is a no-op.
   useEffect(() => {
     if (!scrub.isDragging) return;
     document.body.classList.add("flow-scrubbing");
-    return () => document.body.classList.remove("flow-scrubbing");
+    return () => {
+      document.body.classList.remove("flow-scrubbing");
+      resetDeferred();
+    };
   }, [scrub.isDragging]);
 
   return (
