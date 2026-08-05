@@ -94,6 +94,14 @@ export function useScrubDrag({
       else latest.current.onClick?.();
     };
 
+    // Escape before the drag threshold cancels outright: no commit, and no
+    // click either — the press never became either gesture.
+    const cancel = () => {
+      gesture.current = null;
+      setActive(false);
+      setIsDragging(false);
+    };
+
     const onMove = (e: PointerEvent) => {
       const g = gesture.current;
       if (!g) return;
@@ -132,7 +140,8 @@ export function useScrubDrag({
       const g = gesture.current;
       // Intermediates were never captured, so re-committing the start value
       // produces a no-op diff and leaves no undo entry behind.
-      end(g?.dragging ? g.startValue : null);
+      if (g?.dragging) end(g.startValue);
+      else cancel();
     };
 
     window.addEventListener("pointermove", onMove);
