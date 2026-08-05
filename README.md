@@ -6,6 +6,8 @@ flow is a standalone, single-bundle web app. It ships as plain static files with
 
 > flow reshapes Excalidraw into a desktop-style application: a traditional menu bar, an Illustrator-style dockable properties panel, and local-first storage — while keeping Excalidraw's excellent hand-drawn rendering engine underneath.
 
+![flow with a flowchart on the canvas — desktop menu bar and quick-actions row along the top, vertical tool rail on the left, and the dockable Transform / Color / Swatches / Stroke panels on the right](docs/images/screenshot.png)
+
 ---
 
 ## Features
