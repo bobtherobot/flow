@@ -424,6 +424,11 @@ export default function App() {
               // Users can still toggle it off in-canvas (Alt+S); saved docs
               // restore their own value. Native field; no cast needed.
               objectsSnapModeEnabled: true,
+              // flow draws new shapes with square corners. Excalidraw ships
+              // "round", whose adaptive algorithm applies a fixed 32px radius
+              // that reads as enormous on small boxes. Per-object rounding
+              // still lives in the Transform panel. Native field; no cast.
+              currentItemRoundness: "sharp",
             },
           } as ComponentProps<typeof Excalidraw>["initialData"]}
         />
