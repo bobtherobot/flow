@@ -9,8 +9,9 @@ Shipped 2026-08-04. Four asks, one of which turned out to be a no-op.
 
 - **Square corners** — `src/App.tsx` seeds `currentItemRoundness: "sharp"` in
   `initialData.appState`. Excalidraw ships `"round"`, whose ADAPTIVE_RADIUS
-  algorithm applies a fixed 32px radius (verified: fresh rects reported 32).
-  Zero fork.
+  algorithm sizes the radius from the shape's own dimensions — not a fixed
+  value (verified: a fresh rect reported 32, a diamond reported 35). Zero
+  fork.
 - **2px stroke — ALREADY UPSTREAM, no change made.** `DEFAULT_ELEMENT_PROPS.strokeWidth`
   is 2 (`constants.ts:394`) and `appState.ts:46` seeds `currentItemStrokeWidth`
   from it. Verified live before planning. Only a stale `?? 1` display fallback
