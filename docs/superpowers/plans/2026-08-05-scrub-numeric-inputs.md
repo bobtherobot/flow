@@ -1656,8 +1656,11 @@ Update the `ColorRow` doc comment (line ~26-32), which says "opacity is a separa
 
 Nothing renders it now — the two arrowhead call sites both pass `hideValue`. Remove that prop from both blocks in `src/ui/panels/StrokePanel.tsx` (they keep every other prop), then reduce `src/ui/panels/controls/SliderInput.tsx` to:
 
+**Keep the `resetDeferred` cleanup.** Stripping the numeric field does not remove the leak it guards: the reduced component still holds a `pending` ref and can still unmount mid-drag (a panel collapsing, a layout being applied), which would leave the deferred-commit bit set and hand the next unrelated panel write authority to skip the vendor's uncommitted-element filter. Carry the `useEffect` cleanup and its test across unchanged.
+
 ```tsx
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { resetDeferred } from "../../../lib/deferred-commit";
 
 interface SliderInputProps {
   /** Current value, or null when the selection is mixed. */
@@ -1701,6 +1704,18 @@ export function SliderInput({
     onChange(next, false);
   };
 
+  // A drag that never reaches its commit — this slider unmounting mid-gesture —
+  // would leave the deferred-commit bit set, and the next unrelated panel write
+  // would inherit authority to skip the vendor's uncommitted-element filter.
+  // Gated on this instance's own pending ref, so an unrelated slider's unmount
+  // can never clear a live gesture's bit.
+  useEffect(
+    () => () => {
+      if (pending.current !== null) resetDeferred();
+    },
+    [],
+  );
+
   return (
     <div className="flow-ctl-slider" aria-disabled={disabled || undefined}>
       <input
@@ -1726,7 +1741,7 @@ export function SliderInput({
 }
 ```
 
-In `src/ui/panels/controls/SliderInput.test.tsx`, delete the five tests that exercise the removed field — "shows the current value and unit", "renders an empty field for a mixed (null) value", "commits the numeric field only on Enter, clamped to range", "commits the numeric field on blur", and "hideValue renders only the range slider" — and replace the "disables both inputs when disabled" test with:
+In `src/ui/panels/controls/SliderInput.test.tsx`, **keep the mid-gesture-unmount test** — the cleanup it covers survives this task (see above). Delete only the five tests that exercise the removed field — "shows the current value and unit", "renders an empty field for a mixed (null) value", "commits the numeric field only on Enter, clamped to range", "commits the numeric field on blur", and "hideValue renders only the range slider" — and replace the "disables both inputs when disabled" test with:
 
 ```tsx
   it("parks at min for a mixed (null) value", () => {
