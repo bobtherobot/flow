@@ -959,6 +959,119 @@ In `src/ui/panels/StrokePanel.tsx`, replace `setArrowheadSize` (around line 203)
 
 The two `SliderInput` call sites need no edit — they already pass this function straight through, and `hideValue` stays until Task 5.
 
+- [ ] **Step 5b: Make history shortcuts reachable from the panels**
+
+**Why this is here.** `src/App.tsx:397,437` mounts `<PanelsRoot>` as a DOM *sibling* of `<Excalidraw>`, and the vendor binds its keydown handler on its own container (`vendor/.../App.tsx:1565`) unless `handleKeyboardGlobally` is set — which flow does not set. So a keydown while any panel control has focus never reaches Excalidraw's undo. This is pre-existing on `main`, but it lands squarely on this feature: after a scrub the field is deliberately left unfocused, so Ctrl+Z would do nothing for a real user. The chosen fix forwards only the two history shortcuts, leaving every other behaviour alone.
+
+Create `src/lib/history-shortcuts.ts`:
+
+```ts
+export type HistoryShortcut = "undo" | "redo";
+
+/**
+ * Matches Excalidraw's history shortcuts on a keydown raised inside flow's own
+ * chrome. Returns null for everything else, including plain keys — flow
+ * forwards history only, never tool or canvas shortcuts.
+ */
+export function historyShortcutFor(e: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+}): HistoryShortcut | null {
+  if (!e.ctrlKey && !e.metaKey) return null;
+  const key = e.key.toLowerCase();
+  if (key === "z") return e.shiftKey ? "redo" : "undo";
+  if (key === "y" && !e.shiftKey) return "redo";
+  return null;
+}
+
+/**
+ * Text entry that owns its own undo stack, so a history shortcut belongs to the
+ * browser rather than the canvas. Mirrors the vendor's `isWritableElement`
+ * (`packages/excalidraw/utils.ts:76`) — note `range` is deliberately absent, so
+ * a focused slider still forwards.
+ */
+export function isTextEntry(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLTextAreaElement ||
+    (target instanceof HTMLElement && target.isContentEditable) ||
+    (target instanceof HTMLInputElement &&
+      (target.type === "text" || target.type === "number" || target.type === "password"))
+  );
+}
+```
+
+Write `src/lib/history-shortcuts.test.ts` first:
+
+```ts
+import { describe, it, expect } from "vitest";
+import { historyShortcutFor, isTextEntry } from "./history-shortcuts";
+
+const key = (over: Partial<Parameters<typeof historyShortcutFor>[0]>) => ({
+  key: "z", ctrlKey: false, metaKey: false, shiftKey: false, ...over,
+});
+
+describe("historyShortcutFor", () => {
+  it("maps Ctrl+Z and Cmd+Z to undo", () => {
+    expect(historyShortcutFor(key({ ctrlKey: true }))).toBe("undo");
+    expect(historyShortcutFor(key({ metaKey: true }))).toBe("undo");
+  });
+
+  it("maps Ctrl+Shift+Z and Ctrl+Y to redo", () => {
+    expect(historyShortcutFor(key({ ctrlKey: true, shiftKey: true }))).toBe("redo");
+    expect(historyShortcutFor(key({ key: "y", ctrlKey: true }))).toBe("redo");
+  });
+
+  it("is case-insensitive", () => {
+    expect(historyShortcutFor(key({ key: "Z", ctrlKey: true }))).toBe("undo");
+  });
+
+  it("ignores the keys without a modifier, and unrelated shortcuts", () => {
+    expect(historyShortcutFor(key({}))).toBeNull();
+    expect(historyShortcutFor(key({ key: "d", ctrlKey: true }))).toBeNull();
+    expect(historyShortcutFor(key({ key: "y", ctrlKey: true, shiftKey: true }))).toBeNull();
+  });
+});
+
+describe("isTextEntry", () => {
+  const input = (type: string) => Object.assign(document.createElement("input"), { type });
+
+  it("treats text, number and password inputs as text entry", () => {
+    for (const type of ["text", "number", "password"]) {
+      expect(isTextEntry(input(type))).toBe(true);
+    }
+  });
+
+  it("does not treat a range slider as text entry", () => {
+    expect(isTextEntry(input("range"))).toBe(false);
+  });
+
+  it("treats a textarea as text entry and a button as not", () => {
+    expect(isTextEntry(document.createElement("textarea"))).toBe(true);
+    expect(isTextEntry(document.createElement("button"))).toBe(false);
+  });
+});
+```
+
+Then wire it in `src/ui/panels/PanelsRoot.tsx`, on the component's existing root element:
+
+```tsx
+        onKeyDown={(e) => {
+          // flow's panels are a DOM sibling of <Excalidraw>, which binds keydown
+          // on its own container — so history shortcuts pressed with a panel
+          // control focused never reach the canvas. Forward just those two;
+          // text entry keeps the browser's own undo.
+          if (isTextEntry(e.target)) return;
+          const action = historyShortcutFor(e);
+          if (!action) return;
+          e.preventDefault();
+          api?.executeAction(action);
+        }}
+```
+
+Import `historyShortcutFor` and `isTextEntry` from `../../lib/history-shortcuts`. If `PanelsRoot`'s root element is not a plain DOM element you can attach a handler to, add the handler to the outermost `div` it renders rather than restructuring the component.
+
 - [ ] **Step 6: Write the undo-batching e2e proof**
 
 Append to `e2e/stroke-panel.spec.ts`:
@@ -999,7 +1112,9 @@ test("an arrowhead-size drag records exactly one undo entry", async ({ page }) =
 Run: `npx playwright test e2e/stroke-panel.spec.ts`
 Expected: PASS, all 4 tests.
 
-**This test is the whole point of the task.** It already failed once, against the capture-modes-only design, recording zero undo entries. If it fails again, do not adjust the test, loosen the assertion, add waits, or change the capture mode to make it pass. Stop and report BLOCKED with: the values before the drag / after the drag / after each Ctrl+Z, how many undos were needed to get back (if any number worked), and whether `commitDeferredChanges` is present in the built vendor typings and actually reaching `updateScene` at runtime. The most likely failure now is a stale vendor build — Step 0b's `grep` is what rules that out.
+**This test is the whole point of the task.** It already failed twice: once against the capture-modes-only design (zero undo entries recorded), and once because Ctrl+Z never reached Excalidraw at all with focus left on the slider. Both causes are now fixed — the fork edit for the first, Step 5b's forwarder for the second.
+
+The test presses Ctrl+Z with focus still on the slider, which is exactly what a user does and exactly what Step 5b makes work. **Do not add a focus hack, a canvas click, or a `.focus()` call to make it pass** — that would hide whether the forwarder actually works. If it fails, do not adjust the test, loosen the assertion, add waits, or change the capture mode. Stop and report BLOCKED with: the values before the drag / after the drag / after each Ctrl+Z, how many undos were needed to get back (if any number worked), whether `commitDeferredChanges` is present in the built vendor typings, and whether the `PanelsRoot` handler fired.
 
 Ordinary e2e flakiness — a selector not resolving, the dev server not being ready — is yours to fix normally.
 
@@ -1011,6 +1126,7 @@ The gitlink bump is what makes the fork edit durable, so it belongs in this comm
 npm test -- --run && npm run typecheck
 git add vendor/excalidraw \
         src/lib/deferred-commit.ts src/lib/deferred-commit.test.ts \
+        src/lib/history-shortcuts.ts src/lib/history-shortcuts.test.ts src/ui/panels/PanelsRoot.tsx \
         src/lib/transform.ts src/ui/panels/useSelectionStyle.ts \
         src/ui/panels/controls/SliderInput.tsx src/ui/panels/controls/SliderInput.test.tsx \
         src/ui/panels/StrokePanel.tsx e2e/stroke-panel.spec.ts
