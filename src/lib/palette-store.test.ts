@@ -39,11 +39,11 @@ beforeEach(() => {
 });
 
 describe("seeding + snapshot", () => {
-  it("seeds 7 builtins and defaults to Default on first load", () => {
+  it("seeds 8 builtins and defaults to Pastel on first load", () => {
     const s = store.getSnapshot();
-    expect(s.palettes).toHaveLength(7);
+    expect(s.palettes).toHaveLength(8);
     const def = s.palettes.find((p) => p.id === s.defaultPaletteId);
-    expect(def?.name).toBe("Default");
+    expect(def?.name).toBe("Pastel");
   });
 
   it("getDefaultPaletteColors returns the default palette's colors", () => {
@@ -58,6 +58,70 @@ describe("seeding + snapshot", () => {
     // a new reference after mutation
     const a = store.getSnapshot();
     expect(store.getSnapshot()).toBe(a);
+  });
+});
+
+describe("seed-version migration", () => {
+  /** A pre-migration install: stale builtins plus a palette the user made. */
+  function seedLegacyStorage() {
+    localStorage.setItem(
+      "flow.colorPalettes",
+      JSON.stringify([
+        { id: "d1", name: "Default", colors: ["#000000"] },
+        { id: "p1", name: "Pastel", colors: ["#ffd6e0", "#ffe5b4"] },
+        { id: "u1", name: "Mine", colors: ["#123456"] },
+      ]),
+    );
+    localStorage.setItem("flow.defaultPaletteId", "d1");
+    // No flow.paletteSeedVersion key at all — that is what "legacy" means.
+    // (beforeEach's fresh seed stamps one, so it has to be cleared here.)
+    localStorage.removeItem("flow.paletteSeedVersion");
+    store.reloadPaletteStore();
+  }
+
+  it("stamps the seed version on a first-run seed", () => {
+    expect(localStorage.getItem("flow.paletteSeedVersion")).toBe("2");
+  });
+
+  it("refreshes stale builtin palettes to the current seed colors", () => {
+    seedLegacyStorage();
+    const byName = (n: string) => store.getSnapshot().palettes.find((p) => p.name === n);
+
+    expect(byName("Pastel")?.colors).toHaveLength(20);
+    expect(byName("Default")?.colors).toHaveLength(20);
+    expect(byName("Pastel & Vibrant")?.colors).toHaveLength(20);
+  });
+
+  it("keeps a refreshed builtin's id so references to it survive", () => {
+    seedLegacyStorage();
+    expect(store.getSnapshot().palettes.find((p) => p.name === "Pastel")?.id).toBe("p1");
+  });
+
+  it("preserves user-created palettes untouched", () => {
+    seedLegacyStorage();
+    expect(store.getSnapshot().palettes.find((p) => p.name === "Mine")).toEqual({
+      id: "u1",
+      name: "Mine",
+      colors: ["#123456"],
+    });
+  });
+
+  it("moves the default onto Pastel", () => {
+    seedLegacyStorage();
+    const s = store.getSnapshot();
+    expect(s.palettes.find((p) => p.id === s.defaultPaletteId)?.name).toBe("Pastel");
+  });
+
+  it("does not re-run once the stored version is current", () => {
+    seedLegacyStorage();
+    const pastel = store.getSnapshot().palettes.find((p) => p.name === "Pastel")!;
+    store.removeSwatches(pastel.id, [0]);
+
+    store.reloadPaletteStore();
+
+    expect(
+      store.getSnapshot().palettes.find((p) => p.name === "Pastel")?.colors,
+    ).toHaveLength(19);
   });
 });
 

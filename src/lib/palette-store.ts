@@ -3,6 +3,10 @@ import { useSyncExternalStore } from "react";
 import {
   type ColorPalette,
   BUILTIN_FALLBACK,
+  BUILTIN_PALETTE_NAMES,
+  DEFAULT_SEED_PALETTE_NAME,
+  SEED_VERSION,
+  builtinColors,
   makeBuiltinPalettes,
   makeDefaultPalette,
   nextSetName,
@@ -14,6 +18,8 @@ import {
   setColorPalettes,
   getDefaultPaletteId,
   setDefaultPaletteId,
+  getPaletteSeedVersion,
+  setPaletteSeedVersion,
 } from "../app/preferences";
 
 export interface PaletteState {
@@ -25,22 +31,59 @@ const listeners = new Set<() => void>();
 let state: PaletteState = load();
 let colorsCache: { forState: PaletteState; value: string[] } | null = null;
 
-/** Read persisted state, seeding builtins on first run and repairing a
- *  missing/empty default id. */
+/** Read persisted state, seeding builtins on first run, migrating them on a
+ *  seed-version bump, and repairing a missing/empty default id. */
 function load(): PaletteState {
   const palettes = getColorPalettes();
-  if (palettes.length === 0) {
-    const seeded = makeBuiltinPalettes();
-    setColorPalettes(seeded);
-    setDefaultPaletteId(seeded[0].id);
-    return { palettes: seeded, defaultPaletteId: seeded[0].id };
-  }
+  if (palettes.length === 0) return seedFresh();
+  if (getPaletteSeedVersion() < SEED_VERSION) return migrateBuiltins(palettes);
+
   let defaultPaletteId = getDefaultPaletteId() ?? "";
   if (!palettes.some((p) => p.id === defaultPaletteId)) {
     defaultPaletteId = palettes[0].id;
     setDefaultPaletteId(defaultPaletteId);
   }
   return { palettes, defaultPaletteId };
+}
+
+function persist(state: PaletteState): PaletteState {
+  setColorPalettes(state.palettes);
+  setDefaultPaletteId(state.defaultPaletteId);
+  setPaletteSeedVersion(SEED_VERSION);
+  return state;
+}
+
+/** First run: every builtin, defaulting to Pastel. */
+function seedFresh(): PaletteState {
+  const seeded = makeBuiltinPalettes();
+  const pastel = seeded.find((p) => p.name === DEFAULT_SEED_PALETTE_NAME) ?? seeded[0];
+  return persist({ palettes: seeded, defaultPaletteId: pastel.id });
+}
+
+/**
+ * Bring an older install up to the current seeds: each builtin is refreshed to
+ * its new colors **in place** (same id, so anything pointing at it still
+ * resolves), missing builtins are added, and palettes the user made themselves
+ * are carried over untouched after them. The default moves to Pastel.
+ *
+ * Builtins are matched by NAME — the ids are generated per install, so the name
+ * is the only stable handle. A user palette that happens to be named after a
+ * builtin is therefore treated as that builtin and reseeded.
+ */
+function migrateBuiltins(stored: ColorPalette[]): PaletteState {
+  const byName = new Map(stored.map((p) => [p.name, p]));
+
+  const builtins = BUILTIN_PALETTE_NAMES.map((name) => ({
+    id: byName.get(name)?.id ?? generatePaletteId(),
+    name,
+    colors: builtinColors(name) ?? [],
+  }));
+
+  const userMade = stored.filter((p) => !BUILTIN_PALETTE_NAMES.includes(p.name));
+  const palettes = [...builtins, ...userMade];
+  const pastel = palettes.find((p) => p.name === DEFAULT_SEED_PALETTE_NAME) ?? palettes[0];
+
+  return persist({ palettes, defaultPaletteId: pastel.id });
 }
 
 function commit(next: PaletteState): void {
