@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { FONT_FAMILY } from "@excalidraw/excalidraw";
 import { FontDropdown, type FontOption } from "./controls/FontDropdown";
 import { IconToggleGroup, type IconOption } from "./controls/IconToggleGroup";
@@ -53,6 +54,10 @@ export function TextPanel({ sel }: { sel: SelectionStyle }) {
   const ids = sel.textTargetIds;
   const disabled = !sel.hasText;
 
+  // Font size can't defer its history (Excalidraw's changeFontSize action always
+  // captures), so a scrub previews in the field only and writes once on release.
+  const [scrubSize, setScrubSize] = useState<number | null>(null);
+
   const fallbackFamily = a?.currentItemFontFamily ?? DEFAULT_FAMILY;
   const fallbackSize = a?.currentItemFontSize ?? 20;
   const fallbackAlign = a?.currentItemTextAlign ?? "left";
@@ -103,15 +108,26 @@ export function TextPanel({ sel }: { sel: SelectionStyle }) {
             onChange={(v) => sel.executeAction("changeFontSize", Number(v))}
           />
           {/* Manual size. Reflects the current value (incl. a preset click); a
-              custom value simply won't match any S/M/L/XL, so none stays lit. */}
+              custom value simply won't match any S/M/L/XL, so none stays lit.
+              Dragging previews in the field and commits on release. */}
           <NumberInput
-            value={fontSizeNum === MIXED ? null : fontSizeNum}
+            value={scrubSize ?? (fontSizeNum === MIXED ? null : fontSizeNum)}
             min={FONT_SIZE_MIN}
             max={FONT_SIZE_MAX}
+            scrubSpan={150}
             unit="px"
             ariaLabel="Font size value"
             disabled={disabled}
-            onChange={(n) => sel.executeAction("changeFontSize", n)}
+            onChange={(n, transient) => {
+              if (transient) {
+                setScrubSize(n);
+                return;
+              }
+              // Write first, so the field reads the committed value on the very
+              // next render rather than flashing the pre-drag one.
+              sel.executeAction("changeFontSize", n);
+              setScrubSize(null);
+            }}
           />
         </div>
       </div>
