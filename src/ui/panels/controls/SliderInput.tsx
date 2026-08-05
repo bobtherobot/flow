@@ -1,5 +1,6 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useNumberField } from "./useNumberField";
+import { resetDeferred } from "../../../lib/deferred-commit";
 
 interface SliderInputProps {
   /** Current value in display units, or null when the selection is mixed. */
@@ -50,6 +51,17 @@ export function SliderInput({
     pending.current = null;
     onChange(next, false);
   };
+
+  // If this control unmounts mid-gesture (panel collapsed, a layout applied,
+  // the selection changing while the pointer is still down), none of the
+  // three commit events fire, and `pending.current` never gets read. Release
+  // the shared deferred-write flag so it can't outlive this gesture and leak
+  // into the next, unrelated panel write — see `deferred-commit.ts`.
+  useEffect(() => {
+    return () => {
+      if (pending.current !== null) resetDeferred();
+    };
+  }, []);
 
   return (
     <div className="flow-ctl-slider" aria-disabled={disabled || undefined}>

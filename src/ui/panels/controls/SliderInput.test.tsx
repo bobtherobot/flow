@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SliderInput } from "./SliderInput";
+import { markDeferred, consumeDeferred } from "../../../lib/deferred-commit";
 
 describe("SliderInput", () => {
   it("shows the current value and unit", () => {
@@ -71,6 +72,21 @@ describe("SliderInput", () => {
     fireEvent.change(range, { target: { value: "5" } });
     fireEvent.keyUp(range, { key: "ArrowUp" });
     expect(onChange).toHaveBeenLastCalledWith(5, false);
+  });
+
+  it("releases a leaked deferred mark when the control unmounts mid-gesture", () => {
+    const onChange = vi.fn();
+    const { unmount } = render(
+      <SliderInput value={4} min={0} max={100} onChange={onChange} ariaLabel="Stroke width" />,
+    );
+    const range = screen.getByRole("slider", { name: "Stroke width" });
+    // Starts a transient gesture: the real write path (useSelectionStyle) would
+    // call markDeferred() here too, guarded by `if (transient) markDeferred()`.
+    fireEvent.change(range, { target: { value: "10" } });
+    markDeferred();
+    // No pointerup/keyup/blur follows — the panel is torn down mid-drag instead.
+    unmount();
+    expect(consumeDeferred()).toBe(false);
   });
 
   it("disables both inputs when disabled", () => {

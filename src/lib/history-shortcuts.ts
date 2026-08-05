@@ -20,9 +20,14 @@ export function historyShortcutFor(e: {
 
 /**
  * Text entry that owns its own undo stack, so a history shortcut belongs to the
- * browser rather than the canvas. Mirrors the vendor's `isWritableElement`
- * (`packages/excalidraw/utils.ts:76`) — note `range` is deliberately absent, so
- * a focused slider still forwards.
+ * browser rather than the canvas. Matches the `text` / `number` / `password`
+ * input types and textareas the vendor's `isWritableElement`
+ * (`packages/excalidraw/utils.ts:76`) also treats as writable — the input
+ * types that can actually occur in flow's own panels — plus contenteditable,
+ * which the vendor rule doesn't check (its own wysiwyg/`data-type` and `<br>`
+ * cases only occur inside Excalidraw's own subtree, which this handler never
+ * sees). Note `range` is deliberately absent, so a focused slider still
+ * forwards.
  */
 export function isTextEntry(target: EventTarget | null): boolean {
   return (
