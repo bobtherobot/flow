@@ -61,11 +61,15 @@ every intermediate value and `false` once, on release.
 
 | Event | Behaviour |
 |---|---|
-| `pointerdown` | Ignore when `disabled` or `value === null`. If the input is focused, blur it first so any typed edit commits. `setPointerCapture`, record `anchorY` + `anchorValue`, enter *armed* (not yet dragging). |
+| `pointerdown` | Ignore when `disabled`, `value === null`, or the button isn't primary. `preventDefault` to suppress native focus, record `anchorY` + `anchorValue`, subscribe `pointermove`/`pointerup`/`keydown` on `window`, enter *armed* (not yet dragging). |
 | `pointermove` | Below a 3px threshold, stay armed. Past it, enter *dragging* and emit on every move. |
 | `pointerup` | Dragging → emit the final value with `transient: false`, leave the field unfocused. Still armed → treat as a click: focus the input and select all, ready to type. |
-| `Escape` | Emit `anchorValue` with `transient: false` and end the gesture. |
-| `lostpointercapture` | End the gesture as if released. |
+| `Escape` | Emit the gesture's *start* value (not the anchor, which moves when a modifier changes) with `transient: false` and end. Since intermediates were never captured, this commits a no-op diff and leaves no undo entry. |
+
+Listeners live on `window` rather than using `setPointerCapture`, so a drag that
+leaves the field keeps tracking. jsdom implements neither pointer capture nor
+`hasPointerCapture`, so window listeners are also what makes the gesture
+testable without stubbing DOM methods.
 
 ### Value maths
 
@@ -100,15 +104,23 @@ Snapping is followed by a round to 4 decimal places to clear float noise (a
   input remains the only accessible control.
 - `onChange(value: number, transient: boolean)`. `useNumberField` passes
   `false` for typed commits; the scrub passes `true` mid-drag.
+- `id?` and `className?`, so Preferences can keep its `<label htmlFor>`
+  association and its own dialog sizing (see Change 5).
 
 **Focus arbitration.** The field body scrubs only while the input is unfocused.
 Once focused the user is editing, so the body yields to native text selection and
 only the grip keeps scrubbing.
 
-`useNumberField` (`src/ui/panels/controls/useNumberField.ts`) needs no behavioural
-change — its existing effect already reflects external `value` changes while
-unfocused, which is how the field tracks a scrub in progress. Its `onChange` call
-gains the `false` argument.
+`useNumberField` (`src/ui/panels/controls/useNumberField.ts`) needs no change at
+all — its existing effect already reflects external `value` changes while
+unfocused, which is how the field tracks a scrub in progress. `NumberInput`
+adapts at the boundary, calling `onChange(v, false)` for typed commits.
+
+**`step` has two jobs and only one of them is new.** It sets the scrub's
+granularity (defaulting to 1) and, when a caller passes it explicitly, forwards
+to `useNumberField` to snap typed values too. Leaving it `undefined` by default
+preserves today's behaviour: Transform's fields must keep accepting fractional
+typed input, which a forwarded default of 1 would silently round.
 
 ## Change 3 — `SliderInput` becomes slider-only
 
@@ -152,7 +164,7 @@ Existing callers omit the argument and keep today's `IMMEDIATELY` behaviour.
 | `TransformPanel` rotation | No span needed — its 0–360 bounds are the range |
 | `TransformPanel` radius/padding | `scrubSpan={200}` |
 | `TextPanel` font size | `scrubSpan={150}`; see below |
-| `PreferencesDialog` grid size | Hand-rolled `useNumberField` → `NumberInput`, which needs a new `id` prop to keep its `<label>` association |
+| `PreferencesDialog` grid size | Hand-rolled `useNumberField` → `NumberInput` via the new `id` + `className` props; span defaults to its 5–100 range |
 
 ### Font size
 
@@ -171,9 +183,14 @@ clean undo stack.
 
 The field's label is `` `${ariaLabel} value` `` today, a suffix that existed only
 to disambiguate it from the sibling range. With the track gone, stroke width and
-opacity fields take the plain name (`"Stroke width"`, `"Fill opacity"`). Updates
-land in `src/ui/panels/StrokePanel.test.tsx`, `e2e/color-panel.spec.ts`,
-`e2e/drawing-defaults.spec.ts` and `e2e/stroke-panel.spec.ts`.
+the three opacity rows take the plain name (`"Stroke width"`, `"Fill opacity"`,
+`"Stroke opacity"`, `"Laser opacity"`). Updates land in
+`src/ui/panels/StrokePanel.test.tsx`, `src/ui/panels/ColorPanel.test.tsx`,
+`e2e/color-panel.spec.ts`, `e2e/drawing-defaults.spec.ts` and
+`e2e/stroke-panel.spec.ts`.
+
+Font size is **not** renamed: its field is `"Font size value"` because the
+sibling S/M/L/XL group owns the name `"Font size"`.
 
 ## Change 6 — Styling
 
