@@ -67,66 +67,16 @@ test.describe("Transform panel", () => {
     await expect(rot).toHaveValue("45");
   });
 
-  const OUT = "/tmp/claude-1000/-home-bob-projects-flow/e7e39caa-5e76-4fc7-ae6e-ad10574ecfb0/scratchpad";
-
-  test("corner radius rounds a rectangle", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForSelector(".flow-pnl");
-    await draw(page, "Rectangle", 820, 520);
-
-    const radius = page.getByLabel("Corner radius", { exact: true });
-    await expect(radius).toBeEnabled();
-    await radius.fill("40");
-    await radius.blur();
-    await expect(radius).toHaveValue("40");
-    await page.waitForTimeout(150);
-    await page.screenshot({ path: `${OUT}/corner-radius-rect.png` });
-  });
-
-  test("corner radius applies to an elbow arrow", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForSelector(".flow-pnl");
-    await draw(page, "Elbow arrow", 900, 560); // diagonal so the elbow bends
-
-    const radius = page.getByLabel("Corner radius", { exact: true });
-    await expect(radius).toBeEnabled();
-    await radius.fill("2");
-    await radius.blur();
-    await expect(radius).toHaveValue("2");
-    await page.waitForTimeout(150);
-    await page.screenshot({ path: `${OUT}/corner-radius-elbow.png` });
-  });
-
-  test("corner radius is greyed for an ellipse", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForSelector(".flow-pnl");
-    await draw(page, "Ellipse", 760, 480);
-    await expect(page.getByLabel("Corner radius", { exact: true })).toBeDisabled();
-  });
-
-  test("padding is greyed for a container without text", async ({ page }) => {
+  // Corner radius now lives in the Stroke panel and text padding in the Text
+  // panel — both cover multi-selections, so their specs moved with them.
+  test("no longer carries the radius or padding rows", async ({ page }) => {
     await page.goto("/");
     await page.waitForSelector(".flow-pnl");
     await draw(page, "Rectangle", 760, 480);
-    await expect(page.getByLabel("Padding", { exact: true })).toBeDisabled();
-  });
 
-  test("padding rewraps a container's bound text", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForSelector(".flow-pnl");
-    await draw(page, "Rectangle", 900, 520);
-    // The container is selected after drawing; Enter adds a bound-text label.
-    await page.keyboard.press("Enter");
-    await page.keyboard.type("The quick brown fox jumps over the lazy dog");
-    await page.keyboard.press("Escape");
-
-    const padding = page.getByLabel("Padding", { exact: true });
-    await expect(padding).toBeEnabled();
-    await padding.fill("70");
-    await padding.blur();
-    await expect(padding).toHaveValue("70");
-    await page.waitForTimeout(150);
-    await page.screenshot({ path: `${OUT}/padding-text.png` });
+    const transform = page.locator(".flow-transform-panel");
+    await expect(transform.getByLabel("Corner radius", { exact: true })).toHaveCount(0);
+    await expect(transform.getByLabel("Padding", { exact: true })).toHaveCount(0);
   });
 
   test("width is greyed for a text element", async ({ page }) => {

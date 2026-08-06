@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   cornerRadiusApplies,
+  radiusTargetIds,
   effectiveCornerRadius,
   cornerRadiusUpdate,
   DEFAULT_ELBOW_RADIUS,
@@ -27,6 +28,26 @@ describe("cornerRadiusApplies", () => {
     expect(cornerRadiusApplies(el({ type: "arrow", elbowed: false }))).toBe(false);
     expect(cornerRadiusApplies(el({ type: "text" }))).toBe(false);
     expect(cornerRadiusApplies(null)).toBe(false);
+  });
+});
+
+describe("radiusTargetIds", () => {
+  it("keeps only the selected elements a radius applies to", () => {
+    const elements = [
+      el({ id: "rect" }),
+      el({ id: "ell", type: "ellipse" }),
+      el({ id: "elbow", type: "arrow", elbowed: true }),
+    ];
+    expect(radiusTargetIds(elements, { rect: true, ell: true, elbow: true })).toEqual({
+      rect: true,
+      elbow: true,
+    });
+  });
+
+  it("ignores unselected elements and returns empty when none apply", () => {
+    const elements = [el({ id: "rect" }), el({ id: "ell", type: "ellipse" })];
+    expect(radiusTargetIds(elements, { ell: true })).toEqual({});
+    expect(radiusTargetIds(elements, {})).toEqual({});
   });
 });
 

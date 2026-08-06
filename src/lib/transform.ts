@@ -1,4 +1,4 @@
-import { CaptureUpdateAction, resizeSingleElement } from "@excalidraw/excalidraw";
+import { CaptureUpdateAction, newElementWith, resizeSingleElement } from "@excalidraw/excalidraw";
 import type { ExcalidrawAPI } from "./excalidraw-scene";
 import { markDeferred, consumeDeferred } from "./deferred-commit";
 
@@ -59,26 +59,39 @@ export function resizeElementDimension(
 }
 
 /**
- * Set a container's text padding (gap before the bound text wraps). Because
- * wrapping is precomputed and stored on the text element, we set the padding on
- * a clone then run a same-size `resizeSingleElement`, whose `handleBindTextResize`
- * step rewraps the bound text against the new padding. One undo step (deferred to the next non-transient write when `transient`).
+ * Set the text padding (gap before the bound text wraps) on one or more
+ * containers. Because wrapping is precomputed and stored on the text element,
+ * we set the padding on a clone then run a same-size `resizeSingleElement`,
+ * whose `handleBindTextResize` step rewraps the bound text against the new
+ * padding. Every container shares the one scene write, so a multi-selection edit
+ * is still a single undo step (deferred to the next non-transient write when
+ * `transient`).
  */
 export function setContainerPadding(
   api: ExcalidrawAPI,
-  id: string,
+  ids: readonly string[],
   value: number,
   transient = false,
 ): void {
   const elements = api.getSceneElements();
   const map = new Map<string, SceneElement>(elements.map((el) => [el.id, { ...el }]));
   const origMap = new Map<string, SceneElement>(elements.map((el) => [el.id, { ...el }]));
-  const latest = map.get(id);
-  const orig = origMap.get(id);
-  if (!latest || !orig) return;
 
-  (latest as { padding?: number }).padding = Math.max(0, value);
-  resizeSingleElement(latest.width, latest.height, latest, orig, map, origMap, "e");
+  let touched = false;
+  for (const id of ids) {
+    const current = map.get(id);
+    const orig = origMap.get(id);
+    if (!current || !orig) continue;
+    // Write padding through `newElementWith` so version/versionNonce bump. A raw
+    // assignment leaves the container's version untouched and the history diff
+    // never sees it: the rewrapped text got captured (its own version bumps),
+    // the padding didn't, so undo restored the wrap but not the value.
+    const padded = newElementWith(current, { padding: Math.max(0, value) } as Partial<SceneElement>);
+    map.set(id, padded);
+    resizeSingleElement(padded.width, padded.height, padded, orig, map, origMap, "e");
+    touched = true;
+  }
+  if (!touched) return;
 
   const next = elements.map((el) => map.get(el.id) ?? el);
   if (transient) markDeferred();

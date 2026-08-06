@@ -1,8 +1,32 @@
-# Transform sub-panel (W/H/X/Y/rotation + radius/padding)
+# Transform sub-panel (W/H/X/Y/rotation)
 
 Controls-dock sub-panel for numeric editing of a selected element. Pinned at the
 TOP of the accordion (above Color). **All 3 phases shipped 2026-07-09**:
 W/H/X/Y/rotation, corner radius, text padding.
+
+## MOVED 2026-08-05 — radius → Stroke panel, padding → Text panel
+The Phase 2/3 rows no longer live here (Phase 1 W/H/X/Y/rotation is unchanged
+and still single-selection only). Both moved and gained multi-selection:
+- **Radius** is row 3 of the **Stroke panel** (Width / Dash / **Radius** / Type /
+  Tail / Head). Targets every selected rect/diamond/elbow arrow via new pure
+  `radiusTargetIds` (corner-radius.ts); non-applicable siblings are dropped from
+  the id set, not blocked. One `sel.update` ⇒ one undo step; the updater runs
+  per element so rects get the `roundness` companion and elbows don't.
+- **Padding** is the last row of the **Text panel** (which now takes an `api`
+  prop). New pure `paddingTargetIds` (padding.ts) picks the selected containers
+  that hold bound text. `setContainerPadding` now takes `ids: readonly string[]`
+  and loops the rewrap inside ONE `updateScene` ⇒ one undo step for the lot.
+- Neither has a `currentItem*` tool default, so both stay disabled with an empty
+  selection. MIXED across the targets ⇒ blank field.
+- Elbow-arrow radius needed no new work — the Phase 2 fork edit (Shape.ts:468
+  `generateElbowArrowShape(points, element.cornerRadius ?? 16)`) already drives
+  bend sharpness. Zero fork changes in this move.
+- **Undo bug fixed here:** `setContainerPadding` used to assign `padding` raw, so
+  the container's version never bumped and history never saw it — undoing a
+  later padding edit skipped past every earlier one and cleared the property.
+  It now writes through `newElementWith`. See [[flow-optional-prop-undo]] for
+  the residual vendor limitation.
+- Suite after the move: 543 unit + 103 e2e green.
 
 ## Phase 1 — shipped (X/Y/W/H/Rotation)
 - `src/ui/panels/TransformPanel.tsx` — five `NumberInput`s (Size W/H, Position

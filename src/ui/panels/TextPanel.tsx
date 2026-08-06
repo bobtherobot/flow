@@ -4,11 +4,19 @@ import { FontDropdown, type FontOption } from "./controls/FontDropdown";
 import { IconToggleGroup, type IconOption } from "./controls/IconToggleGroup";
 import { NumberInput } from "./controls/NumberInput";
 import { MIXED, readFormValue } from "../../lib/selection-style";
+import { paddingTargetIds, effectivePadding, type PaddingElement } from "../../lib/padding";
+import { setContainerPadding } from "../../lib/transform";
+import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { SelectionStyle } from "./useSelectionStyle";
 
 /** Bounds for the manual font-size field (px). */
 const FONT_SIZE_MIN = 1;
 const FONT_SIZE_MAX = 999;
+
+/** Upper bound for the padding field — a sanity cap on typed values. */
+const MAX_PADDING = 1e5;
+
+const roundTo2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Excalidraw's original hand-drawn/normal/code families — hidden per spec. */
 const DEPRECATED = new Set(["Virgil", "Helvetica", "Cascadia"]);
@@ -45,11 +53,16 @@ const TEXT_ALIGNS: IconOption<"left" | "center" | "right">[] = [
 ];
 
 /**
- * Text panel: font family, size (S/M/L/XL), and alignment. Targets the selected
- * text (and bound container text) and is disabled when the selection has none.
- * With no selection the rows edit the text tool defaults.
+ * Text panel: font family, size (S/M/L/XL), alignment, and the padding a
+ * container leaves around its bound text. The first three target the selected
+ * text (and bound container text) and are disabled when the selection has none;
+ * with no selection they edit the text tool defaults.
+ *
+ * Padding is narrower: it needs a selected shape container that actually holds
+ * bound text, so it carries its own gate and has no tool default to fall back
+ * on. Within a selection it pads every labelled container and skips the rest.
  */
-export function TextPanel({ sel }: { sel: SelectionStyle }) {
+export function TextPanel({ sel, api }: { sel: SelectionStyle; api: ExcalidrawAPI | null }) {
   const a = sel.appState;
   const ids = sel.textTargetIds;
   const disabled = !sel.hasText;
@@ -81,6 +94,21 @@ export function TextPanel({ sel }: { sel: SelectionStyle }) {
     (el) => (el.type === "text" ? el.textAlign : fallbackAlign),
     fallbackAlign,
   ) as "left" | "center" | "right" | typeof MIXED;
+
+  const paddingElements = sel.elements as readonly PaddingElement[];
+  const paddingIds = paddingTargetIds(paddingElements, sel.selectedIds);
+  const paddingDisabled = api === null || Object.keys(paddingIds).length === 0;
+  const paddingCommon = readFormValue(
+    paddingElements,
+    paddingIds,
+    (el) => roundTo2(effectivePadding(el)),
+    0,
+  );
+  const paddingValue = paddingDisabled || paddingCommon === MIXED ? null : paddingCommon;
+
+  const setPadding = (value: number, transient: boolean) => {
+    if (api) setContainerPadding(api, Object.keys(paddingIds), value, transient);
+  };
 
   return (
     <div className="flow-text-panel">
@@ -141,6 +169,22 @@ export function TextPanel({ sel }: { sel: SelectionStyle }) {
             ariaLabel="Text align"
             disabled={disabled}
             onChange={(v) => sel.executeAction("changeTextAlign", v)}
+          />
+        </div>
+      </div>
+
+      <div className="flow-ctl-row" aria-disabled={paddingDisabled || undefined}>
+        <span className="flow-ctl-row__label">Padding</span>
+        <div className="flow-ctl-row__control">
+          <NumberInput
+            value={paddingValue}
+            min={0}
+            max={MAX_PADDING}
+            scrubSpan={200}
+            unit="px"
+            ariaLabel="Padding"
+            disabled={paddingDisabled}
+            onChange={setPadding}
           />
         </div>
       </div>

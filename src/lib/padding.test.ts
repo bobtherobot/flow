@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   paddingApplies,
+  paddingTargetIds,
   effectivePadding,
   hasBoundText,
   DEFAULT_BOUND_TEXT_PADDING,
@@ -35,6 +36,28 @@ describe("paddingApplies", () => {
     expect(paddingApplies(container(), [])).toBe(false);
     expect(paddingApplies(container({ type: "arrow" }), [boundText])).toBe(false);
     expect(paddingApplies(null, [boundText])).toBe(false);
+  });
+});
+
+describe("paddingTargetIds", () => {
+  const labelled = { id: "c", type: "rectangle" };
+  const bare = { id: "d", type: "rectangle" };
+  const label = { id: "t", type: "text", containerId: "c" };
+
+  it("keeps only the selected containers that hold bound text", () => {
+    expect(paddingTargetIds([labelled, bare, label], { c: true, d: true })).toEqual({ c: true });
+  });
+
+  it("targets every labelled container in a multi-selection", () => {
+    const second = { id: "e", type: "ellipse" };
+    const secondLabel = { id: "u", type: "text", containerId: "e" };
+    const elements = [labelled, second, label, secondLabel];
+    expect(paddingTargetIds(elements, { c: true, e: true })).toEqual({ c: true, e: true });
+  });
+
+  it("ignores unselected containers and the bound text itself", () => {
+    expect(paddingTargetIds([labelled, label], { t: true })).toEqual({});
+    expect(paddingTargetIds([labelled, label], {})).toEqual({});
   });
 });
 

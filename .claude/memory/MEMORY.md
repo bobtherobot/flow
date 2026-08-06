@@ -13,7 +13,7 @@ Repo-local memory index. One line per memory; see `CLAUDE.md` for the read-at-st
 - [Bottom bar](bottom-bar.md) — flow-native horizontal bottom-left bar (grid/zen/zoom/canvas-bg/search); zero fork; shipped 2026-07-08
 - [Search sub-panel](search-panel.md) — flow-native canvas search in the controls dock (fork export #2 `getSearchMatches`); native sidebar retired; bottom bar + Ctrl/F auto-open it; shipped 2026-07-09
 - [Arrowhead size](arrowhead-size.md) — per-end arrow head size slider (Stroke panel), size = strokeWidth × factor; fork SCHEMA edit (start/endArrowheadSize on linear elements); shipped 2026-07-09
-- [Transform panel](transform-panel.md) — top-of-dock sub-panel for numeric W/H/X/Y/rotation/corner-radius/padding; all 3 phases shipped 2026-07-09; reuses Excalidraw resize (additive export) + per-element cornerRadius (rect/diamond/elbow) + per-container text padding
+- [Transform panel](transform-panel.md) — top-of-dock sub-panel for numeric W/H/X/Y/rotation; shipped 2026-07-09; reuses Excalidraw resize (additive export). **Radius moved to the Stroke panel and padding to the Text panel on 2026-08-05**, both now multi-selection
 - [Laser color](laser-color.md) — global laser-pointer trail color+opacity in the Color panel (always-global, `ColorRow` `onWrite` hatch, `ids={{}}`); 2nd appState fork field (mirrors bindingMode); shipped 2026-07-09
 - [Selection mode](selection-mode.md) — Preferences `Select: [marquee touch] [marquee enclose]`; 3rd appState fork field (`getElementsWithinSelection` touch/enclose); vendor rebuild+types gotcha; shipped 2026-07-09
 - [Grid size preference](grid-size-preference.md) — global flow.gridSize (5–100, default 20) in File ▸ Preferences; zero fork (native appState field); shipped 2026-07-09
@@ -21,4 +21,5 @@ Repo-local memory index. One line per memory; see `CLAUDE.md` for the read-at-st
 - [Flow-owned global appState](flow-global-appstate.md) — `FLOW_GLOBAL_APP_STATE_KEYS` stripped on doc open so a saved scene can't clobber flow prefs; ADD NEW GLOBAL PREFS TO THAT LIST; shipped 2026-08-04
 - [Color swatches](color-swatches.md) — palette manager sub-panel; default palette drives ColorSwatch presets everywhere; palette-store (useSyncExternalStore) + preferences keys; zero fork; shipped 2026-07-10
 - [Drawing defaults](drawing-defaults.md) — square corners, 0–10px stroke slider, tight selection chrome (`SELECTION_SPACING` fork edit); 2px stroke was already upstream; shipped 2026-08-04
+- [Optional-prop undo](flow-optional-prop-undo.md) — flow-added element props must be written via `newElementWith` or history misses them; undo can never return one to never-set (vendor `applyDelta` skips `undefined`)
 - [Scrub numeric inputs](scrub-numeric-inputs.md) — drag-to-scrub on every panel number field + native spin buttons (grip retired); transient/EVENTUALLY undo batching; the live-echo commit bug; shipped 2026-08-05

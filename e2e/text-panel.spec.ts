@@ -9,6 +9,37 @@ async function addText(page: Page, text: string) {
   await page.keyboard.press("Escape");
 }
 
+/**
+ * Draw a rectangle and give it a bound-text label. Double-clicking a hollow
+ * shape's interior would make a FREE text element instead, so the label goes on
+ * with Enter while the freshly drawn container is still selected.
+ */
+async function addLabelledBox(
+  page: Page,
+  text: string,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+) {
+  await page.getByRole("button", { name: "Rectangle" }).click();
+  await page.mouse.move(x1, y1);
+  await page.mouse.down();
+  await page.mouse.move(x2, y2, { steps: 8 });
+  await page.mouse.up();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type(text);
+  await page.keyboard.press("Escape");
+}
+
+/** Every container's stored padding, in scene order. */
+const containerPaddings = (page: Page) =>
+  page.evaluate(() =>
+    window.h.elements
+      .filter((e: any) => e.type === "rectangle")
+      .map((e: any) => e.padding as number | undefined),
+  );
+
 test("text controls are disabled without a text selection", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
@@ -139,4 +170,76 @@ test("changing font family recenters text bound to a container", async ({ page }
   const after = await read();
   expect(after.lineHeight).not.toBe(before.lineHeight); // metrics recomputed for the new font
   expect(after.textMid).toBe(after.boxMid); // still centered
+});
+
+test("padding is greyed without a labelled container", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await expect(page.getByLabel("Padding", { exact: true })).toBeDisabled();
+
+  // A bare container has no bound text to pad…
+  await page.getByRole("button", { name: "Rectangle" }).click();
+  await page.mouse.move(560, 320);
+  await page.mouse.down();
+  await page.mouse.move(820, 500, { steps: 6 });
+  await page.mouse.up();
+  await expect(page.getByLabel("Padding", { exact: true })).toBeDisabled();
+
+  // …and free text has no container.
+  await addText(page, "Flow");
+  await expect(page.getByLabel("Padding", { exact: true })).toBeDisabled();
+});
+
+test("padding rewraps a container's bound text", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await addLabelledBox(page, "The quick brown fox jumps over the lazy dog", 560, 300, 900, 520);
+
+  const height = () =>
+    page.evaluate(
+      () => window.h.elements.find((e: any) => e.type === "text" && e.containerId)!.height,
+    );
+  const before = await height();
+
+  const padding = page.getByLabel("Padding", { exact: true });
+  await expect(padding).toBeEnabled();
+  await expect(padding).toHaveValue("5"); // the vendor default
+  await padding.fill("70");
+  await padding.blur();
+  await expect(padding).toHaveValue("70");
+  await page.waitForTimeout(150);
+
+  // Narrower wrap width ⇒ more lines ⇒ a taller text element.
+  expect(await height()).toBeGreaterThan(before);
+  await page.screenshot({ path: `${OUT}/padding-text.png` });
+});
+
+test("padding applies to every labelled container in a multi-selection", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await addLabelledBox(page, "First label here", 340, 260, 620, 420);
+  await addLabelledBox(page, "Second label here", 700, 260, 980, 420);
+  await page.keyboard.press("Control+a");
+
+  const padding = page.getByLabel("Padding", { exact: true });
+  await expect(padding).toBeEnabled();
+  await padding.fill("30");
+  // Tab off rather than blur, so the undo shortcut lands on a control the dock
+  // forwards from (see number-field.spec / lib/history-shortcuts.ts).
+  await padding.press("Tab");
+  await page.waitForTimeout(150);
+  expect(await containerPaddings(page)).toEqual([30, 30]);
+
+  await padding.fill("45");
+  await padding.press("Tab");
+  await page.waitForTimeout(150);
+  expect(await containerPaddings(page)).toEqual([45, 45]);
+
+  // One undo steps both containers back together — the multi-write is a single
+  // history entry, not one per container. (It steps back to 30 rather than
+  // clearing the property: Excalidraw's delta application ignores `undefined`
+  // updates, so no flow-added optional prop can be undone back to never-set.)
+  await page.keyboard.press("Control+z");
+  await page.waitForTimeout(200);
+  expect(await containerPaddings(page)).toEqual([30, 30]);
 });

@@ -2,6 +2,12 @@ import { IconToggleGroup, type IconOption } from "./controls/IconToggleGroup";
 import { NumberInput } from "./controls/NumberInput";
 import { SliderInput } from "./controls/SliderInput";
 import { MIXED, readFormValue, type SelectedElementIds } from "../../lib/selection-style";
+import {
+  radiusTargetIds,
+  effectiveCornerRadius,
+  cornerRadiusUpdate,
+  type RadiusElement,
+} from "../../lib/corner-radius";
 import { displayValue, toPx, unitStep, type Unit } from "../../lib/units";
 import type { SelectionStyle } from "./useSelectionStyle";
 
@@ -21,6 +27,13 @@ const ARROWHEAD_SIZE_MIN = 3;
 const ARROWHEAD_SIZE_MAX = 10;
 const ARROWHEAD_SIZE_DEFAULT = 6;
 const ARROWHEAD_SIZE_STEP = 0.5;
+
+/** Upper bound for the corner-radius field. The fork caps a rectangle/diamond at
+ *  half its short side when rendering, so this only stops absurd typed values;
+ *  elbow arrows are uncapped. */
+const MAX_RADIUS = 1e5;
+
+const roundTo2 = (n: number) => Math.round(n * 100) / 100;
 
 // ── Icons ───────────────────────────────────────────────────────────────────
 const svg = (children: React.ReactNode) => (
@@ -114,10 +127,15 @@ const ahToValue = (a: string | null | undefined) => a ?? "none";
 const valueToAh = (v: string) => (v === "none" ? null : v);
 
 /**
- * Stroke panel: width (in the preferred unit), dash style, arrow type, and
- * start/end arrowheads. Arrow controls apply to linear elements (arrows/lines)
- * and are disabled when the selection has none. Elbow arrow type is omitted —
- * it needs Excalidraw's routing/binding logic that isn't reimplementable here.
+ * Stroke panel: width (in the preferred unit), dash style, corner radius, arrow
+ * type, and start/end arrowheads. Arrow controls apply to linear elements
+ * (arrows/lines) and are disabled when the selection has none. Elbow arrow type
+ * is omitted — it needs Excalidraw's routing/binding logic that isn't
+ * reimplementable here.
+ *
+ * Radius rounds rectangles/diamonds and softens an elbow arrow's bends. Unlike
+ * the rest of the panel it has no tool default to fall back on, so it needs a
+ * selection; within one it edits every element it applies to and skips the rest.
  */
 export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }) {
   const a = sel.appState;
@@ -190,6 +208,20 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
   const startSize = sizeOf("startArrowheadSize", "currentItemStartArrowheadSize");
   const endSize = sizeOf("endArrowheadSize", "currentItemEndArrowheadSize");
 
+  // Corner radius. Targets every selected element it applies to (rectangle,
+  // diamond, elbow arrow); a selection with none disables the row. The shown
+  // value is the shared effective radius, blank when the targets disagree.
+  const radiusElements = sel.elements as readonly RadiusElement[];
+  const radiusIds = radiusTargetIds(radiusElements, sel.selectedIds);
+  const radiusDisabled = Object.keys(radiusIds).length === 0;
+  const radiusCommon = readFormValue(
+    radiusElements,
+    radiusIds,
+    (el) => roundTo2(effectiveCornerRadius(el)),
+    0,
+  );
+  const radiusValue = radiusDisabled || radiusCommon === MIXED ? null : radiusCommon;
+
   // Reuse Excalidraw's own action — it handles round/sharp plus elbow routing and
   // binding, which can't be reimplemented from element props alone.
   const setArrowType = (value: "sharp" | "round" | "elbow") =>
@@ -205,6 +237,17 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
   ) =>
     (value: number, transient: boolean) =>
       sel.setProp({ prop: which, value, currentItemKey, ids: linearIds, transient });
+
+  // Each target computes its own update: rectangles/diamonds need the companion
+  // `roundness` write for the rounded render path, elbow arrows take the radius
+  // straight. One `update` call, so a multi-selection is one undo step.
+  const setRadius = (value: number, transient: boolean) =>
+    sel.update(
+      radiusIds,
+      (el) => cornerRadiusUpdate(el as unknown as RadiusElement, value),
+      undefined,
+      transient,
+    );
 
   return (
     <div className="flow-stroke-panel">
@@ -248,6 +291,22 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
             onChange={(v) =>
               sel.setProp({ prop: "strokeStyle", value: v, currentItemKey: "currentItemStrokeStyle" })
             }
+          />
+        </div>
+      </div>
+
+      <div className="flow-ctl-row" aria-disabled={radiusDisabled || undefined}>
+        <span className="flow-ctl-row__label">Radius</span>
+        <div className="flow-ctl-row__control">
+          <NumberInput
+            value={radiusValue}
+            min={0}
+            max={MAX_RADIUS}
+            scrubSpan={200}
+            unit="px"
+            ariaLabel="Corner radius"
+            disabled={radiusDisabled}
+            onChange={setRadius}
           />
         </div>
       </div>

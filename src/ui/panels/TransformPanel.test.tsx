@@ -11,7 +11,7 @@ vi.mock("../../lib/transform", () => ({
 }));
 
 import { TransformPanel } from "./TransformPanel";
-import { resizeElementDimension, setContainerPadding } from "../../lib/transform";
+import { resizeElementDimension } from "../../lib/transform";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { SelectionStyle } from "./useSelectionStyle";
 
@@ -39,7 +39,6 @@ const api = {} as unknown as ExcalidrawAPI;
 describe("TransformPanel", () => {
   beforeEach(() => {
     vi.mocked(resizeElementDimension).mockClear();
-    vi.mocked(setContainerPadding).mockClear();
   });
 
   it("shows the selected element's dimensions, position and rotation", () => {
@@ -82,41 +81,11 @@ describe("TransformPanel", () => {
     expect(screen.getByLabelText("X position")).toBeEnabled();
   });
 
-  it("enables corner radius for a rectangle but not an ellipse", () => {
-    const rectSel = mockSel([rect()], { a: true });
-    const { unmount } = render(<TransformPanel sel={rectSel.sel} api={api} />);
-    expect(screen.getByLabelText("Corner radius")).toBeEnabled();
-    unmount();
-
-    const ellipseSel = mockSel([rect({ type: "ellipse" })], { a: true });
-    render(<TransformPanel sel={ellipseSel.sel} api={api} />);
-    expect(screen.getByLabelText("Corner radius")).toBeDisabled();
-  });
-
-  it("disables padding without bound text, enables it with bound text", () => {
-    const plain = mockSel([rect()], { a: true });
-    const { unmount } = render(<TransformPanel sel={plain.sel} api={api} />);
-    expect(screen.getByLabelText("Padding")).toBeDisabled();
-    unmount();
-
-    const withText = mockSel(
-      [rect(), { id: "t", type: "text", containerId: "a" }],
-      { a: true },
-    );
-    render(<TransformPanel sel={withText.sel} api={api} />);
-    expect(screen.getByLabelText("Padding")).toBeEnabled();
-  });
-
-  it("commits a corner-radius edit with roundness for a rectangle", async () => {
-    const user = userEvent.setup();
-    const { sel, update } = mockSel([rect()], { a: true });
+  it("no longer owns radius or padding — they live in the Stroke and Text panels", () => {
+    const { sel } = mockSel([rect()], { a: true });
     render(<TransformPanel sel={sel} api={api} />);
-    const radius = screen.getByLabelText("Corner radius");
-    await user.clear(radius);
-    await user.type(radius, "16{Enter}");
-    const [ids, updater] = update.mock.lastCall!;
-    expect(ids).toEqual({ a: true });
-    expect(updater()).toEqual({ cornerRadius: 16, roundness: { type: 2 } });
+    expect(screen.queryByLabelText("Corner radius")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Padding")).not.toBeInTheDocument();
   });
 
   it("commits an X edit through the selection bridge", async () => {
@@ -146,7 +115,7 @@ describe("TransformPanel", () => {
     expect((updater() as { angle: number }).angle).toBeCloseTo(Math.PI / 2);
   });
 
-  // Field order in the panel: W, H, X, Y, Rotation, Radius, Padding.
+  // Field order in the panel: W, H, X, Y, Rotation.
   const fieldAt = (container: HTMLElement, index: number) =>
     container.querySelectorAll(".flow-ctl-num__input")[index];
 
@@ -200,36 +169,5 @@ describe("TransformPanel", () => {
       angle: number;
     };
     expect(updater(rect()).angle).toBeCloseTo(Math.PI, 5);
-  });
-
-  it("scrubs corner radius with a 200-unit span, deferring history until release", () => {
-    const { sel, update } = mockSel([rect()], { a: true });
-    const { container } = render(<TransformPanel sel={sel} api={api} />);
-
-    scrub(fieldAt(container, 5), 15); // 15px × (200/150) = +20, from radius=0
-
-    const flags = update.mock.calls.map((call) => call[3]);
-    expect(flags.length).toBeGreaterThan(1);
-    expect(flags.slice(0, -1).every((f) => f === true)).toBe(true);
-    expect(flags[flags.length - 1]).toBe(false);
-
-    const updater = update.mock.calls[update.mock.calls.length - 1][1] as (
-      el: El,
-    ) => Record<string, unknown>;
-    expect(updater(rect())).toEqual({ cornerRadius: 20, roundness: { type: 2 } });
-  });
-
-  it("scrubs padding through the container-padding helper with the transient flag", () => {
-    const { sel } = mockSel(
-      [rect(), { id: "t", type: "text", containerId: "a" }],
-      { a: true },
-    );
-    const { container } = render(<TransformPanel sel={sel} api={api} />);
-
-    scrub(fieldAt(container, 6), 15); // 15px × (200/150) = +20, from padding=5 (default)
-
-    const calls = vi.mocked(setContainerPadding).mock.calls;
-    expect(calls[calls.length - 1]).toEqual([api, "a", 25, false]);
-    expect(calls.slice(0, -1).every((c) => c[3] === true)).toBe(true);
   });
 });

@@ -1,9 +1,11 @@
 /**
- * Corner-radius logic for the Transform panel, kept free of the Excalidraw
+ * Corner-radius logic for the Stroke panel, kept free of the Excalidraw
  * package barrel (which pulls runtime that can't load under jsdom) so it stays
  * pure and unit-testable. The ROUNDNESS type ids and radius constants are inlined
  * from the vendor `constants.ts` — keep them in sync with the fork.
  */
+
+import type { SelectedElementIds } from "./selection-style";
 
 const ROUNDNESS_PROPORTIONAL = 2; // ROUNDNESS.PROPORTIONAL_RADIUS
 const ROUNDNESS_ADAPTIVE = 3; // ROUNDNESS.ADAPTIVE_RADIUS
@@ -31,6 +33,22 @@ const isElbowArrow = (el: RadiusElement) => el.type === "arrow" && el.elbowed ==
  *  diamond, or elbow arrow). */
 export function cornerRadiusApplies(el: RadiusElement | null): boolean {
   return el !== null && (isRoundable(el) || isElbowArrow(el));
+}
+
+/**
+ * The selected ids a radius edit targets. Selected elements the radius means
+ * nothing for (ellipses, plain arrows, text) are left out rather than blocking
+ * the control, so a mixed multi-selection still rounds the ones that support it.
+ */
+export function radiusTargetIds(
+  elements: readonly RadiusElement[],
+  selectedIds: SelectedElementIds,
+): SelectedElementIds {
+  const targets: Record<string, true> = {};
+  for (const el of elements) {
+    if (selectedIds[el.id] === true && cornerRadiusApplies(el)) targets[el.id] = true;
+  }
+  return targets;
 }
 
 /**

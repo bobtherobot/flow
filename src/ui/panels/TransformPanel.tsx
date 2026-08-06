@@ -1,12 +1,5 @@
 import { NumberInput } from "./controls/NumberInput";
-import { resizeElementDimension, setContainerPadding, MIN_ELEMENT_SIZE } from "../../lib/transform";
-import {
-  cornerRadiusApplies,
-  effectiveCornerRadius,
-  cornerRadiusUpdate,
-  type RadiusElement,
-} from "../../lib/corner-radius";
-import { paddingApplies, effectivePadding, type PaddingElement } from "../../lib/padding";
+import { resizeElementDimension, MIN_ELEMENT_SIZE } from "../../lib/transform";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { SelectionStyle } from "./useSelectionStyle";
 
@@ -31,10 +24,9 @@ function soleSelected(sel: SelectionStyle): SceneElement | null {
  * Transform panel: numeric width, height, x, y and rotation for a single
  * selected element (empty/mixed selections grey the fields out). W/H reuse
  * Excalidraw's resize routine; x/y/rotation write immutably through the shared
- * selection bridge. Corner radius and padding are fully wired and scrubbable
- * like the rest; each is disabled only when it doesn't apply to the current
- * selection (e.g. radius for a plain line, padding for a shape with no bound
- * text) rather than unconditionally.
+ * selection bridge. Corner radius lives in the Stroke panel and text padding in
+ * the Text panel — both of those work across a multi-selection, which is why
+ * they don't sit here.
  */
 export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: ExcalidrawAPI | null }) {
   const el = soleSelected(sel);
@@ -43,18 +35,6 @@ export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: Excalid
   // Text elements have no independent width/height; frames can't be rotated.
   const sizeDisabled = disabled || el?.type === "text";
   const angleDisabled = disabled || el?.type === "frame";
-
-  // Corner radius applies to rectangles, diamonds and elbow arrows.
-  const radiusEl = el as RadiusElement | null;
-  const radiusApplies = cornerRadiusApplies(radiusEl);
-  const radiusDisabled = disabled || !radiusApplies;
-  const radiusValue = radiusEl && radiusApplies ? round(effectiveCornerRadius(radiusEl)) : null;
-
-  // Padding applies to shape containers (rect/ellipse/diamond) holding bound text.
-  const paddingEl = el as PaddingElement | null;
-  const padApplies = paddingApplies(paddingEl, sel.elements);
-  const paddingDisabled = disabled || !padApplies;
-  const paddingValue = paddingEl && padApplies ? round(effectivePadding(paddingEl)) : null;
 
   const num = (v: number | undefined) => (el ? round(v ?? 0) : null);
 
@@ -72,14 +52,6 @@ export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: Excalid
     )?.id;
     const ids = boundTextId ? { [el.id]: true, [boundTextId]: true } : { [el.id]: true };
     sel.update(ids, () => ({ angle: degToRad(deg) }), undefined, transient);
-  };
-  const setRadius = (value: number, transient: boolean) => {
-    if (radiusEl) {
-      sel.update({ [radiusEl.id]: true }, () => cornerRadiusUpdate(radiusEl, value), undefined, transient);
-    }
-  };
-  const setPadding = (value: number, transient: boolean) => {
-    if (el && api) setContainerPadding(api, el.id, value, transient);
   };
 
   return (
@@ -155,38 +127,6 @@ export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: Excalid
             ariaLabel="Rotation"
             disabled={angleDisabled}
             onChange={setAngle}
-          />
-        </div>
-      </div>
-
-      <div className="flow-ctl-row" aria-disabled={radiusDisabled || undefined}>
-        <span className="flow-ctl-row__label">Radius</span>
-        <div className="flow-ctl-row__control">
-          <NumberInput
-            value={radiusValue}
-            min={0}
-            max={MAX_SIZE}
-            scrubSpan={200}
-            unit="px"
-            ariaLabel="Corner radius"
-            disabled={radiusDisabled}
-            onChange={setRadius}
-          />
-        </div>
-      </div>
-
-      <div className="flow-ctl-row" aria-disabled={paddingDisabled || undefined}>
-        <span className="flow-ctl-row__label">Padding</span>
-        <div className="flow-ctl-row__control">
-          <NumberInput
-            value={paddingValue}
-            min={0}
-            max={MAX_SIZE}
-            scrubSpan={200}
-            unit="px"
-            ariaLabel="Padding"
-            disabled={paddingDisabled}
-            onChange={setPadding}
           />
         </div>
       </div>

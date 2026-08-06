@@ -44,7 +44,7 @@ export function PanelsRoot({ api, units, search, onChangeLaserColor }: PanelsRoo
     { id: "color", label: "Color", render: () => <ColorPanel sel={sel} onChangeLaserColor={onChangeLaserColor} /> },
     { id: "swatches", label: "Color Swatches", render: () => <SwatchesPanel /> },
     { id: "stroke", label: "Stroke", render: () => <StrokePanel sel={sel} units={units} /> },
-    { id: "text", label: "Text", render: () => <TextPanel sel={sel} /> },
+    { id: "text", label: "Text", render: () => <TextPanel sel={sel} api={api} /> },
     { id: "align", label: "Align", render: () => <AlignPanel sel={sel} /> },
     { id: "search", label: "Search", render: () => <SearchPanel api={api} signal={search} /> },
     { id: "layers", label: "Layers", render: () => <LayersPlaceholder /> },
