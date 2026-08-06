@@ -137,9 +137,17 @@ describe("useStyleMemory", () => {
 
     h.change({ selectedElementIds: { r: true, s: true } });
 
-    expect(
-      resolveLoad({ category: "shape", toolType: "rectangle", arrowType: "sharp" }),
-    ).toEqual({});
+    // Not a plain {}: a rectangle target never drops currentItemCornerRadius
+    // from applicableKeys, so an untouched "shape" bucket still yields the
+    // RESET_WHEN_UNRECORDED explicit-undefined entry (see style-memory-store.ts)
+    // regardless of whether the bulk add adopted anything. toEqual({}) would
+    // pass here whether or not the bulk-add-is-ignored behavior this test
+    // claims to prove actually held, because it silently ignores that
+    // undefined-valued key — toStrictEqual does not, so the true shape must be
+    // spelled out.
+    const patch = resolveLoad({ category: "shape", toolType: "rectangle", arrowType: "sharp" });
+    expect("currentItemCornerRadius" in patch).toBe(true);
+    expect(patch).toStrictEqual({ currentItemCornerRadius: undefined });
   });
 
   it("adopts on a later single add even after a bulk selection", () => {
@@ -278,9 +286,14 @@ describe("useStyleMemory", () => {
     expect(
       resolveLoad({ category: "linear", toolType: "line", arrowType: "sharp" }),
     ).toMatchObject({ currentItemStrokeWidth: 9 });
-    expect(
-      resolveLoad({ category: "shape", toolType: "rectangle", arrowType: "sharp" }),
-    ).toEqual({});
+    // Same reasoning as the bulk-add test above: a rectangle target keeps
+    // currentItemCornerRadius in applicableKeys, so the untouched "shape"
+    // bucket still yields the explicit-undefined reset entry. toStrictEqual
+    // against the real shape, not a bare {}, is what actually proves the edit
+    // did not leak into "shape".
+    const patch = resolveLoad({ category: "shape", toolType: "rectangle", arrowType: "sharp" });
+    expect("currentItemCornerRadius" in patch).toBe(true);
+    expect(patch).toStrictEqual({ currentItemCornerRadius: undefined });
   });
 
   it("does not fold its own load back into the wrong bucket", () => {

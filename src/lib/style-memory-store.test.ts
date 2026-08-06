@@ -129,9 +129,13 @@ describe("style-memory-store", () => {
     expect(
       resolveLoad({ category: "linear", toolType: "arrow", arrowType: "elbow" }),
     ).toMatchObject({ currentItemCornerRadius: 8 });
+    // A sharp arrow drops both currentItemCornerRadius and currentItemRoundness
+    // from applicableKeys, so this patch is genuinely empty — not just empty of
+    // defined values. toStrictEqual (unlike toEqual) would catch a stray
+    // undefined-valued key the way toEqual cannot.
     expect(
       resolveLoad({ category: "linear", toolType: "arrow", arrowType: "sharp" }),
-    ).toEqual({});
+    ).toStrictEqual({});
   });
 
   it("lets the active category be set without adopting", () => {
@@ -144,8 +148,10 @@ describe("style-memory-store", () => {
     resetStyleMemory();
 
     expect(getActiveCategory()).toBe("shape");
+    // A line toolType drops currentItemCornerRadius from applicableKeys, and
+    // the bucket was just reset, so this patch is genuinely empty.
     expect(
       resolveLoad({ category: "linear", toolType: "line", arrowType: "sharp" }),
-    ).toEqual({});
+    ).toStrictEqual({});
   });
 });

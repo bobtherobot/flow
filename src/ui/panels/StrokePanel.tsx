@@ -240,15 +240,23 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
 
   // Each target computes its own update: rectangles/diamonds need the companion
   // `roundness` write for the rounded render path, elbow arrows take the radius
-  // straight. One `update` call, so a multi-selection is one undo step. The
-  // `currentItemCornerRadius` default rides along in the same call so the next
-  // new shape inherits it without requiring a reselect (style-memory's drift
-  // capture only sees appState writes, not raw element edits).
+  // straight. One `update` call, so a multi-selection is one undo step. Both
+  // `currentItemCornerRadius` and `currentItemRoundness` ride along in the same
+  // call so the next new shape inherits a *coherent* pair, not just the radius:
+  // `cornerRadiusUpdate` always sets `roundness` alongside `cornerRadius` on the
+  // edited element, but the vendor only renders rounded corners when
+  // `element.roundness` is truthy (Shape.ts) — writing radius to appState
+  // without its matching roundness would seed the next new shape with a
+  // positive `cornerRadius` and a null `roundness`, which draws square.
+  // `currentItemRoundness` is already a contended, bucketed key (SURFACE_KEYS
+  // in style-memory.ts), so drift capture folds it into the `shape` bucket
+  // right alongside the radius and the pair survives a bucket swap intact;
+  // `applicableKeys` drops it for arrow targets, where it means nothing.
   const setRadius = (value: number, transient: boolean) =>
     sel.update(
       radiusIds,
       (el) => cornerRadiusUpdate(el as unknown as RadiusElement, value),
-      { currentItemCornerRadius: value },
+      { currentItemCornerRadius: value, currentItemRoundness: value > 0 ? "round" : "sharp" },
       transient,
     );
 

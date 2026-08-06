@@ -56,27 +56,17 @@ function readElements(page: Page) {
       type: el.type as string,
       strokeWidth: el.strokeWidth as number,
       cornerRadius: el.cornerRadius as number | undefined,
+      roundness: el.roundness as { type: number } | null | undefined,
     }));
   });
 }
 
-test("a second box inherits the first box's stroke width", async ({ page }) => {
-  await page.goto("/");
-  await page.waitForSelector(".flow-pnl");
-
-  await draw(page, "Rectangle", ...BOX_A);
-  const width = page.getByLabel("Stroke width");
-  await width.fill("7");
-  await width.blur();
-  await expect(width).toHaveValue("7");
-
-  // No explicit deselect: clicking the Rectangle tool to start the next draw
-  // clears the current selection on its own.
-  await draw(page, "Rectangle", ...BOX_B);
-
-  await expect(page.getByLabel("Stroke width")).toHaveValue("7");
-});
-
+// "A second box inherits the first box's stroke width" is deliberately absent:
+// it passed with the whole hook unmounted (vanilla Excalidraw's single shared
+// currentItemStrokeWidth already carries a value forward between two
+// same-category draws) and is fully subsumed by the harder case right below,
+// which adds an intervening different-category draw the vanilla behavior
+// cannot survive.
 test("an arrow's stroke width does not reach the next box", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
@@ -125,7 +115,21 @@ test("selecting an element adopts its style for the next one of that kind", asyn
   await expect(page.getByLabel("Stroke width")).toHaveValue("8");
 });
 
-test("using the text tool between two boxes does not disturb the shape bucket", async ({
+// Forward-looking guard, not a per-category-isolation test: it cannot detect
+// the absence of isolation today. CATEGORY_KEYS.text currently holds only
+// currentItemOpacity, and no flow panel writes currentItemOpacity at all (alpha
+// rides in an 8-digit color hex instead — see .claude/memory/style-memory.md's
+// "Known gap"), so activating the text tool never touches currentItemStrokeWidth
+// either way; this passes identically with useStyleMemory unmounted. What it
+// *does* pin: drawing a box, using the text tool, then drawing a second box
+// still reads and stores the same stroke width on both boxes — a regression
+// here would mean either the text tool clobbers unrelated appState, or the
+// rectangle tool fails to reload its own default after an intervening tool
+// change. If CATEGORY_KEYS.text ever widens to include a stroke-surface key,
+// promote this back into a real per-category-isolation test (assert the
+// panel/element value *during* text-tool activation, before the next box's own
+// tool-change reload can paper over a leak).
+test("stroke width survives an intervening text-tool detour, panel and element alike", async ({
   page,
 }) => {
   await page.goto("/");
@@ -137,8 +141,6 @@ test("using the text tool between two boxes does not disturb the shape bucket", 
   await width.blur();
   await expect(width).toHaveValue("6");
 
-  // Activating the text tool loads the text bucket. That must not evict the
-  // shape bucket's remembered width.
   await addText(page, "hello");
 
   await draw(page, "Rectangle", ...BOX_B);
@@ -163,6 +165,15 @@ test("a second box inherits the first box's corner radius", async ({ page }) => 
   await draw(page, "Rectangle", ...BOX_B);
 
   await expect(page.getByLabel("Corner radius", { exact: true })).toHaveValue("18");
+
+  // The panel field alone is not proof: `effectiveCornerRadius` reads
+  // `cornerRadius` directly and never consults `roundness`, so it would read
+  // 18 even if the box rendered square. Assert the element actually carries
+  // a non-null `roundness` alongside the radius — that pair is what the
+  // vendor's render path (Shape.ts) requires to draw rounded corners at all.
+  const boxes = (await readElements(page)).filter((el) => el.type === "rectangle");
+  expect(boxes[1]?.cornerRadius).toBe(18);
+  expect(boxes[1]?.roundness).not.toBeNull();
 });
 
 test("an ellipse is never stamped with a remembered corner radius", async ({ page }) => {

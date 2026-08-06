@@ -129,8 +129,13 @@ describe("StrokePanel", () => {
       expect(updater(shape())).toEqual({ cornerRadius: 8, roundness: { type: 2 } });
       expect(updater(shape({ type: "arrow", elbowed: true }))).toEqual({ cornerRadius: 8 });
       // The remembered default rides along in the same call, so the next new
-      // shape inherits 8 without requiring a reselect.
-      expect(update.mock.lastCall![2]).toEqual({ currentItemCornerRadius: 8 });
+      // shape inherits 8 without requiring a reselect — and the companion
+      // roundness default rides with it, so the shape also inherits round
+      // corners rather than a radius with nothing to render it.
+      expect(update.mock.lastCall![2]).toEqual({
+        currentItemCornerRadius: 8,
+        currentItemRoundness: "round",
+      });
     });
 
     it("clears a rectangle back to sharp at 0", async () => {
@@ -144,7 +149,10 @@ describe("StrokePanel", () => {
 
       const [, updater] = update.mock.lastCall!;
       expect(updater(shape())).toEqual({ cornerRadius: 0, roundness: null });
-      expect(update.mock.lastCall![2]).toEqual({ currentItemCornerRadius: 0 });
+      expect(update.mock.lastCall![2]).toEqual({
+        currentItemCornerRadius: 0,
+        currentItemRoundness: "sharp",
+      });
     });
 
     it("scrubs with a 200-unit span, deferring history until release", () => {

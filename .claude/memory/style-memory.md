@@ -51,6 +51,16 @@ that category. `src/lib/style-memory.ts` (pure), `src/lib/style-memory-store.ts`
   swallow exactly this reset, silently restoring the stale value it existed to
   clear. `Object.is(appState[key], value)` on the next line already dedupes the
   case where both are already `undefined`, so nothing else changed.
+- **Adoption pins an explicit `cornerRadius: 0` onto every rectangle/diamond
+  drawn after the first, not just onto rounded ones.** `snapshotElement`
+  records `effectiveCornerRadius`, which resolves a sharp rectangle to `0`
+  rather than `undefined`. That `0` gets adopted into the shape bucket like any
+  other value, so every subsequent new rectangle/diamond is created with an
+  explicit `cornerRadius: 0` field rather than leaving it unset. Harmless for
+  rendering (0 draws exactly like unset), and deliberate given
+  `RESET_WHEN_UNRECORDED` needing *some* defined value to reset away from — but
+  it does mean such an element can no longer fall back to the vendor's derived
+  default; it now carries a literal opinion instead of no opinion.
 - **Panels must write their own `currentItem*` default alongside the element
   edit — drift capture only sees appState writes, not raw element mutation.**
   `StrokePanel`'s `setRadius` passes `{ currentItemCornerRadius: value }` as
@@ -142,8 +152,17 @@ not just as history from this one feature.
 
 ## Deferred, not fixed
 
-- The two e2e tests named above that pass with the hook unmounted — still
-  valuable as regression guards, but worth a rename or split if
-  `CATEGORY_KEYS.text` ever widens beyond `currentItemOpacity`.
+- Of the two e2e tests named above that passed with the hook unmounted: `"a
+  second box inherits the first box's stroke width"` was removed — fully
+  subsumed by `"an arrow's stroke width does not reach the next box"`, which
+  covers the same path under strictly harder conditions. The other was renamed
+  to `"stroke width survives an intervening text-tool detour, panel and
+  element alike"` with a comment stating plainly that it is a regression guard,
+  not a per-category-isolation test — it still cannot detect the absence of
+  isolation, since `CATEGORY_KEYS.text` holds only `currentItemOpacity` today.
+  Promote it back to a real isolation test if `CATEGORY_KEYS.text` ever widens
+  to include a stroke-surface key.
 - `src/lib/transform.ts` still has no unit test file — `setContainerPadding`'s
-  appState write is covered only at the e2e layer.
+  `currentItemPadding` write is untested at **every** layer, not just at the
+  e2e layer: `e2e/text-panel.spec.ts` asserts element `padding` only and never
+  touches `currentItemPadding` or new-container inheritance.
