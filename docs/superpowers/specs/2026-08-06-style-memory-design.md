@@ -46,7 +46,7 @@ Three consequences:
 | Multi-select adopt | Single-element adds only | A marquee or Ctrl+A has no last-clicked element; silently rewriting defaults from an arbitrary member is worse than doing nothing |
 | Edit capture | Selection-derived, via `currentItem*` drift | One mechanism catches panel writes, `executeAction` writes, and vendor-side writes alike |
 | Load point | `activeTool` change | Creation reads `currentItem*` at creation time, and every contended key is reachable only via an explicit tool activation |
-| Text keys | Write through, never swapped | `currentItemTextColor`/font/align/padding are uncontended, so they can stay resident and double-click text stays correct |
+| What is swapped | Contended keys only | A key just one category can use is already correct in vendor's single slot; swapping it would be motion without effect |
 | Applying a key | Only where it renders | Never stamp `cornerRadius` on an ellipse or arrowheads on a line |
 | Persistence | Session-only | Buckets reset on reload; no storage schema, no migration, no interaction with `FLOW_GLOBAL_APP_STATE_KEYS` |
 | Roughness | Excluded from all buckets | Sloppiness is already an app-wide flow preference re-asserted at the call site |
@@ -55,13 +55,54 @@ Three consequences:
 
 Derived from element type on the read side, from active tool on the write side.
 
-| Bucket | Elements | Tools | Keys it owns |
-|---|---|---|---|
-| `shape` | rectangle, diamond, ellipse | rectangle, diamond, ellipse | strokeColor, backgroundColor, fillStyle, strokeWidth, strokeStyle, opacity, roundness, cornerRadius |
-| `linear` | arrow, line | arrow (all three variants), line | strokeColor, backgroundColor, fillStyle, strokeWidth, strokeStyle, opacity, roundness, arrowType, startArrowhead, endArrowhead, startArrowheadSize, endArrowheadSize, cornerRadius |
-| `text` | text (loose and bound) | text | textColor, fontFamily, fontSize, textAlign, opacity, padding |
-| `freedraw` | freedraw | freedraw | strokeColor, strokeWidth, strokeStyle, opacity |
-| — | image, frame, iframe, embeddable | image, frame, laser, eraser, hand, selection | none; never adopted from, never applied to |
+| Bucket | Elements | Tools |
+|---|---|---|
+| `shape` | rectangle, diamond, ellipse | rectangle, diamond, ellipse |
+| `linear` | arrow, line | arrow (all three variants), line |
+| `text` | text (loose and bound) | text |
+| `freedraw` | freedraw | freedraw |
+| — | image, frame, iframe, embeddable | image, frame, laser, eraser, hand, selection — never adopted from, never applied to |
+
+### Only contended keys are bucketed
+
+A `currentItem*` key needs a bucket only if **two or more categories can
+actually render it**. A key just one category uses is already correct in
+vendor's single flat slot — nothing else ever overwrites it — so bucketing it
+would be motion without effect. That splits the keys in two:
+
+**Contended — bucketed and swapped on tool change:**
+
+| Key | Contended between | Why |
+|---|---|---|
+| `currentItemStrokeColor` | shape, linear, freedraw | all three stroke |
+| `currentItemStrokeWidth` | shape, linear, freedraw | " |
+| `currentItemStrokeStyle` | shape, linear, freedraw | " |
+| `currentItemOpacity` | all four | every creation site reads it |
+| `currentItemBackgroundColor` | shape, linear | a **closed line renders its fill**, and flow's Fill row writes to any selected element |
+| `currentItemFillStyle` | shape, linear | same |
+| `currentItemRoundness` | shape, linear | rectangles/diamonds *and* `newLinearElement` read it (`App.tsx:7782`); arrows do not — they derive roundness from `currentItemArrowType` (`:7752`) |
+| `currentItemCornerRadius` | shape, linear | rectangle/diamond corners vs elbow-arrow bends |
+
+Per bucket, that is: `shape` and `linear` carry all eight; `freedraw` carries
+strokeColor, strokeWidth, strokeStyle, opacity; `text` carries opacity alone.
+
+**Resident — left in `currentItem*`, never swapped:** `currentItemTextColor`,
+`currentItemFontFamily`, `currentItemFontSize`, `currentItemTextAlign`,
+`currentItemPadding`, `currentItemArrowType`, `currentItemStartArrowhead`,
+`currentItemEndArrowhead`, `currentItemStartArrowheadSize`,
+`currentItemEndArrowheadSize`.
+
+Residency is about the *swap*, not about adoption: adopt-on-select still writes
+resident keys, because vendor never adopts from a selection at all. Selecting an
+arrow with a big dot arrowhead must still make the next arrow match, and
+selecting a 40px caption must still size the next text — those writes just go
+straight to `currentItem*` with no bucket in between.
+
+`currentItemArrowType` is resident by the same rule, which also removes an
+ambiguity: the rail's Curved/Elbow buttons set it before activating the shared
+`"arrow"` tool (`useActiveTool.ts:45`), so the rail stays its sole owner and can
+never be fought by a bucket. The load still *reads* the live value to decide
+whether `cornerRadius` applies.
 
 Buckets are **partial**. All four start empty, so before anything is touched the
 vendor's own defaults apply unchanged. Only keys that have actually been
@@ -86,15 +127,14 @@ radius or your remembered elbow-bend softness. flow's Radius control already
 targets rectangle, diamond and elbow arrow (`radiusTargetIds`,
 `src/lib/corner-radius.ts`), and the buckets match that exactly.
 
-### `padding` lives in the text bucket
+### `padding` is resident
 
 `padding` is also a fork field, on the **container** (rectangle/ellipse/diamond
 holding bound text), defaulting to `BOUND_TEXT_PADDING` = 5 when unset
-(`src/lib/padding.ts`, `vendor/…/element/textElement.ts:351`). It belongs to the
-text bucket — it is the Text panel's control and it is meaningless without text
-— but it is *applied* at container-shape creation. That works because text keys
-are resident (below), so `currentItemPadding` is always live whenever a
-rectangle, ellipse or diamond is created.
+(`src/lib/padding.ts`, `vendor/…/element/textElement.ts:351`). Only shape
+containers can carry it, so it is uncontended and stays resident: adopting a
+captioned container writes `currentItemPadding` straight to appState, and it is
+read back at container-shape creation. No bucket in between.
 
 ## Change 1 — `src/lib/style-memory.ts`
 
@@ -106,11 +146,11 @@ convention already set by `selection-style.ts`, `corner-radius.ts` and
 export type StyleCategory = "shape" | "linear" | "text" | "freedraw";
 export type StyleBucket = Partial<Record<string, unknown>>; // currentItem* keys
 
-/** The currentItem* keys each category owns. */
+/** The contended currentItem* keys each category buckets. */
 export const CATEGORY_KEYS: Record<StyleCategory, readonly string[]>;
 
-/** Keys no other category contends for — safe to keep resident. */
-export const RESIDENT_KEYS: readonly string[];
+/** Every contended key, across all categories — what the drift watcher folds. */
+export const CONTENDED_KEYS: readonly string[];
 
 export function categoryOfElement(type: string): StyleCategory | null;
 export function categoryOfTool(toolType: string): StyleCategory | null;
@@ -137,15 +177,15 @@ export function applicableKeys(target: LoadTarget): readonly string[];
 meaning". The load resolves a target from the tool and drops everything that
 would be inert or wrong on it:
 
-| Target | Dropped |
+| Target | Dropped from the bucket's contended keys |
 |---|---|
 | rectangle, diamond | — |
 | ellipse | `cornerRadius` — `radiusTargetIds` excludes ellipses |
-| arrow, sharp or round | `cornerRadius` — only elbows have bends to soften |
-| arrow, elbow | — |
-| line | `cornerRadius`, both arrowheads, both arrowhead sizes — the rail exposes no arrowheads for lines |
-| freedraw | backgroundColor, fillStyle, roundness — inert on a pencil stroke |
-| text | nothing swapped; keys are resident |
+| arrow, sharp or round | `cornerRadius` — only elbows have bends to soften; also `roundness`, which arrows never read |
+| arrow, elbow | `roundness` — same reason |
+| line | `cornerRadius` — a plain line has no numeric radius; `roundness` is kept, `newLinearElement` reads it |
+| freedraw | `roundness` — the `freedraw` bucket already excludes background and fill |
+| text | everything — the `text` bucket holds only `opacity`, which a tool change to `text` does load |
 | image, frame, laser, eraser, hand, selection | everything — no load at all |
 
 `cornerRadius` and `padding` are stamped **at creation only**, never toggled on
@@ -170,9 +210,13 @@ export function adopt(category: StyleCategory, snapshot: StyleBucket): void;
 export function record(categories: readonly StyleCategory[], patch: StyleBucket): void;
 
 /** The appState patch to apply for a creation target, already filtered. */
-export function resolveLoad(category: StyleCategory, target: LoadTarget): StyleBucket;
+export function resolveLoad(target: LoadTarget): StyleBucket;
 
 export function getActiveCategory(): StyleCategory;
+export function setActiveCategory(category: StyleCategory): void;
+
+/** Clear every bucket. For tests — the app never resets mid-session. */
+export function resetStyleMemory(): void;
 ```
 
 `activeCategory` starts at `"shape"` and is set by both `adopt` and a tool-change
@@ -192,15 +236,19 @@ container into `shape`, its bound text into `text`, matching how the Text panel
 already resolves bound text as a target (`resolveTextTargetIds`,
 `src/lib/selection-style.ts`).
 
-Adopting also **writes the resident keys straight through** to `currentItem*` in
-the same pass. Contended keys can wait for the next tool change, but the
-resident text keys have no other write point — without this, selecting a 40px
-caption and then double-clicking to create text would not inherit the size.
+Adopting also **writes the whole snapshot straight through** to `currentItem*` in
+the same pass, contended keys included. Resident keys have no other write point
+— vendor never adopts from a selection, so without this, selecting a 40px
+caption would not size the next text and selecting a dot-headed arrow would not
+head the next arrow. Writing the contended keys through as well is safe because
+the next tool change reloads them from the correct bucket regardless, and it
+keeps the panels' empty-selection fallbacks showing what was just adopted.
 
-**Capture edits from `currentItem*` drift.** Diff the `currentItem*` keys
-against the previous snapshot, ignoring any change this hook itself just wrote.
-Fold whatever changed into the categories present in the **current selection**;
-with an empty selection, into `activeCategory`.
+**Capture edits from `currentItem*` drift.** Diff the **contended** keys against
+the previous snapshot, ignoring any change this hook itself just wrote. Fold
+whatever changed into the categories present in the **current selection**; with
+an empty selection, into `activeCategory`. Resident keys need no folding — they
+already live authoritatively in appState.
 
 Drift is the single capture mechanism because writes reach `currentItem*` by
 more than one route: `setProp`'s `currentItemKey`
@@ -232,11 +280,8 @@ api.updateScene({
 `NEVER` because this changes defaults only and touches no element — a defaults
 swap must not become an undo entry.
 
-**Arrow variants override.** The rail's Curved and Elbow buttons already set
-`currentItemArrowType` before activating the shared `"arrow"` tool
-(`useActiveTool.ts:45`, `tools.ts` `TOOLS`). That click is explicit intent, so
-the rail's `arrowType` wins over the bucket's and is written through to it —
-the highlighted rail variant and the remembered value stay in agreement.
+The load never writes `currentItemArrowType` — it is resident, owned by the
+rail, and only *read* here to resolve elbow-ness.
 
 **Loop guard.** Both writes are conditional: `updateScene` is called only when
 at least one resolved key differs from live appState, and the trigger diffs are
@@ -267,12 +312,17 @@ this needs a vendor rebuild with types regenerated, not a source edit alone.
 ## Known gap
 
 Double-click-to-text and Enter-on-a-container create text without a tool change,
-so they miss the load. This is harmless for every text key *except* `opacity`,
-which all four buckets own and which is therefore swap-managed: a double-clicked
-text picks up whatever opacity the last drawing tool loaded rather than the text
-bucket's. Every other text key — `currentItemTextColor` (a fork field nothing
-else writes), fontFamily, fontSize, textAlign, padding — is uncontended,
-resident, and correct on that path.
+so they miss the load. `currentItemOpacity` is the only text-relevant key that
+is swap-managed, so a double-clicked text picks up whatever opacity the last
+drawing tool loaded rather than the text bucket's. Every other text key —
+`currentItemTextColor`, fontFamily, fontSize, textAlign, padding — is resident
+and correct on that path.
+
+In practice the gap is close to theoretical: flow's Color panel folds alpha into
+an 8-digit hex on the colour itself rather than moving element opacity
+(`ColorPanel.tsx` `ColorRow`, `combineColorAlpha`), so no flow control writes
+`currentItemOpacity` at all today. It is bucketed for correctness against vendor
+shortcuts, not because flow's UI moves it.
 
 ## Testing
 
@@ -280,8 +330,8 @@ resident, and correct on that path.
 non-obvious row: text `strokeColor` → `currentItemTextColor`; elbow, round and
 sharp arrows → the three `arrowType` values; `roundness` → `"round"`/`"sharp"`;
 unset `cornerRadius` recording its derived value. `applicableKeys` per target:
-ellipse drops `cornerRadius`, sharp arrow drops it, elbow keeps it, line drops
-arrowheads.
+ellipse drops `cornerRadius`, sharp arrow drops it, elbow keeps it, line keeps
+`roundness` while arrows drop it, and no target ever yields a resident key.
 
 **Unit — `style-memory-store.ts`:** buckets stay isolated (recording into
 `linear` leaves `shape` untouched); a `record` spanning two categories writes
