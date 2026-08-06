@@ -85,6 +85,15 @@ describe("NumberInput", () => {
     expect(container.querySelector(".flow-ctl-num__grip")).not.toBeInTheDocument();
   });
 
+  it("renders no grip for a mixed (null) value even with a finite span", () => {
+    // useScrubDrag refuses to start a gesture when value is null, so a grip
+    // here would advertise a drag the field won't perform.
+    const { container } = render(
+      <NumberInput value={null} min={0} max={100} onChange={() => {}} ariaLabel="Opacity" />,
+    );
+    expect(container.querySelector(".flow-ctl-num__grip")).not.toBeInTheDocument();
+  });
+
   it("scrubs from the grip, emitting transient values then one commit", () => {
     const onChange = vi.fn();
     const { container } = render(

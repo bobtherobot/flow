@@ -48,6 +48,12 @@ export function SliderInput({
   // would inherit authority to skip the vendor's uncommitted-element filter.
   // Gated on this instance's own pending ref, so an unrelated slider's unmount
   // can never clear a live gesture's bit.
+  //
+  // This is unmount-only ([]), unlike NumberInput's equivalent release (keyed
+  // on its isDragging transition): the native <input type="range"> here owns
+  // its own drag state entirely (pending ref + onChange/onPointerUp/onKeyUp/
+  // onBlur), so there is no isDragging-like signal to key off — only unmount
+  // can end the gesture without a matching commit.
   useEffect(
     () => () => {
       if (pending.current !== null) resetDeferred();

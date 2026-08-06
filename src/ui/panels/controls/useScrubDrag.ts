@@ -59,7 +59,10 @@ const multiplierOf = (e: { shiftKey: boolean; altKey: boolean }) =>
  *
  * Move/up/Escape are handled on `window` rather than via pointer capture, so a
  * drag that leaves the element keeps tracking (and so jsdom, which implements
- * no pointer capture, can drive the gesture in tests).
+ * no pointer capture, can drive the gesture in tests). A window blur commits
+ * the gesture too, so a release we never see (context menu, alt-tab, releasing
+ * over another application) can't leave the gesture live or the deferred-commit
+ * bit stuck pending.
  */
 export function useScrubDrag({
   value,
@@ -132,7 +135,12 @@ export function useScrubDrag({
 
     const onUp = () => {
       const g = gesture.current;
-      end(g?.dragging ? g.last : null);
+      // Guard against a second gesture-end event: e.g. a window blur ends the
+      // gesture and a genuine pointerup for the same release still arrives
+      // before the effect cleanup below detaches these listeners. Without this,
+      // the second call would see a null gesture and fire the click branch.
+      if (!g) return;
+      end(g.dragging ? g.last : null);
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -144,15 +152,24 @@ export function useScrubDrag({
       else cancel();
     };
 
+    // Neither pointerup nor pointercancel is guaranteed to arrive: a right-click
+    // opening the context menu mid-drag, or releasing over another application
+    // (alt-tab), can end the gesture without either event. Native <input
+    // type="range"> controls never have this problem — they get implicit
+    // pointer capture from the browser — but this hand-rolled gesture does, so
+    // a window blur commits what we have rather than leaving `gesture.current`
+    // and the deferred-commit bit stuck live.
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("blur", onUp);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("blur", onUp);
     };
   }, [active]);
 

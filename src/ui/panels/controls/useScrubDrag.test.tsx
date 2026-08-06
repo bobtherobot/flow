@@ -162,4 +162,26 @@ describe("useScrubDrag", () => {
     fireEvent.pointerMove(window, { clientY: 200 });
     expect(onScrub).not.toHaveBeenCalled();
   });
+
+  it("commits and ends the gesture on a window blur that arrives with no pointerup", () => {
+    // A right-click context menu, alt-tab, or releasing over another
+    // application can end a drag without ever delivering pointerup/pointercancel
+    // to window. Native <input type="range"> can't lose its release this way
+    // (implicit pointer capture); this hand-rolled gesture must fall back to blur.
+    const onScrub = vi.fn();
+    render(<Harness value={50} min={0} max={100} span={100} onScrub={onScrub} />);
+    fireEvent.pointerDown(screen.getByTestId("grip"), { clientY: 300, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 270 }); // past the 3px threshold: now dragging
+    expect(screen.getByTestId("grip")).toHaveTextContent("dragging");
+
+    fireEvent.blur(window);
+
+    expect(onScrub).toHaveBeenLastCalledWith(70, false);
+    expect(screen.getByTestId("grip")).toHaveTextContent("idle");
+
+    // The gesture is over: further movement must not resurrect it.
+    onScrub.mockClear();
+    fireEvent.pointerMove(window, { clientY: 200 });
+    expect(onScrub).not.toHaveBeenCalled();
+  });
 });

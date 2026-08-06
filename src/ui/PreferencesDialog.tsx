@@ -179,6 +179,10 @@ export function PreferencesDialog({
                   step={GRID_SIZE_STEP}
                   unit="px"
                   ariaLabel="Grid size"
+                  // The `transient` flag is deliberately dropped: this is a
+                  // preference, not a scene write, so there's no undo history to
+                  // defer, and persisting every frame gives a live grid preview
+                  // while dragging.
                   onChange={(n) => onChangeGridSize(n)}
                 />
               </div>

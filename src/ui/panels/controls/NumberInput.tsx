@@ -78,6 +78,12 @@ export function NumberInput({
   // unrelated panel write would inherit authority to skip the vendor's
   // uncommitted-element filter. On a normal drag end the commit has already
   // consumed the bit by the time this runs, so the release is a no-op.
+  //
+  // This is keyed on the isDragging transition, unlike SliderInput's equivalent
+  // release (unmount-only): useScrubDrag already exposes isDragging as a
+  // reactive signal for this gesture, so keying off it (rather than waiting for
+  // unmount) releases the bit as soon as the drag itself ends, not just when
+  // this component happens to unmount mid-drag.
   useEffect(() => {
     if (!scrub.isDragging) return;
     document.body.classList.add("flow-scrubbing");
@@ -92,7 +98,7 @@ export function NumberInput({
       className={`flow-ctl-num${className ? ` ${className}` : ""}`}
       aria-disabled={disabled || undefined}
     >
-      {span !== null && (
+      {value !== null && span !== null && (
         <span
           className="flow-ctl-num__grip"
           aria-hidden="true"

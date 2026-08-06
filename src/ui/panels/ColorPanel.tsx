@@ -49,6 +49,9 @@ function ColorRow({
   const isTransparent = hue === "transparent";
   const currentAlpha = alpha === MIXED ? 100 : alpha;
 
+  // `onWrite` (the always-global laser row) deliberately drops `transient`:
+  // it persists + live-updates a preference rather than writing element props,
+  // so there's no scene history to defer either.
   const write = (color: string, transient = false) =>
     onWrite ? onWrite(color) : sel.setProp({ prop, value: color, currentItemKey, ids, transient });
 

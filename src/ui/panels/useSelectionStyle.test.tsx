@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 
 // The hook imports CaptureUpdateAction + newElementWith from the Excalidraw
@@ -14,6 +14,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 }));
 
 import { useSelectionStyle } from "./useSelectionStyle";
+import { resetDeferred } from "../../lib/deferred-commit";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
 type El = Record<string, unknown> & { id: string; type: string; version: number };
@@ -46,6 +47,13 @@ const rect = (id: string, over: Partial<El> = {}): El => ({
 });
 
 describe("useSelectionStyle", () => {
+  // `deferred-commit.ts` holds module-level state (only one gesture can be in
+  // flight at a time in the real app), so a mark left by one test would leak
+  // into the next. Start every test from a clean, unmarked slate.
+  beforeEach(() => {
+    resetDeferred();
+  });
+
   it("reports no selection and is inert with a null api", () => {
     const { result } = renderHook(() => useSelectionStyle(null));
     expect(result.current.hasSelection).toBe(false);
@@ -133,5 +141,36 @@ describe("useSelectionStyle", () => {
     expect(api.updateScene).toHaveBeenCalledWith(
       expect.objectContaining({ captureUpdate: "EVENTUALLY" }),
     );
+  });
+
+  // This is the pairing that makes one drag gesture one undo entry: the
+  // vendor's `updateScene` filters out elements whose live version has run
+  // ahead of the history snapshot (exactly what a transient write's deferred
+  // frames look like), and the write that closes the gesture must opt out of
+  // that filter via `commitDeferredChanges`. Nothing else in the unit suite
+  // pins this line, and this repo has no CI, so it's otherwise unguarded.
+  it("marks the closing write after a transient one with commitDeferredChanges", () => {
+    const api = makeApi([rect("r")], { r: true });
+    const { result } = renderHook(() => useSelectionStyle(api));
+    act(() => result.current.setProp({ prop: "strokeWidth", value: 4, transient: true }));
+    act(() => result.current.setProp({ prop: "strokeWidth", value: 6 }));
+
+    expect(api.updateScene).toHaveBeenCalledTimes(2);
+    expect(api.updateScene.mock.calls[1][0]).toEqual(
+      expect.objectContaining({ captureUpdate: "IMMEDIATELY", commitDeferredChanges: true }),
+    );
+  });
+
+  it("a lone non-transient setProp keeps commitDeferredChanges falsy", () => {
+    const api = makeApi([rect("r")], { r: true });
+    const { result } = renderHook(() => useSelectionStyle(api));
+    act(() => result.current.setProp({ prop: "strokeWidth", value: 6 }));
+
+    expect(api.updateScene).toHaveBeenCalledTimes(1);
+    const arg = api.updateScene.mock.calls[0][0];
+    expect(arg.captureUpdate).toBe("IMMEDIATELY");
+    // Falsy (not necessarily `false`) so an ordinary panel write with no
+    // deferred frames behind it keeps the vendor filter's protection.
+    expect(arg.commitDeferredChanges).toBeFalsy();
   });
 });

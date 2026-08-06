@@ -31,8 +31,10 @@ function soleSelected(sel: SelectionStyle): SceneElement | null {
  * Transform panel: numeric width, height, x, y and rotation for a single
  * selected element (empty/mixed selections grey the fields out). W/H reuse
  * Excalidraw's resize routine; x/y/rotation write immutably through the shared
- * selection bridge. Corner radius and padding are placeholders wired up in a
- * later phase — always disabled for now.
+ * selection bridge. Corner radius and padding are fully wired and scrubbable
+ * like the rest; each is disabled only when it doesn't apply to the current
+ * selection (e.g. radius for a plain line, padding for a shape with no bound
+ * text) rather than unconditionally.
  */
 export function TransformPanel({ sel, api }: { sel: SelectionStyle; api: ExcalidrawAPI | null }) {
   const el = soleSelected(sel);

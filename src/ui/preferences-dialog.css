@@ -108,7 +108,11 @@
   font-weight: 600;
   color: #4a5163;
 }
-.flow-num__control {
+/* Scoped to both classes (not just .flow-num__control) so this rule's gap
+   deterministically beats panels.css's .flow-ctl-num gap on the same element,
+   regardless of bundler source-order — equal specificity would otherwise make
+   the winner order-dependent. */
+.flow-ctl-num.flow-num__control {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
