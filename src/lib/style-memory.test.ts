@@ -210,8 +210,8 @@ describe("snapshotElement", () => {
   });
 
   it("records the derived cornerRadius when the field is unset", () => {
-    // effectiveCornerRadius: an unset rectangle renders the 32px adaptive radius,
-    // but only when roundness is set; a square-cornered rectangle reads 0.
+    // effectiveCornerRadius: 200x100 with ADAPTIVE_RADIUS (type: 3):
+    // x = min(200, 100) = 100; fixed = 32; 100 <= 128, so 100 * 0.25 = 25.
     const snap = snapshotElement({
       id: "r",
       type: "rectangle",
@@ -219,7 +219,7 @@ describe("snapshotElement", () => {
       height: 100,
       roundness: { type: 3 },
     });
-    expect(typeof snap.currentItemCornerRadius).toBe("number");
+    expect(snap.currentItemCornerRadius).toBe(25);
   });
 
   it("omits cornerRadius where it has no meaning", () => {
