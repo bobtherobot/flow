@@ -52,7 +52,7 @@ export function NumberInput({
   className,
 }: NumberInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const field = useNumberField({ value, min, max, step, onChange: (v) => onChange(v, false) });
+  const field = useNumberField({ value, min, max, step, onChange });
 
   const range = max - min;
   const span = scrubSpan ?? (Number.isFinite(range) ? range : null);
@@ -127,6 +127,7 @@ export function NumberInput({
         onBlur={field.onBlur}
         onChange={field.onChange}
         onKeyDown={field.onKeyDown}
+        onKeyUp={field.onKeyUp}
         onPointerDown={(e) => {
           // A focused field is being edited: leave the body to text selection.
           if (document.activeElement === inputRef.current) return;

@@ -65,6 +65,19 @@ jobs:
           test -d dist/prod || { echo "::error::vendor build: dist/prod missing (buildPackage.js failed)"; exit 1; }
           test -f dist/types/excalidraw/index.d.ts || { echo "::error::vendor build: dist/types/excalidraw/index.d.ts missing (tsc did not emit declarations)"; exit 1; }
 
+      # This workflow exists specifically to catch a submodule rebase that
+      # silently drops the vendor `commitDeferredChanges` fork edit (see the
+      # comment at the top of this file). Assert directly on the built typings
+      # here, right after the vendor build, instead of waiting for that loss
+      # to surface later as a confusing typecheck or e2e failure.
+      - name: Verify fork edit survived (commitDeferredChanges)
+        working-directory: vendor/excalidraw/packages/excalidraw
+        run: |
+          grep -q "commitDeferredChanges" dist/types/excalidraw/components/App.d.ts || {
+            echo "::error::vendor build: commitDeferredChanges missing from dist/types/excalidraw/components/App.d.ts — the vendor fork edit was dropped or rebased away";
+            exit 1;
+          }
+
       - name: Typecheck (flow)
         run: npm run typecheck
 

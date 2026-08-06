@@ -57,6 +57,44 @@ describe("NumberInput", () => {
     expect(field).toHaveValue(20);
   });
 
+  it("batches a held ArrowUp into one commit: N transient writes, then a single non-transient commit on keyUp", async () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={20} min={1} max={999} onChange={onChange} ariaLabel="Font size value" />);
+    const field = screen.getByLabelText("Font size value");
+    field.focus();
+
+    // Simulate the browser auto-repeating keydown with no interleaved keyup
+    // while the key stays physically held, then the single keyup on release.
+    fireEvent.keyDown(field, { key: "ArrowUp" });
+    fireEvent.keyDown(field, { key: "ArrowUp" });
+    fireEvent.keyDown(field, { key: "ArrowUp" });
+
+    const transientCalls = onChange.mock.calls.filter(([, transient]) => transient === true);
+    const commitCallsBeforeRelease = onChange.mock.calls.filter(([, transient]) => transient === false);
+    expect(transientCalls).toHaveLength(3);
+    expect(commitCallsBeforeRelease).toHaveLength(0);
+
+    fireEvent.keyUp(field, { key: "ArrowUp" });
+
+    const commitCalls = onChange.mock.calls.filter(([, transient]) => transient === false);
+    expect(commitCalls).toHaveLength(1);
+    expect(commitCalls[0][0]).toBe(23);
+  });
+
+  it("a single ArrowUp tap commits exactly once", async () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={20} min={1} max={999} onChange={onChange} ariaLabel="Font size value" />);
+    const field = screen.getByLabelText("Font size value");
+    field.focus();
+
+    fireEvent.keyDown(field, { key: "ArrowUp" });
+    fireEvent.keyUp(field, { key: "ArrowUp" });
+
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange.mock.calls[0]).toEqual([21, true]);
+    expect(onChange.mock.calls[1]).toEqual([21, false]);
+  });
+
   it("reflects an external value change when not focused", () => {
     const { rerender } = render(<NumberInput value={20} onChange={() => {}} ariaLabel="Font size value" />);
     rerender(<NumberInput value={28} onChange={() => {}} ariaLabel="Font size value" />);
