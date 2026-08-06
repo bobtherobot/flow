@@ -180,6 +180,10 @@ describe("useStyleMemory", () => {
     expect(h.appState.currentItemTextColor).toBe("#123456");
     expect(h.appState.currentItemFontSize).toBe(40);
     expect(h.appState.currentItemPadding).toBe(20);
+    // Adopting the bound caption makes "text" active internally; the clicked
+    // element (the container) must win so a subsequent tool change or edit
+    // lands in "shape", not "text".
+    expect(getActiveCategory()).toBe("shape");
   });
 
   it("does not let an arrow's style reach a newly drawn box", () => {
@@ -294,5 +298,27 @@ describe("useStyleMemory", () => {
     expect(
       resolveLoad({ category: "linear", toolType: "line", arrowType: "sharp" }),
     ).toMatchObject({ currentItemStrokeColor: "#0000ff" });
+  });
+
+  // Mutation-kill test for applyPatch's ref-before-write ordering. The prior
+  // "does not fold its own load back into the wrong bucket" test does not
+  // catch a swapped ordering: in every sequence it drives, the re-entrant fold
+  // lands back in the category that was just made active — a harmless
+  // overwrite of the value already there. A selection spanning two categories,
+  // built by sequential single-adds, is what makes the corruption observable:
+  // adopting the second element writes through while both are still selected,
+  // so categoriesInSelection returns both, and a stale prevContended makes the
+  // re-entrant onChange see drift and fold the second element's values into
+  // the first element's (still-active) bucket too.
+  it("a second single-add does not fold its write-through into the first element's bucket", () => {
+    const h = makeApi([rect("r"), arrow("a")]);
+    renderHook(() => useStyleMemory(h.api));
+
+    h.change({ selectedElementIds: { r: true } }); // single add, adopts shape
+    h.change({ selectedElementIds: { r: true, a: true } }); // ctrl-click the arrow: single add, adopts linear, writes through while both selected
+
+    expect(
+      resolveLoad({ category: "shape", toolType: "rectangle", arrowType: "sharp" }),
+    ).toMatchObject({ currentItemStrokeColor: "#ff0000", currentItemStrokeWidth: 4 });
   });
 });
