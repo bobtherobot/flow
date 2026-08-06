@@ -29,18 +29,13 @@ asserts the About dialog's actual link text ("Excalidraw", `exact`), and
 `bottombar.spec.ts` pins its presets — see [[color-swatches]]. The full e2e suite
 is green as of that date: 87 e2e + 448 unit.)_
 
-## Push the vendor fork's `flow` branch (added 2026-08-05) — BLOCKING for CI
-The scrub-numeric-inputs work added flow's 4th behavioural fork edit
-(`commitDeferredChanges` on `updateScene` — see [[scrub-numeric-inputs]]). Two
-commits sit on the submodule's local `flow` branch and the parent gitlink points
-at the newer one, but **neither is pushed**:
-
-- local `vendor/excalidraw` `flow` = `813d2983`
-- `origin/flow` on `github.com/bobtherobot/excalidraw` = `0444f0f9`
-
-Until `git -C vendor/excalidraw push origin flow` runs, a fresh clone cannot
-fetch the pinned commit and `actions/checkout --recurse-submodules` fails — so
-the CI added in the same branch cannot run at all.
+_(The vendor fork push blocker recorded here on 2026-08-05 is **resolved**:
+`origin/flow` on `github.com/bobtherobot/excalidraw` is at `813d2983`, so the
+gitlink resolves for a fresh clone and `actions/checkout --recurse-submodules`
+works. CI ran for the first time on the 2026-08-05 spin-button commit. The
+standing rule stands, though: a fork edit is only real once the submodule branch
+is pushed **and** the parent gitlink is bumped — `dist/` is gitignored, so
+nothing else reveals a missing push until CI or a fresh clone fails.)_
 
 ## Keyboard shortcuts unreachable from flow's chrome (added 2026-08-05)
 `PanelsRoot`, `ToolBar`, `QuickBar`, `BottomBar` and `MenuBar` are all DOM
