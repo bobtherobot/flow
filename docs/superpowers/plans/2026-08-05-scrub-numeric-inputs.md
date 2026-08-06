@@ -2256,11 +2256,13 @@ Add `fireEvent` to the RTL import and append:
     const grip = document.querySelector(".flow-ctl-num__grip")!;
 
     fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
-    // span 95 over 150px → 15px ≈ +9.5, from 20 → 29.5, snapped to step 5 → 30.
-    fireEvent.pointerMove(window, { clientY: 285 });
-    fireEvent.pointerUp(window, { clientY: 285 });
+    // span 95 over 150px → 20px = +12.67, from 20 → 32.67.
+    // Snapped to step 5 that is 35; with a step of 1 it would be 33. The two
+    // must diverge, or the test cannot tell a forwarded step from the default.
+    fireEvent.pointerMove(window, { clientY: 280 });
+    fireEvent.pointerUp(window, { clientY: 280 });
 
-    expect(onChangeGridSize).toHaveBeenLastCalledWith(30);
+    expect(onChangeGridSize).toHaveBeenLastCalledWith(35);
   });
 ```
 
