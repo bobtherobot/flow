@@ -26,6 +26,12 @@ interface NumberFieldBinding {
   onBlur: () => void;
   onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
   onKeyUp: (e: KeyboardEvent<HTMLInputElement>) => void;
+  /** Applies one step the *browser UI* made (its spin buttons), writing it
+   *  transiently. Not for typed text, which must not commit per keystroke. */
+  stepFromUi: (raw: number) => void;
+  /** Closes out a spin-button gesture with its single commit. Bind to the
+   *  element's native `change` event, which fires once when the gesture ends. */
+  commitStep: () => void;
 }
 
 /**
@@ -40,6 +46,13 @@ interface NumberFieldBinding {
  * without a matching keyup per tick — so each step writes transiently and only
  * keyUp fires the single non-transient commit, batching a whole hold into one
  * undo entry. This mirrors SliderInput.tsx's `pending`-ref pattern exactly.
+ *
+ * The browser's own spin buttons follow the same shape, which is why they can
+ * share the machinery: they step the value through `input` events and fire a
+ * single `change` when the gesture ends. Each step writes transiently here and
+ * `commitStep` — bound to that `change` — is the one commit. Without this the
+ * spinners changed only the digits in the box: the field commits on blur/Enter,
+ * and a spin gesture involves neither.
  */
 export function useNumberField({ value, min, max, step, onChange }: UseNumberFieldArgs): NumberFieldBinding {
   const [text, setText] = useState(value === null ? "" : String(value));
@@ -112,6 +125,16 @@ export function useNumberField({ value, min, max, step, onChange }: UseNumberFie
     commitValue(n);
   };
 
+  // Apply one discrete step: show it, record it as the outstanding write, and
+  // push it transiently so the canvas tracks the gesture live. The single
+  // non-transient commit that closes the gesture comes later — keyUp for a held
+  // arrow key, the native `change` event for the spin buttons.
+  const stepTo = (snapped: number) => {
+    setText(String(snapped));
+    pending.current = snapped;
+    onChange(snapped, true);
+  };
+
   // Close out a held arrow key: fire the single non-transient commit for
   // whatever step is outstanding. Guarded on `pending` so keyUp and blur —
   // whichever ends the hold first — can't both commit the same value.
@@ -119,10 +142,16 @@ export function useNumberField({ value, min, max, step, onChange }: UseNumberFie
     if (pending.current === null) return;
     const next = pending.current;
     pending.current = null;
-    if (next !== committed.current) {
-      committed.current = next;
-      onChange(next, false);
-    }
+    // Unconditional, unlike the typed-entry commit above, and SliderInput.tsx's
+    // `commit` is unconditional for the same reason: this write's job is the
+    // *capture*, not the number. The transient writes already put the value on
+    // the scene, and each one echoed straight back as a new `value` prop — so
+    // `committed` always already equals `next` here, and a guard on that would
+    // skip every gesture's closing commit. That leaves the scene advanced past
+    // a stale store snapshot with nothing in history, which is precisely the
+    // failure mode the deferred-commit machinery exists to prevent.
+    committed.current = next;
+    onChange(next, false);
   };
 
   return {
@@ -131,6 +160,10 @@ export function useNumberField({ value, min, max, step, onChange }: UseNumberFie
       focused.current = true;
     },
     onChange: (e) => setText(e.target.value),
+    stepFromUi: (raw) => {
+      // Stepping an empty field can hand back "" rather than a number.
+      if (Number.isFinite(raw)) stepTo(clampSnap(raw));
+    },
     onBlur: () => {
       focused.current = false;
       // The canvas already reflects any in-flight transient step (that's the
@@ -155,10 +188,11 @@ export function useNumberField({ value, min, max, step, onChange }: UseNumberFie
         e.currentTarget.blur(); // blur handler reverts (commit is skipped)
       } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         // Replace the browser's native number-input stepping outright — letting
-        // it run alongside ours would double-increment. Arrow keys are a
-        // discrete gesture like the scrub drag, not free-form typing, so the
-        // same deferred-until-blur behaviour that protects typing doesn't
-        // apply — each tick writes transiently right away so the announced
+        // it run alongside ours would double-increment, and its own commit
+        // (`change`) doesn't arrive until blur, unlike the spin buttons'.
+        // Arrow keys are a discrete gesture like the scrub drag, not free-form
+        // typing, so the deferred-until-blur behaviour that protects typing
+        // doesn't apply — each tick writes transiently right away so the announced
         // value and the canvas never disagree (the screen-reader regression
         // this fixes). But a held key auto-repeats keydown with no keyup in
         // between, so committing non-transiently on every tick would split one
@@ -169,12 +203,10 @@ export function useNumberField({ value, min, max, step, onChange }: UseNumberFie
         const typed = Number(text);
         const base = text.trim() !== "" && Number.isFinite(typed) ? typed : committed.current;
         if (base === null) return; // nothing usable to step from (empty field, mixed selection)
-        const snapped = clampSnap(base + (e.key === "ArrowUp" ? delta : -delta));
-        setText(String(snapped));
-        pending.current = snapped;
-        onChange(snapped, true);
+        stepTo(clampSnap(base + (e.key === "ArrowUp" ? delta : -delta)));
       }
     },
     onKeyUp: commitPending,
+    commitStep: commitPending,
   };
 }

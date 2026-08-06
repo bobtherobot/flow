@@ -14,5 +14,19 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // Firefox runs one spec, not the suite. The panel number field's spin
+    // buttons are browser-native chrome and the engines genuinely differ — the
+    // first version of that feature worked in Chromium and did nothing at all
+    // in Firefox, because Firefox reports a spin step as an InputEvent that
+    // looks exactly like typing. jsdom cannot catch that class of bug (it
+    // renders no spin buttons), and running the whole suite on a second engine
+    // would cost far more than the one place where the difference bites.
+    {
+      name: "firefox-number-field",
+      testMatch: /number-field\.spec\.ts/,
+      use: { ...devices["Desktop Firefox"] },
+    },
+  ],
 });

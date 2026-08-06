@@ -97,6 +97,90 @@ from `vendor/excalidraw/packages/excalidraw` as `node ../../scripts/buildPackage
 pre-existing upstream errors and still emits. Fork edits must be committed on the
 submodule's `flow` branch **and** the parent gitlink bumped; `dist/` is gitignored.
 
+## The native spin buttons are back (2026-08-05)
+
+The `↕` scrub grip beside each field is gone — the whole field body already
+scrubs, so it was redundant — and `<input type="number">`'s own spin buttons are
+enabled in its place. Fields went 56px → 64px (the buttons reserve ~12px of
+layout, the grip freed ~11px beside the field; 64 is the widest that fits two
+fields plus axis captions in the 260px default dock, which the old pair
+overflowed).
+
+Three things had to be true for this to work, all measured in Chromium with a
+throwaway Playwright probe rather than reasoned about:
+
+1. **The spinners fire `input` per step and one `change` on release**, which maps
+   exactly onto the existing transient/commit split — so a click, or a held
+   button's auto-repeat, is one undo entry. **This is why the buttons previously
+   did nothing to the object**: the field only commits on blur/Enter, and a spin
+   gesture involves neither.
+
+   **Telling a step from typing is engine-specific, and this is where it first
+   shipped broken.** Chromium dispatches a plain `Event` with no `inputType`;
+   **Firefox dispatches an `InputEvent` with `inputType: "insertReplacementText"`**
+   (typing is `"insertText"` in both). Reading only the interface — "not an
+   InputEvent means it's a spin" — worked in Chromium and made Firefox's buttons
+   do nothing at all, since every Firefox step was read as typing and deferred to
+   a blur the gesture never produces. `NumberInput.isUiStep` now checks a
+   `spinning` ref (a press is down on the buttons — engine-agnostic, and the
+   reason a third engine can't reproduce this) *first*, with the `inputType`
+   allowlist as the converse safety net. `e2e/number-field.spec.ts` runs on
+   Firefox as well as Chromium precisely because jsdom renders no spin buttons
+   and cannot catch any of this.
+2. **`preventDefault()` on pointerdown kills the spinner outright** — no step,
+   no focus. The scrub arms itself that way (to suppress focus), so a press
+   within `SPINNER_HIT_PX` of the field's right edge is left entirely to the
+   browser. Measured with this field's padding/border (6px inset): Chromium's
+   control is 15px wide (reaching 21px in), **Firefox's is 18px (reaching 24px)**
+   — hence 25, which costs a few px of Chromium field body that starts no
+   gesture and beats a band of Firefox button that does nothing when pressed.
+   Firefox also does **not** focus the field on a spin press, where Chromium
+   does; that is why a stale display shows up there first (see below).
+3. **A wheel over a *focused* number field steps it** (unfocused does nothing).
+   Suppressed outright — inside a scrollable dock it edits values by accident,
+   and its `change` wouldn't arrive until blur, leaving the deferred-commit bit
+   set across unrelated writes. React registers `wheel` passively at the root, so
+   this needs a native listener with `{ passive: false }`.
+
+A mixed (`null`) selection hides the buttons via `.flow-ctl-num--mixed` — there
+is no base value to step from, and stepping an empty field would write an
+arbitrary one to everything selected.
+
+### Stroke width's step had to match its display precision
+
+`StrokePanel` passed `step={units === "px" ? 0.5 : unitStep(units)}`, but
+`PRECISION.px` is 0 — `displayValue` rounds px to whole numbers. So a half-step
+landed on a width the field cannot render: the element held 2.5 while the field
+showed "3", and a spin-button click looked like it did nothing. (Firefox showed
+it immediately, because it doesn't focus the field on a spin press, so the
+value-echo effect overwrote the text; Chromium hid it until the next re-read.)
+`unitStep` already returns the display-consistent step for every unit, px
+included, so the px override is gone. Same rounding that retired the 0.5px
+*minimum* — see [drawing-defaults.md](drawing-defaults.md). **A control's `step`
+must agree with the precision its unit displays at.**
+
+### The commit bug this uncovered
+
+`commitPending` guarded its closing write on `next !== committed.current`. In the
+live app that is **always** equal: every transient write echoes straight back as
+a new `value` prop and the sync effect updates `committed.current`. So the
+gesture-closing commit never fired — the scene advanced past a stale snapshot
+with nothing captured. It only looked right in unit tests, where a static `value`
+prop never echoes. `SliderInput.commit` is unconditional for exactly this reason;
+`commitPending` now is too. **This affected the shipped held-arrow-key path, not
+just the new spinners.** `NumberInput.test.tsx`'s `LiveField` wrapper (a parent
+that echoes each write back) is the regression detector — a static `value` in a
+test cannot catch this class of bug.
+
+### Known gap: undo right after a spin gesture
+
+A spin gesture leaves the field focused, and `isTextEntry` (lib/history-shortcuts.ts)
+deliberately leaves Ctrl+Z to the browser's own text-undo stack for `type="number"`
+inputs — so undo doesn't reach the canvas until focus leaves the field. Identical
+to the pre-existing arrow-key behaviour, but far more visible now that a mouse
+gesture triggers it. Fixing it means deciding that canvas undo outranks text undo
+in flow's panels; not taken here.
+
 ## Gotchas
 
 - `NumberInput`'s `step` is forwarded to `useNumberField` only when a caller

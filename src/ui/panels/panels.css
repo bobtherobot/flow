@@ -301,24 +301,12 @@
   /* A vertical scrub must not scroll the panel on touch. */
   touch-action: none;
 }
-.flow-ctl-num__grip {
-  display: inline-flex;
-  align-items: center;
-  color: var(--flow-ink-muted);
-  opacity: 0.45;
-  cursor: ns-resize;
-  /* The stylesheet has no duration token; 120ms matches its other hovers. */
-  transition: opacity 120ms ease;
-}
-.flow-ctl-num:hover .flow-ctl-num__grip {
-  opacity: 0.9;
-}
-.flow-ctl-num[aria-disabled] .flow-ctl-num__grip {
-  opacity: 0.25;
-  cursor: default;
-}
 .flow-ctl-num__input {
-  width: 56px;
+  /* The spin buttons reserve ~12px of layout, and the retired scrub grip freed
+     about as much beside the field. 64px is the widest that still fits two of
+     these plus their axis captions inside the 260px default dock — the pair
+     used to overflow it by a few px. */
+  width: 64px;
   padding: 3px 5px;
   font: inherit;
   font-size: 12px;
@@ -339,13 +327,21 @@
 .flow-ctl-num__input:disabled {
   cursor: default;
 }
-/* The grip is the affordance now — the spinners only steal width. */
-.flow-ctl-num__input::-webkit-outer-spin-button,
+/* The native spin buttons are the discrete-step affordance beside the drag
+   scrub, so they are left on. Only their cursor needs correcting — it would
+   otherwise inherit the field body's ns-resize and promise a drag. */
 .flow-ctl-num__input::-webkit-inner-spin-button {
+  cursor: default;
+}
+/* A mixed selection has no base value to step from, and stepping an empty
+   field would write an arbitrary one to everything selected — so the buttons
+   go away exactly where the scrub is disabled too. */
+.flow-ctl-num--mixed .flow-ctl-num__input::-webkit-outer-spin-button,
+.flow-ctl-num--mixed .flow-ctl-num__input::-webkit-inner-spin-button {
   appearance: none;
   margin: 0;
 }
-.flow-ctl-num__input[type="number"] {
+.flow-ctl-num--mixed .flow-ctl-num__input[type="number"] {
   appearance: textfield;
 }
 .flow-ctl-num__unit {

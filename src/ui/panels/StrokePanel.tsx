@@ -215,7 +215,15 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
             value={widthDisplay}
             min={displayValue(MIN_STROKE_PX, units)}
             max={displayValue(MAX_STROKE_PX, units)}
-            step={units === "px" ? 0.5 : unitStep(units)}
+            // `unitStep` is the step that matches each unit's display precision
+            // — for px that is 1, because `displayValue` rounds px to 0
+            // decimals. The old px-only override of 0.5 predates that rounding
+            // and contradicted it: a half-step landed on a width the field
+            // could not render, so 2.5px displayed as "3" while the element
+            // held 2.5, and a spin-button click looked like it did nothing.
+            // (Same rounding that retired the old 0.5px minimum — see
+            // .claude/memory/drawing-defaults.md.)
+            step={unitStep(units)}
             unit={units}
             ariaLabel="Stroke width"
             onChange={(v, transient) =>

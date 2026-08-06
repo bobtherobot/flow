@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NumberInput } from "./NumberInput";
@@ -106,39 +107,11 @@ describe("NumberInput", () => {
     expect(screen.getByLabelText("Font size value")).toBeDisabled();
   });
 
-  it("renders a scrub grip when the bounds give it a span", () => {
-    const { container } = render(
-      <NumberInput value={20} min={0} max={100} onChange={() => {}} ariaLabel="Opacity" />,
-    );
-    const grip = container.querySelector(".flow-ctl-num__grip");
-    expect(grip).toBeInTheDocument();
-    // The input is the accessible control; the grip is decoration.
-    expect(grip).toHaveAttribute("aria-hidden", "true");
-  });
-
-  it("renders no grip when the bounds are infinite and no span is given", () => {
-    const { container } = render(
-      <NumberInput value={20} onChange={() => {}} ariaLabel="Opacity" />,
-    );
-    expect(container.querySelector(".flow-ctl-num__grip")).not.toBeInTheDocument();
-  });
-
-  it("renders no grip for a mixed (null) value even with a finite span", () => {
-    // useScrubDrag refuses to start a gesture when value is null, so a grip
-    // here would advertise a drag the field won't perform.
-    const { container } = render(
-      <NumberInput value={null} min={0} max={100} onChange={() => {}} ariaLabel="Opacity" />,
-    );
-    expect(container.querySelector(".flow-ctl-num__grip")).not.toBeInTheDocument();
-  });
-
-  it("scrubs from the grip, emitting transient values then one commit", () => {
+  it("scrubs the field body, emitting transient values then one commit", () => {
     const onChange = vi.fn();
-    const { container } = render(
-      <NumberInput value={50} min={0} max={100} onChange={onChange} ariaLabel="Opacity" />,
-    );
-    const grip = container.querySelector(".flow-ctl-num__grip")!;
-    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    render(<NumberInput value={50} min={0} max={100} onChange={onChange} ariaLabel="Opacity" />);
+    const field = screen.getByLabelText("Opacity");
+    fireEvent.pointerDown(field, { clientY: 300, button: 0 });
     fireEvent.pointerMove(window, { clientY: 285 });
     fireEvent.pointerUp(window, { clientY: 285 });
     // span defaults to max-min = 100 → 15px of a 150px travel = +10.
@@ -148,14 +121,26 @@ describe("NumberInput", () => {
 
   it("honours an explicit scrubSpan over the min/max range", () => {
     const onChange = vi.fn();
-    const { container } = render(
+    render(
       <NumberInput value={0} min={-1e6} max={1e6} scrubSpan={300} onChange={onChange} ariaLabel="X position" />,
     );
-    const grip = container.querySelector(".flow-ctl-num__grip")!;
-    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    const field = screen.getByLabelText("X position");
+    fireEvent.pointerDown(field, { clientY: 300, button: 0 });
     fireEvent.pointerMove(window, { clientY: 250 });   // 50px → 300/150 × 50 = 100
     fireEvent.pointerUp(window, { clientY: 250 });
     expect(onChange).toHaveBeenLastCalledWith(100, false);
+  });
+
+  it("marks a mixed (null) value so the spin buttons are hidden with the scrub", () => {
+    // There is no base value to step from, and stepping an empty field would
+    // write an arbitrary one to the whole selection. The buttons themselves are
+    // shadow DOM, so the class carrying the CSS is what there is to assert.
+    const { container, rerender } = render(
+      <NumberInput value={null} min={0} max={100} onChange={() => {}} ariaLabel="Opacity" />,
+    );
+    expect(container.querySelector(".flow-ctl-num")).toHaveClass("flow-ctl-num--mixed");
+    rerender(<NumberInput value={20} min={0} max={100} onChange={() => {}} ariaLabel="Opacity" />);
+    expect(container.querySelector(".flow-ctl-num")).not.toHaveClass("flow-ctl-num--mixed");
   });
 
   it("scrubs from the field body while it is unfocused", () => {
@@ -192,11 +177,11 @@ describe("NumberInput", () => {
   });
 
   it("releases the deferred-commit bit if it unmounts mid-scrub", () => {
-    const { container, unmount } = render(
+    const { unmount } = render(
       <NumberInput value={50} min={0} max={100} onChange={() => {}} ariaLabel="Opacity" />,
     );
-    const grip = container.querySelector(".flow-ctl-num__grip")!;
-    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    const field = screen.getByLabelText("Opacity");
+    fireEvent.pointerDown(field, { clientY: 300, button: 0 });
     fireEvent.pointerMove(window, { clientY: 285 }); // a transient write is now outstanding
     markDeferred();
     unmount();
@@ -207,14 +192,230 @@ describe("NumberInput", () => {
 
   it("does not scrub when disabled", () => {
     const onChange = vi.fn();
-    const { container } = render(
+    render(
       <NumberInput value={50} min={0} max={100} onChange={onChange} ariaLabel="Opacity" disabled />,
     );
-    const grip = container.querySelector(".flow-ctl-num__grip")!;
-    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    const field = screen.getByLabelText("Opacity");
+    fireEvent.pointerDown(field, { clientY: 300, button: 0 });
     fireEvent.pointerMove(window, { clientY: 285 });
     fireEvent.pointerUp(window, { clientY: 285 });
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  // The browser's spin buttons live in the input's shadow DOM, so jsdom can't
+  // press them. What it *can* do is reproduce the event sequence they produce,
+  // measured in Chromium: the value is set internally (bypassing React's value
+  // tracker, hence the prototype setter), each step dispatches a plain `input`
+  // Event — never the InputEvent typing produces — and one `change` fires when
+  // the gesture ends.
+  //
+  // Engines disagree on the event, so both measured shapes are exercised:
+  // Chromium sends a plain Event, Firefox an InputEvent saying
+  // "insertReplacementText". Reading only the interface classified every
+  // Firefox spin as typing — the field's digits moved and the object never did.
+  const spinTo = (field: HTMLInputElement, next: string, engine: "chromium" | "firefox" = "chromium") => {
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    setValue.call(field, next);
+    fireEvent(
+      field,
+      engine === "firefox"
+        ? new InputEvent("input", { bubbles: true, inputType: "insertReplacementText" })
+        : new Event("input", { bubbles: true }),
+    );
+  };
+  const endSpin = (field: HTMLInputElement) => fireEvent(field, new Event("change", { bubbles: true }));
+
+  it("writes a spin-button step transiently and commits it when the gesture ends", () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={20} min={1} max={999} onChange={onChange} ariaLabel="Font size value" />);
+    const field = screen.getByLabelText("Font size value") as HTMLInputElement;
+
+    spinTo(field, "21");
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenLastCalledWith(21, true); // canvas tracks it live
+    expect(field).toHaveValue(21);
+
+    endSpin(field);
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange).toHaveBeenLastCalledWith(21, false); // one undo entry, on release
+  });
+
+  it("writes a Firefox spin-button step, which arrives as typing-shaped InputEvent", () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={20} min={1} max={999} onChange={onChange} ariaLabel="Font size value" />);
+    const field = screen.getByLabelText("Font size value") as HTMLInputElement;
+
+    spinTo(field, "21", "firefox");
+    expect(onChange).toHaveBeenLastCalledWith(21, true);
+
+    endSpin(field);
+    expect(onChange).toHaveBeenLastCalledWith(21, false);
+  });
+
+  it("reads a step as a step while a press is held on the buttons, whatever the engine calls it", () => {
+    // The engine-agnostic half of the detection: an engine whose inputType is
+    // neither measured shape still steps, because the press was recognised.
+    const onChange = vi.fn();
+    render(<NumberInput value={20} min={1} max={999} onChange={onChange} ariaLabel="Font size value" />);
+    const field = screen.getByLabelText("Font size value") as HTMLInputElement;
+    vi.spyOn(field, "getBoundingClientRect").mockReturnValue({
+      x: 100, y: 0, left: 100, right: 164, top: 0, bottom: 24, width: 64, height: 24,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.pointerDown(field, { clientX: 156, clientY: 300, button: 0 }); // on the buttons
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    setValue.call(field, "21");
+    fireEvent(field, new InputEvent("input", { bubbles: true, inputType: "insertFromSomethingNew" }));
+
+    expect(onChange).toHaveBeenLastCalledWith(21, true);
+  });
+
+  it("batches a held spin button's auto-repeat into a single commit", () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={20} min={1} max={999} onChange={onChange} ariaLabel="Font size value" />);
+    const field = screen.getByLabelText("Font size value") as HTMLInputElement;
+
+    spinTo(field, "19");
+    spinTo(field, "18");
+    spinTo(field, "17");
+    expect(onChange.mock.calls.filter(([, t]) => t === false)).toHaveLength(0);
+
+    endSpin(field);
+    const commits = onChange.mock.calls.filter(([, t]) => t === false);
+    expect(commits).toHaveLength(1);
+    expect(commits[0][0]).toBe(17);
+  });
+
+  it("clamps a spin-button step to the field's bounds", () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={5} min={3} max={999} onChange={onChange} ariaLabel="Font size value" />);
+    const field = screen.getByLabelText("Font size value") as HTMLInputElement;
+
+    spinTo(field, "0");
+    endSpin(field);
+    expect(onChange).toHaveBeenLastCalledWith(3, false);
+  });
+
+  // A panel field is live: every transient write lands on the scene and comes
+  // straight back as a new `value` prop. Anything that closes a gesture has to
+  // survive that echo, which a static `value` in a test never exercises.
+  function LiveField({ writes }: { writes: [number, boolean][] }) {
+    const [v, setV] = useState(2);
+    return (
+      <NumberInput
+        value={v}
+        min={0}
+        max={10}
+        step={0.5}
+        ariaLabel="Stroke width"
+        onChange={(n, transient) => {
+          writes.push([n, transient]);
+          setV(n);
+        }}
+      />
+    );
+  }
+
+  it("commits a spin gesture even though its transient writes already moved the value", () => {
+    // The closing write is what captures history — its job is the capture, not
+    // the number, which the transient writes already applied. Skipping it as a
+    // no-op leaves the scene advanced past a stale snapshot and the gesture
+    // unundoable. SliderInput commits its gesture unconditionally for exactly
+    // this reason.
+    const writes: [number, boolean][] = [];
+    render(<LiveField writes={writes} />);
+    const field = screen.getByLabelText("Stroke width") as HTMLInputElement;
+
+    spinTo(field, "2.5");
+    endSpin(field);
+
+    expect(writes).toEqual([
+      [2.5, true],
+      [2.5, false],
+    ]);
+  });
+
+  it("commits a held arrow key even though its transient writes already moved the value", () => {
+    const writes: [number, boolean][] = [];
+    render(<LiveField writes={writes} />);
+    const field = screen.getByLabelText("Stroke width");
+    field.focus();
+
+    fireEvent.keyDown(field, { key: "ArrowUp" });
+    fireEvent.keyDown(field, { key: "ArrowUp" });
+    fireEvent.keyUp(field, { key: "ArrowUp" });
+
+    expect(writes).toEqual([
+      [2.5, true],
+      [3, true],
+      [3, false],
+    ]);
+  });
+
+  it("releases the deferred-commit bit if it unmounts mid-step", () => {
+    const { unmount } = render(
+      <NumberInput value={20} min={1} max={999} onChange={() => {}} ariaLabel="Font size value" />,
+    );
+    const field = screen.getByLabelText("Font size value") as HTMLInputElement;
+
+    spinTo(field, "21"); // a transient write is now outstanding
+    markDeferred();
+    unmount(); // the gesture never reaches its commit
+    expect(consumeDeferred()).toBe(false);
+  });
+
+  it("still defers typed input to Enter or blur", async () => {
+    // The spin-button path must not swallow typing: the two arrive on the same
+    // React onChange and are told apart only by the native event.
+    const onChange = vi.fn();
+    render(<NumberInput value={20} min={1} max={999} onChange={onChange} ariaLabel="Font size value" />);
+    const field = screen.getByLabelText("Font size value");
+    await userEvent.clear(field);
+    await userEvent.type(field, "24");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("leaves a press on the spin buttons to the browser instead of scrubbing", () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={50} min={0} max={100} onChange={onChange} ariaLabel="Opacity" />);
+    const field = screen.getByLabelText("Opacity") as HTMLInputElement;
+    // jsdom has no layout; give the field its real 64px so the hit test has a
+    // right edge to measure from.
+    vi.spyOn(field, "getBoundingClientRect").mockReturnValue({
+      x: 100, y: 0, left: 100, right: 164, top: 0, bottom: 24, width: 64, height: 24,
+      toJSON: () => ({}),
+    });
+
+    // Inside the spin buttons: arming the scrub here would preventDefault and
+    // suppress the browser's own stepping.
+    fireEvent.pointerDown(field, { clientX: 156, clientY: 300, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 285 });
+    fireEvent.pointerUp(window, { clientY: 285 });
+    expect(onChange).not.toHaveBeenCalled();
+
+    // Clear of them, the body still scrubs.
+    fireEvent.pointerDown(field, { clientX: 110, clientY: 300, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 285 });
+    fireEvent.pointerUp(window, { clientY: 285 });
+    expect(onChange).toHaveBeenLastCalledWith(60, false);
+  });
+
+  it("suppresses wheel stepping while the field is focused", () => {
+    // Chromium steps a focused number input on wheel. In a scrollable dock that
+    // edits values by accident, and the step's commit wouldn't arrive until
+    // blur — leaving the deferred-commit bit set across unrelated writes.
+    render(<NumberInput value={50} min={0} max={100} onChange={() => {}} ariaLabel="Opacity" />);
+    const field = screen.getByLabelText("Opacity") as HTMLInputElement;
+
+    const scrolled = new WheelEvent("wheel", { deltaY: -120, bubbles: true, cancelable: true });
+    field.dispatchEvent(scrolled);
+    expect(scrolled.defaultPrevented).toBe(false); // unfocused: the dock scrolls
+
+    field.focus();
+    const stepped = new WheelEvent("wheel", { deltaY: -120, bubbles: true, cancelable: true });
+    field.dispatchEvent(stepped);
+    expect(stepped.defaultPrevented).toBe(true);
   });
 
   it("applies an external id and className", () => {

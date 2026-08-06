@@ -52,9 +52,9 @@ describe("TextPanel", () => {
   it("shows scrubbed digits without writing, then commits once on release", () => {
     const { sel, executeAction } = mockSel();
     const { container } = render(<TextPanel sel={sel} />);
-    const grip = container.querySelectorAll(".flow-ctl-num__grip")[0];
+    const field = container.querySelectorAll(".flow-ctl-num__input")[0];
 
-    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    fireEvent.pointerDown(field, { clientY: 300, button: 0 });
     fireEvent.pointerMove(window, { clientY: 290 }); // 10px × (150/150) = +10
     // The digits track the drag; the canvas deliberately does not, because
     // Excalidraw's changeFontSize action always captures history.

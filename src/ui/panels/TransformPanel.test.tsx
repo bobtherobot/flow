@@ -146,13 +146,12 @@ describe("TransformPanel", () => {
     expect((updater() as { angle: number }).angle).toBeCloseTo(Math.PI / 2);
   });
 
-  // Field order in the panel: W, H, X, Y, Rotation, Radius, Padding — every one
-  // has finite bounds, so every one renders a grip.
-  const gripAt = (container: HTMLElement, index: number) =>
-    container.querySelectorAll(".flow-ctl-num__grip")[index];
+  // Field order in the panel: W, H, X, Y, Rotation, Radius, Padding.
+  const fieldAt = (container: HTMLElement, index: number) =>
+    container.querySelectorAll(".flow-ctl-num__input")[index];
 
-  const scrub = (grip: Element, dy: number) => {
-    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+  const scrub = (field: Element, dy: number) => {
+    fireEvent.pointerDown(field, { clientY: 300, button: 0 });
     fireEvent.pointerMove(window, { clientY: 300 - dy });
     fireEvent.pointerUp(window, { clientY: 300 - dy });
   };
@@ -161,7 +160,7 @@ describe("TransformPanel", () => {
     const { sel, update } = mockSel([rect()], { a: true });
     const { container } = render(<TransformPanel sel={sel} api={api} />);
 
-    scrub(gripAt(container, 2), 15); // 15px × (300/150) = +30, from x=10
+    scrub(fieldAt(container, 2), 15); // 15px × (300/150) = +30, from x=10
 
     const flags = update.mock.calls.map((call) => call[3]);
     expect(flags.length).toBeGreaterThan(1);
@@ -179,7 +178,7 @@ describe("TransformPanel", () => {
     const { sel } = mockSel([rect()], { a: true });
     const { container } = render(<TransformPanel sel={sel} api={api} />);
 
-    scrub(gripAt(container, 0), 15); // +30, from width=100
+    scrub(fieldAt(container, 0), 15); // +30, from width=100
 
     const calls = vi.mocked(resizeElementDimension).mock.calls;
     expect(calls[calls.length - 1]).toEqual([api, "a", "width", 130, false]);
@@ -190,7 +189,7 @@ describe("TransformPanel", () => {
     const { sel, update } = mockSel([rect()], { a: true });
     const { container } = render(<TransformPanel sel={sel} api={api} />);
 
-    scrub(gripAt(container, 4), 75); // half the travel → half of 360 = +180
+    scrub(fieldAt(container, 4), 75); // half the travel → half of 360 = +180
 
     const flags = update.mock.calls.map((call) => call[3]);
     expect(flags.length).toBeGreaterThan(1);
@@ -207,7 +206,7 @@ describe("TransformPanel", () => {
     const { sel, update } = mockSel([rect()], { a: true });
     const { container } = render(<TransformPanel sel={sel} api={api} />);
 
-    scrub(gripAt(container, 5), 15); // 15px × (200/150) = +20, from radius=0
+    scrub(fieldAt(container, 5), 15); // 15px × (200/150) = +20, from radius=0
 
     const flags = update.mock.calls.map((call) => call[3]);
     expect(flags.length).toBeGreaterThan(1);
@@ -227,7 +226,7 @@ describe("TransformPanel", () => {
     );
     const { container } = render(<TransformPanel sel={sel} api={api} />);
 
-    scrub(gripAt(container, 6), 15); // 15px × (200/150) = +20, from padding=5 (default)
+    scrub(fieldAt(container, 6), 15); // 15px × (200/150) = +20, from padding=5 (default)
 
     const calls = vi.mocked(setContainerPadding).mock.calls;
     expect(calls[calls.length - 1]).toEqual([api, "a", 25, false]);

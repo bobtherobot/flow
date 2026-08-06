@@ -90,10 +90,14 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      # playwright.config.ts only defines a chromium project, so only that
-      # browser (plus its OS-level dependencies) needs to be installed.
+      # Chromium runs the whole suite; Firefox runs e2e/number-field.spec.ts
+      # alone (see playwright.config.ts). That one spec exists because the panel
+      # number field's spin buttons are browser-native chrome whose events
+      # differ per engine — the feature shipped working in Chromium and doing
+      # nothing at all in Firefox — and jsdom renders no spin buttons to test
+      # against. Dropping firefox here would make that project skip silently.
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
 
       - name: E2E tests
         run: npm run test:e2e

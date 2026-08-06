@@ -116,9 +116,9 @@ describe("PreferencesDialog", () => {
 
   it("scrubs the grid size, snapped to the step", () => {
     const { onChangeGridSize } = setup();
-    const grip = document.querySelector(".flow-ctl-num__grip")!;
+    const field = document.querySelector(".flow-ctl-num__input")!;
 
-    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    fireEvent.pointerDown(field, { clientY: 300, button: 0 });
     // span 95 over 150px → 20px = +12.67, from 20 → 32.67.
     // Snapped to step 5 that is 35; with a step of 1 it would be 33. The two
     // must diverge, or the test cannot tell a forwarded step from the default.
