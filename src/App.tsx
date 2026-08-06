@@ -61,6 +61,7 @@ import { PreferencesDialog } from "./ui/PreferencesDialog";
 import { PropertiesDialog } from "./ui/PropertiesDialog";
 import { AboutDialog } from "./ui/AboutDialog";
 import type { SaveDestination } from "./ui/dialog-types";
+import { useStyleMemory } from "./ui/useStyleMemory";
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -74,6 +75,10 @@ export default function App() {
   // Also mirrored in state so the panels re-render once the API is ready.
   const [excalidrawApi, setExcalidrawApi] = useState<ExcalidrawAPI | null>(null);
   const provider = useMemo(() => new IndexedDbProvider(), []);
+
+  // Per-category style memory: adopts the last selected/edited element's style
+  // and applies it to the next element drawn in that category. Renders nothing.
+  useStyleMemory(excalidrawApi);
 
   const [currentId, setCurrentId] = useState<string | undefined>(undefined);
   const [currentName, setCurrentName] = useState("Untitled");
