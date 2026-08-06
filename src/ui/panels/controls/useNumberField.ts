@@ -47,12 +47,13 @@ export function useNumberField({ value, min, max, step, onChange }: UseNumberFie
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
-  const commit = () => {
-    const n = Number(text);
-    if (text.trim() === "" || !Number.isFinite(n)) {
-      reflect(); // invalid/empty → restore the last good value
-      return;
-    }
+  // Clamp + step-snap a raw number, then push it through as the committed
+  // value — updating the displayed text and firing onChange, unless it's
+  // unchanged from what the parent already holds. Shared by the typed-entry
+  // commit path (below) and arrow-key stepping, so both apply identical
+  // float-noise rounding and identical "don't re-fire an unchanged value"
+  // bookkeeping.
+  const commitValue = (n: number) => {
     const clamped = clamp(n, min, max);
     const snapped =
       typeof step === "number" && Number.isFinite(step) && step > 0
@@ -63,6 +64,15 @@ export function useNumberField({ value, min, max, step, onChange }: UseNumberFie
       committed.current = snapped;
       onChange(snapped);
     }
+  };
+
+  const commit = () => {
+    const n = Number(text);
+    if (text.trim() === "" || !Number.isFinite(n)) {
+      reflect(); // invalid/empty → restore the last good value
+      return;
+    }
+    commitValue(n);
   };
 
   return {
@@ -87,6 +97,20 @@ export function useNumberField({ value, min, max, step, onChange }: UseNumberFie
       } else if (e.key === "Escape") {
         cancelled.current = true;
         e.currentTarget.blur(); // blur handler reverts (commit is skipped)
+      } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        // Replace the browser's native number-input stepping outright — letting
+        // it run alongside ours would double-increment — and commit immediately
+        // instead of just updating the text. Arrow keys are a discrete gesture
+        // like the scrub drag, not free-form typing, so the same
+        // deferred-until-blur behaviour that protects typing doesn't apply:
+        // a screen reader announcing the new digits while the canvas still
+        // shows the old value is the exact regression this fixes.
+        e.preventDefault();
+        const delta = typeof step === "number" && Number.isFinite(step) && step > 0 ? step : 1;
+        const typed = Number(text);
+        const base = text.trim() !== "" && Number.isFinite(typed) ? typed : committed.current;
+        if (base === null) return; // nothing usable to step from (empty field, mixed selection)
+        commitValue(base + (e.key === "ArrowUp" ? delta : -delta));
       }
     },
   };
