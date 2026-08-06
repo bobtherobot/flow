@@ -1,0 +1,86 @@
+name: CI
+
+# Runs on every push and every pull request so a submodule rebase that
+# silently drops the vendor `commitDeferredChanges` fork edit gets caught by
+# e2e/stroke-panel.spec.ts's undo tests instead of shipping unnoticed.
+"on":
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repo (with vendor submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Node 22: the vendor/excalidraw submodule's package.json pins
+      # "engines.node": "18.0.0 - 22.x.x", and this repo's own .nvmrc pins 22.
+      # Node 25 (the default on some local dev machines) falls outside that
+      # range and made `yarn` unusable when this workflow was authored;
+      # Node 22 is the newest version both the fork and this repo support.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install flow dependencies
+        run: npm ci
+
+      # The vendor package build is NOT run via `npm run build:excalidraw`
+      # (which chains yarn install && yarn build:package with `&&`). The type
+      # generation sub-step of build:package is expected to exit non-zero (see
+      # below), which would abort that chain before dist/dev and dist/prod
+      # ever exist. Running each step explicitly lets us tolerate the known
+      # type-check failure while still hard-failing on anything else.
+      - name: Install vendor (submodule) dependencies
+        working-directory: vendor/excalidraw
+        run: yarn install --frozen-lockfile
+
+      - name: Build vendor package (esm bundles + type declarations)
+        working-directory: vendor/excalidraw/packages/excalidraw
+        run: |
+          set -e
+          rm -rf dist
+
+          # Entry points in buildPackage.js are relative, so it must run from
+          # this directory (packages/excalidraw), not the submodule root.
+          node ../../scripts/buildPackage.js
+
+          # gen:types (`tsc`, emitDeclarationOnly) prints pre-existing
+          # upstream type errors unrelated to any flow/fork edit (e.g.
+          # cornerRadius/Point narrowing in data/restore.ts) and exits
+          # non-zero. tsconfig.json does not set noEmitOnError, so the
+          # declaration files are written to dist/types regardless -- tsc's
+          # exit code does not reflect whether the build artifact exists.
+          # Tolerate the exit code here, then verify the real output below.
+          node_modules/.bin/tsc -p tsconfig.json || true
+
+          test -d dist/dev || { echo "::error::vendor build: dist/dev missing (buildPackage.js failed)"; exit 1; }
+          test -d dist/prod || { echo "::error::vendor build: dist/prod missing (buildPackage.js failed)"; exit 1; }
+          test -f dist/types/excalidraw/index.d.ts || { echo "::error::vendor build: dist/types/excalidraw/index.d.ts missing (tsc did not emit declarations)"; exit 1; }
+
+      - name: Typecheck (flow)
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # playwright.config.ts only defines a chromium project, so only that
+      # browser (plus its OS-level dependencies) needs to be installed.
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: npm run test:e2e
