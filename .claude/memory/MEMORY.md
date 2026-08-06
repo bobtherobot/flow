@@ -21,3 +21,4 @@ Repo-local memory index. One line per memory; see `CLAUDE.md` for the read-at-st
 - [Flow-owned global appState](flow-global-appstate.md) — `FLOW_GLOBAL_APP_STATE_KEYS` stripped on doc open so a saved scene can't clobber flow prefs; ADD NEW GLOBAL PREFS TO THAT LIST; shipped 2026-08-04
 - [Color swatches](color-swatches.md) — palette manager sub-panel; default palette drives ColorSwatch presets everywhere; palette-store (useSyncExternalStore) + preferences keys; zero fork; shipped 2026-07-10
 - [Drawing defaults](drawing-defaults.md) — square corners, 0–10px stroke slider, tight selection chrome (`SELECTION_SPACING` fork edit); 2px stroke was already upstream; shipped 2026-08-04
+- [Scrub numeric inputs](scrub-numeric-inputs.md) — Firefox-devtools drag-to-scrub on every panel number field; sliders retired except arrowhead size; transient/EVENTUALLY undo batching; shipped 2026-08-05
