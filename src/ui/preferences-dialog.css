@@ -114,8 +114,9 @@
   gap: 0.5rem;
   width: fit-content;
 }
-.flow-num__input {
-  font: inherit;
+/* The dialog's field is larger than the panels' — override NumberInput's
+   compact panel sizing without touching the shared control. */
+.flow-num__control .flow-ctl-num__input {
   font-size: 0.875rem;
   width: 5rem;
   padding: 0.4rem 0.5rem;
@@ -123,12 +124,13 @@
   border-radius: 8px;
   background: #fbfcfe;
   color: #4a5163;
+  text-align: left;
 }
-.flow-num__input:focus-visible {
+.flow-num__control .flow-ctl-num__input:focus-visible {
   outline: 2px solid #6366f1;
   outline-offset: -2px;
 }
-.flow-num__suffix {
+.flow-num__control .flow-ctl-num__unit {
   font-size: 0.8125rem;
   color: #6b7280;
 }

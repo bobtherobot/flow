@@ -11,7 +11,7 @@ import {
   type SelectionMode,
 } from "../lib/selection-mode";
 import { MIN_GRID_SIZE, MAX_GRID_SIZE, GRID_SIZE_STEP } from "../lib/grid";
-import { useNumberField } from "./panels/controls/useNumberField";
+import { NumberInput } from "./panels/controls/NumberInput";
 import "./dialogs.css";
 import "./preferences-dialog.css";
 
@@ -54,16 +54,6 @@ export function PreferencesDialog({
   const titleId = useId();
   const unitsId = useId();
   const gridSizeId = useId();
-  // Commit the grid size on blur/Enter (not per keystroke) so clamping/rounding
-  // doesn't rewrite the field while the user is still typing — mirrors the
-  // NumberInput fields used elsewhere (Transform panel, etc.).
-  const gridField = useNumberField({
-    value: gridSize,
-    min: MIN_GRID_SIZE,
-    max: MAX_GRID_SIZE,
-    step: GRID_SIZE_STEP,
-    onChange: onChangeGridSize,
-  });
 
   return (
     <div
@@ -180,22 +170,17 @@ export function PreferencesDialog({
                 <label className="flow-num__label" htmlFor={gridSizeId}>
                   Grid size
                 </label>
-                <div className="flow-num__control">
-                  <input
-                    id={gridSizeId}
-                    className="flow-num__input"
-                    type="number"
-                    min={MIN_GRID_SIZE}
-                    max={MAX_GRID_SIZE}
-                    step={GRID_SIZE_STEP}
-                    value={gridField.text}
-                    onFocus={gridField.onFocus}
-                    onChange={gridField.onChange}
-                    onBlur={gridField.onBlur}
-                    onKeyDown={gridField.onKeyDown}
-                  />
-                  <span className="flow-num__suffix">px</span>
-                </div>
+                <NumberInput
+                  id={gridSizeId}
+                  className="flow-num__control"
+                  value={gridSize}
+                  min={MIN_GRID_SIZE}
+                  max={MAX_GRID_SIZE}
+                  step={GRID_SIZE_STEP}
+                  unit="px"
+                  ariaLabel="Grid size"
+                  onChange={(n) => onChangeGridSize(n)}
+                />
               </div>
             )}
 

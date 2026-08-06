@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PreferencesDialog } from "./PreferencesDialog";
 
@@ -107,6 +107,23 @@ describe("PreferencesDialog", () => {
     await user.type(input, "500");
     await user.tab();
     expect(onChangeGridSize).toHaveBeenLastCalledWith(100);
+  });
+
+  it("keeps the label associated with the grid size field", () => {
+    setup();
+    expect(screen.getByLabelText("Grid size")).toHaveValue(20);
+  });
+
+  it("scrubs the grid size, snapped to the step", () => {
+    const { onChangeGridSize } = setup();
+    const grip = document.querySelector(".flow-ctl-num__grip")!;
+
+    fireEvent.pointerDown(grip, { clientY: 300, button: 0 });
+    // span 95 over 150px → 15px ≈ +9.5, from 20 → 29.5, snapped to step 5 → 30.
+    fireEvent.pointerMove(window, { clientY: 285 });
+    fireEvent.pointerUp(window, { clientY: 285 });
+
+    expect(onChangeGridSize).toHaveBeenLastCalledWith(30);
   });
 
   it("switches to the Keyboard category and fires onShowShortcuts", async () => {
