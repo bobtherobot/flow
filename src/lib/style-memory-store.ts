@@ -49,15 +49,28 @@ export function record(categories: readonly StyleCategory[], patch: StyleBucket)
 }
 
 /**
- * The appState patch to apply before creating `target`. Only keys actually
- * recorded are returned, so an untouched bucket yields `{}` and Excalidraw's own
- * defaults stand.
+ * The appState patch to apply before creating `target`. Keys actually recorded
+ * are returned as-is, so an untouched bucket yields `{}` and Excalidraw's own
+ * defaults stand — except `currentItemCornerRadius`, explicitly reset to
+ * `undefined` when unrecorded. Every other contended key is a plain
+ * color/width/etc. default with no "no preference" state, so an unrecorded
+ * value safely falls through to whatever is already active in appState.
+ * `currentItemCornerRadius` is different: unset is itself meaningful (it tells
+ * the vendor to fall back to its own per-type derived default — 32px adaptive
+ * rectangles, 16px elbow arrows), so a category that has never recorded one
+ * must clear whatever the previously active category left behind. Without
+ * this, an elbow arrow drawn after a square-cornered rectangle would inherit
+ * the rectangle's literal 0 instead of its own 16px default.
  */
 export function resolveLoad(target: LoadTarget): StyleBucket {
   const bucket = buckets[target.category];
   const patch: StyleBucket = {};
   for (const key of applicableKeys(target)) {
-    if (key in bucket) patch[key] = bucket[key];
+    if (key in bucket) {
+      patch[key] = bucket[key];
+    } else if (key === "currentItemCornerRadius") {
+      patch[key] = undefined;
+    }
   }
   return patch;
 }

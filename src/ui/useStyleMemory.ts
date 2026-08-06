@@ -77,11 +77,16 @@ export function useStyleMemory(api: ExcalidrawAPI | null): void {
      * lands — so the `onChange` this provokes sees no drift and folds nothing.
      * Without that ordering the hook would fold its own load into whichever
      * bucket happens to be active, silently corrupting it.
+     *
+     * A literal `undefined` in `patch` is not skipped: `resolveLoad` uses it
+     * deliberately to reset `currentItemCornerRadius` when the target category
+     * never recorded one, clearing whatever a previous category left behind
+     * (see style-memory-store.ts). Dropping it here would silently restore the
+     * stale value it was trying to clear.
      */
     const applyPatch = (patch: StyleBucket, appState: Record<string, unknown>) => {
       const next: StyleBucket = {};
       for (const [key, value] of Object.entries(patch)) {
-        if (value === undefined) continue;
         if (Object.is(appState[key], value)) continue;
         next[key] = value;
       }

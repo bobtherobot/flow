@@ -3,6 +3,7 @@ import type { ExcalidrawAPI } from "./excalidraw-scene";
 import { markDeferred, consumeDeferred } from "./deferred-commit";
 
 type SceneElement = ReturnType<ExcalidrawAPI["getSceneElements"]>[number];
+type UpdateAppState = NonNullable<Parameters<ExcalidrawAPI["updateScene"]>[0]>["appState"];
 
 /** Smallest width/height a resize may produce (matches Excalidraw's floor). */
 export const MIN_ELEMENT_SIZE = 1;
@@ -97,6 +98,11 @@ export function setContainerPadding(
   if (transient) markDeferred();
   api.updateScene({
     elements: next,
+    // flow: the `currentItemPadding` default rides along in the same call so
+    // the next new container inherits it without requiring a reselect —
+    // style-memory's drift capture only sees appState writes, not raw element
+    // edits.
+    appState: { currentItemPadding: Math.max(0, value) } as UpdateAppState,
     captureUpdate: captureFor(transient),
     commitDeferredChanges: transient ? undefined : consumeDeferred(),
   });

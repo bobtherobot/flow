@@ -240,12 +240,15 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
 
   // Each target computes its own update: rectangles/diamonds need the companion
   // `roundness` write for the rounded render path, elbow arrows take the radius
-  // straight. One `update` call, so a multi-selection is one undo step.
+  // straight. One `update` call, so a multi-selection is one undo step. The
+  // `currentItemCornerRadius` default rides along in the same call so the next
+  // new shape inherits it without requiring a reselect (style-memory's drift
+  // capture only sees appState writes, not raw element edits).
   const setRadius = (value: number, transient: boolean) =>
     sel.update(
       radiusIds,
       (el) => cornerRadiusUpdate(el as unknown as RadiusElement, value),
-      undefined,
+      { currentItemCornerRadius: value },
       transient,
     );
 

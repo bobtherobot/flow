@@ -147,3 +147,41 @@ test("using the text tool between two boxes does not disturb the shape bucket", 
   const boxes = (await readElements(page)).filter((el) => el.type === "rectangle");
   expect(boxes.map((b) => b.strokeWidth)).toEqual([6, 6]);
 });
+
+test("a second box inherits the first box's corner radius", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+
+  await draw(page, "Rectangle", ...BOX_A);
+  const radius = page.getByLabel("Corner radius", { exact: true });
+  await radius.fill("18");
+  await radius.blur();
+  await expect(radius).toHaveValue("18");
+
+  // No explicit deselect: clicking the Rectangle tool to start the next draw
+  // clears the current selection on its own.
+  await draw(page, "Rectangle", ...BOX_B);
+
+  await expect(page.getByLabel("Corner radius", { exact: true })).toHaveValue("18");
+});
+
+test("an ellipse is never stamped with a remembered corner radius", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+
+  await draw(page, "Rectangle", ...BOX_A);
+  const radius = page.getByLabel("Corner radius", { exact: true });
+  await radius.fill("18");
+  await radius.blur();
+  await expect(radius).toHaveValue("18");
+
+  // No explicit deselect: clicking the Ellipse tool to start the next draw
+  // clears the current selection on its own.
+  await draw(page, "Ellipse", ...BOX_B);
+
+  // The control is inapplicable to an ellipse, and — the point of the test —
+  // the remembered radius must not have been written onto the element either.
+  await expect(page.getByLabel("Corner radius", { exact: true })).toBeDisabled();
+  const ellipse = (await readElements(page)).find((el) => el.type === "ellipse");
+  expect(ellipse?.cornerRadius).toBeUndefined();
+});
