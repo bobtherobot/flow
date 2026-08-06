@@ -3,6 +3,7 @@ import type { ExcalidrawAPI } from "./excalidraw-scene";
 import { markDeferred, consumeDeferred } from "./deferred-commit";
 
 type SceneElement = ReturnType<ExcalidrawAPI["getSceneElements"]>[number];
+type UpdateAppState = NonNullable<Parameters<ExcalidrawAPI["updateScene"]>[0]>["appState"];
 
 /** Smallest width/height a resize may produce (matches Excalidraw's floor). */
 export const MIN_ELEMENT_SIZE = 1;
@@ -97,6 +98,13 @@ export function setContainerPadding(
   if (transient) markDeferred();
   api.updateScene({
     elements: next,
+    // flow: currentItemPadding is a resident appState key (see
+    // style-memory.ts's CATEGORY_KEYS doc) — only the "shape" category ever
+    // creates a container with one, so there is no per-category bucket to
+    // swap and appState is its only home. Without this write, editing an
+    // existing container's padding directly (rather than reselecting one)
+    // would never update what the next new container inherits.
+    appState: { currentItemPadding: Math.max(0, value) } as UpdateAppState,
     captureUpdate: captureFor(transient),
     commitDeferredChanges: transient ? undefined : consumeDeferred(),
   });
