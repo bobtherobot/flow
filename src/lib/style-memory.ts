@@ -93,6 +93,24 @@ export const CONTENDED_KEYS: readonly string[] = [
   ...new Set(Object.values(CATEGORY_KEYS).flat()),
 ];
 
+/**
+ * Contended keys whose *absence* from a bucket is itself meaningful, and so
+ * must be applied as an explicit `undefined` reset on load rather than left
+ * as whatever the previously active category happened to leave in appState.
+ *
+ * `currentItemCornerRadius` is the only member. Every other contended key
+ * (color, width, fill style, ...) is a plain default with no "unset" state:
+ * if a category has never recorded one, quietly falling through to whatever
+ * is already active in appState is a harmless, even reasonable, soft
+ * fallback. `currentItemCornerRadius` is different — unset specifically
+ * means "let the vendor fall back to its own per-type derived default" (0
+ * for a square rectangle, 16px for an elbow arrow). A stale *defined* number
+ * left behind by a previously active category (e.g. a square rectangle's 0)
+ * is therefore actively wrong on a target that never recorded one of its
+ * own, not a benign fallback — so it must be cleared, not inherited.
+ */
+export const RESET_WHEN_UNRECORDED: ReadonlySet<string> = new Set(["currentItemCornerRadius"]);
+
 /** `patch` reduced to the keys a bucket is allowed to hold. Resident keys are
  *  dropped: they live authoritatively in appState, with nothing to swap. */
 export function contendedOnly(patch: StyleBucket): StyleBucket {

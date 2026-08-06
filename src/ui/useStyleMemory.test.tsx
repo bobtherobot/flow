@@ -300,6 +300,36 @@ describe("useStyleMemory", () => {
     ).toMatchObject({ currentItemStrokeColor: "#0000ff" });
   });
 
+  // Mutation-kill test for applyPatch no longer dropping a literal `undefined`
+  // patch value. The mock appState never otherwise touches
+  // currentItemCornerRadius, so without this test a reintroduced
+  // `if (value === undefined) continue;` guard would pass all 601 unit tests
+  // silently — the guard's removal has no observable effect unless something
+  // seeds a stale defined value first. This seeds one exactly the way a real
+  // session would (a live edit folded into the active "shape" bucket via the
+  // capture-edit path), then switches to an elbow arrow — a "linear" target
+  // that never recorded a radius of its own — and asserts the stale value is
+  // actually cleared, not left behind.
+  it("resets a stale corner radius instead of leaking it into a category that never recorded one", () => {
+    const h = makeApi([rect("r")]);
+    renderHook(() => useStyleMemory(h.api));
+
+    // Folds into the active ("shape") bucket, since nothing is selected —
+    // mirrors what editing an existing square rectangle's radius leaves
+    // behind (see StrokePanel's setRadius).
+    h.change({ currentItemCornerRadius: 0 });
+
+    h.api.updateScene.mockClear();
+    h.change({ activeTool: { type: "arrow" }, currentItemArrowType: "elbow" });
+
+    expect(h.api.updateScene).toHaveBeenCalled();
+    const writes = h.api.updateScene.mock.calls.map(([arg]) => arg.appState ?? {});
+    // The reset must be an explicit write, not an accidental omission that
+    // happens to leave appState looking right.
+    expect(writes.some((w) => "currentItemCornerRadius" in w)).toBe(true);
+    expect(h.appState.currentItemCornerRadius).toBeUndefined();
+  });
+
   // Mutation-kill test for applyPatch's ref-before-write ordering. The prior
   // "does not fold its own load back into the wrong bucket" test does not
   // catch a swapped ordering: in every sequence it drives, the re-entrant fold

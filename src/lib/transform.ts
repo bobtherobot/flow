@@ -98,10 +98,12 @@ export function setContainerPadding(
   if (transient) markDeferred();
   api.updateScene({
     elements: next,
-    // flow: the `currentItemPadding` default rides along in the same call so
-    // the next new container inherits it without requiring a reselect —
-    // style-memory's drift capture only sees appState writes, not raw element
-    // edits.
+    // flow: currentItemPadding is a resident appState key (see
+    // style-memory.ts's CATEGORY_KEYS doc) — only the "shape" category ever
+    // creates a container with one, so there is no per-category bucket to
+    // swap and appState is its only home. Without this write, editing an
+    // existing container's padding directly (rather than reselecting one)
+    // would never update what the next new container inherits.
     appState: { currentItemPadding: Math.max(0, value) } as UpdateAppState,
     captureUpdate: captureFor(transient),
     commitDeferredChanges: transient ? undefined : consumeDeferred(),

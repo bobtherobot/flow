@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   CONTENDED_KEYS,
   CATEGORY_KEYS,
+  RESET_WHEN_UNRECORDED,
   contendedOnly,
   categoryOfElement,
   categoryOfTool,
@@ -99,6 +100,25 @@ describe("CATEGORY_KEYS", () => {
       "currentItemStrokeStyle",
       "currentItemStrokeWidth",
     ]);
+  });
+});
+
+describe("RESET_WHEN_UNRECORDED", () => {
+  it("contains only currentItemCornerRadius — the one key whose absence is meaningful", () => {
+    expect(RESET_WHEN_UNRECORDED.has("currentItemCornerRadius")).toBe(true);
+    expect(RESET_WHEN_UNRECORDED.size).toBe(1);
+  });
+
+  it("does not mark a plain default like stroke color for a reset", () => {
+    // Every other contended key has no "unset" state — an unrecorded value
+    // safely falls through to whatever is already active in appState, so it
+    // must not be forced to an explicit undefined on load.
+    expect(RESET_WHEN_UNRECORDED.has("currentItemStrokeColor")).toBe(false);
+    expect(RESET_WHEN_UNRECORDED.has("currentItemStrokeWidth")).toBe(false);
+  });
+
+  it("is a subset of the contended keys", () => {
+    for (const key of RESET_WHEN_UNRECORDED) expect(CONTENDED_KEYS).toContain(key);
   });
 });
 

@@ -14,8 +14,16 @@ describe("style-memory-store", () => {
     resetStyleMemory();
   });
 
-  it("starts empty, so a load yields no patch", () => {
-    expect(resolveLoad({ category: "shape", toolType: "rectangle", arrowType: "sharp" })).toEqual({});
+  it("starts empty, so a load carries no values except the corner-radius reset", () => {
+    // currentItemCornerRadius is the one contended key RESET_WHEN_UNRECORDED
+    // covers (see style-memory.ts): its absence from an untouched bucket must
+    // be applied as an explicit `undefined`, not silently omitted. toEqual
+    // would pass even if this key were missing entirely — it ignores
+    // undefined-valued properties — so this asserts the key's presence
+    // directly, then locks the whole shape with toStrictEqual.
+    const patch = resolveLoad({ category: "shape", toolType: "rectangle", arrowType: "sharp" });
+    expect("currentItemCornerRadius" in patch).toBe(true);
+    expect(patch).toStrictEqual({ currentItemCornerRadius: undefined });
   });
 
   it("defaults the active category to shape", () => {
@@ -47,12 +55,31 @@ describe("style-memory-store", () => {
   it("keeps the buckets isolated", () => {
     adopt("linear", { currentItemStrokeColor: "#00ff00" });
 
+    // Untouched "shape" still carries the corner-radius reset (toStrictEqual,
+    // not toEqual, so an accidental leak of another key would fail loudly).
     expect(
       resolveLoad({ category: "shape", toolType: "rectangle", arrowType: "sharp" }),
-    ).toEqual({});
+    ).toStrictEqual({ currentItemCornerRadius: undefined });
     expect(
       resolveLoad({ category: "linear", toolType: "line", arrowType: "sharp" }),
     ).toMatchObject({ currentItemStrokeColor: "#00ff00" });
+  });
+
+  it("clears a stale corner radius left by another category instead of leaking it across", () => {
+    // This is the exact regression that motivated RESET_WHEN_UNRECORDED: a
+    // rectangle's radius (here 0, a square corner) was recorded into "shape".
+    // An elbow arrow, drawn next, belongs to "linear" — a category that has
+    // never recorded a radius of its own. Before the fix, resolveLoad simply
+    // omitted the key and the caller's stale appState value (0) survived
+    // untouched, so the arrow was wrongly stamped sharp instead of getting
+    // its own 16px elbow default. See e2e/stroke-panel.spec.ts's
+    // "corner radius applies across a multi-selection" test, which caught
+    // this live.
+    record(["shape"], { currentItemCornerRadius: 0 });
+
+    const patch = resolveLoad({ category: "linear", toolType: "arrow", arrowType: "elbow" });
+    expect("currentItemCornerRadius" in patch).toBe(true);
+    expect(patch.currentItemCornerRadius).toBeUndefined();
   });
 
   it("records one patch into several categories at once", () => {
