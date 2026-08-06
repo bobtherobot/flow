@@ -84,6 +84,10 @@ export function NumberInput({
   // reactive signal for this gesture, so keying off it (rather than waiting for
   // unmount) releases the bit as soon as the drag itself ends, not just when
   // this component happens to unmount mid-drag.
+  //
+  // The field's typed-entry arrow-key hold has its own equivalent release
+  // inside useNumberField.ts (unmount-only, gated on its own pending ref, like
+  // SliderInput's) — a third site of the same pattern, not a new one.
   useEffect(() => {
     if (!scrub.isDragging) return;
     document.body.classList.add("flow-scrubbing");

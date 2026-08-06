@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { resetDeferred } from "../../../lib/deferred-commit";
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -62,6 +63,21 @@ export function useNumberField({ value, min, max, step, onChange }: UseNumberFie
     // reflect intentionally excluded: it closes over this render's `value`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
+
+  // A held arrow key that never reaches its keyUp/blur commit — this field
+  // unmounting mid-hold (a panel collapsing, a layout applied, the selection
+  // changing) — would leave the deferred-commit bit set, and the next
+  // unrelated panel write would inherit authority to skip the vendor's
+  // uncommitted-element filter. Same release, same gating on this instance's
+  // own pending ref, as SliderInput.tsx's unmount cleanup and NumberInput.tsx's
+  // isDragging-keyed cleanup for its scrub gesture — this is the third site of
+  // the same pattern, not a new one.
+  useEffect(
+    () => () => {
+      if (pending.current !== null) resetDeferred();
+    },
+    [],
+  );
 
   // Clamp + step-snap a raw number. Shared by the typed-entry commit path and
   // arrow-key stepping, so both apply identical float-noise rounding.

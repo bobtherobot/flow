@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useNumberField } from "./useNumberField";
+import { markDeferred, consumeDeferred } from "../../../lib/deferred-commit";
 
 describe("useNumberField", () => {
   it("snaps a typed in-range value up to the nearest step on commit", () => {
@@ -300,5 +301,22 @@ describe("useNumberField", () => {
     expect(onChange).toHaveBeenCalledTimes(2);
     expect(onChange.mock.calls[0]).toEqual([21, true]);
     expect(onChange.mock.calls[1]).toEqual([21, false]);
+  });
+
+  it("releases a leaked deferred mark when the field unmounts mid-hold (no keyUp/blur ever arrives)", () => {
+    const onChange = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useNumberField({ value: 20, min: 5, max: 100, onChange }),
+    );
+
+    act(() => result.current.onFocus());
+    // Starts a transient hold: the real write path (useSelectionStyle/transform)
+    // would call markDeferred() here too, guarded by `if (transient) markDeferred()`.
+    arrowKeyDown(result, "ArrowUp");
+    markDeferred();
+    // No keyUp/blur follows — the panel collapses (or a layout applies, or the
+    // selection changes) mid-hold instead.
+    unmount();
+    expect(consumeDeferred()).toBe(false);
   });
 });

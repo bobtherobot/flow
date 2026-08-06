@@ -54,6 +54,10 @@ export function SliderInput({
   // its own drag state entirely (pending ref + onChange/onPointerUp/onKeyUp/
   // onBlur), so there is no isDragging-like signal to key off — only unmount
   // can end the gesture without a matching commit.
+  //
+  // useNumberField.ts's held-arrow-key hold has the same unmount-only release
+  // for the same reason (its keyboard gesture has no isDragging-like signal
+  // either) — this is the same pattern at a third site, not a new one.
   useEffect(
     () => () => {
       if (pending.current !== null) resetDeferred();
