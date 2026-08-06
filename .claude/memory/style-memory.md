@@ -128,16 +128,22 @@ never be anything else; store tests whose resident-key-filtering assertion held
 whether or not the filtering existed (`toEqual({})` silently ignores an
 `undefined`-valued key — `toStrictEqual` does not); a re-entrancy test that
 still passed after swapping the exact ordering it was written to pin; and two
-e2e cases (test 1, and the `[6, 6]` stroke-width assertion in test 4 at
-`e2e/style-memory.spec.ts:148`) that pass with the whole hook unmounted, because
-vanilla Excalidraw's single shared `currentItemStrokeWidth` already carries a
-value forward between two same-category draws regardless of per-category
-memory — left in place as regression guards, but their names overstate what
-they prove. The practice that caught all of these: break the invariant the test
-claims to protect, confirm the test fails, then restore it. Worth keeping as
-routine for this codebase, not just as history from this one feature.
+`e2e/style-memory.spec.ts` cases — `"a second box inherits the first box's
+stroke width"`, and the `[6, 6]` stroke-width assertion inside `"using the text
+tool between two boxes does not disturb the shape bucket"` — that pass with the
+whole hook unmounted, because vanilla Excalidraw's single shared
+`currentItemStrokeWidth` already carries a value forward between two
+same-category draws regardless of per-category memory — left in place as
+regression guards, but their names overstate what they prove (see "Deferred,
+not fixed" below for the same two tests as open work). The practice that
+caught all of these: break the invariant the test claims to protect, confirm
+the test fails, then restore it. Worth keeping as routine for this codebase,
+not just as history from this one feature.
 
 ## Deferred, not fixed
 
-`src/lib/transform.ts` still has no unit test file — `setContainerPadding`'s
-appState write is covered only at the e2e layer.
+- The two e2e tests named above that pass with the hook unmounted — still
+  valuable as regression guards, but worth a rename or split if
+  `CATEGORY_KEYS.text` ever widens beyond `currentItemOpacity`.
+- `src/lib/transform.ts` still has no unit test file — `setContainerPadding`'s
+  appState write is covered only at the e2e layer.
