@@ -36,7 +36,7 @@ let activeCategory: StyleCategory = "shape";
  * contended subset is stored. Adopting also makes the category active.
  */
 export function adopt(category: StyleCategory, snapshot: StyleBucket): void {
-  buckets[category] = { ...buckets[category], ...contendedOnly(snapshot) };
+  buckets = { ...buckets, [category]: { ...buckets[category], ...contendedOnly(snapshot) } };
   activeCategory = category;
 }
 
@@ -44,7 +44,7 @@ export function adopt(category: StyleCategory, snapshot: StyleBucket): void {
 export function record(categories: readonly StyleCategory[], patch: StyleBucket): void {
   const contended = contendedOnly(patch);
   for (const category of categories) {
-    buckets[category] = { ...buckets[category], ...contended };
+    buckets = { ...buckets, [category]: { ...buckets[category], ...contended } };
   }
 }
 

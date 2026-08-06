@@ -22,7 +22,7 @@ describe("style-memory-store", () => {
     expect(getActiveCategory()).toBe("shape");
   });
 
-  it("adopts a snapshot and replays its contended keys", () => {
+  it("adopts a snapshot and replays the contended keys it stored, never surfacing resident keys", () => {
     adopt("shape", {
       currentItemStrokeColor: "#ff0000",
       currentItemStrokeWidth: 4,
@@ -32,6 +32,10 @@ describe("style-memory-store", () => {
     const patch = resolveLoad({ category: "shape", toolType: "rectangle", arrowType: "sharp" });
     expect(patch.currentItemStrokeColor).toBe("#ff0000");
     expect(patch.currentItemStrokeWidth).toBe(4);
+    // Resident keys are structurally impossible to surface: resolveLoad reads only
+    // applicableKeys(target), which is a subset of CATEGORY_KEYS (contended-only by
+    // construction). The actual filtering by contendedOnly is unit-tested in
+    // style-memory.test.ts.
     expect(patch.currentItemFontSize).toBeUndefined();
   });
 
@@ -71,10 +75,13 @@ describe("style-memory-store", () => {
     expect(patch.currentItemStrokeWidth).toBe(4);
   });
 
-  it("drops resident keys from a record", () => {
+  it("records only contended keys and a load never surfaces resident keys", () => {
     record(["text"], { currentItemFontSize: 40, currentItemOpacity: 50 });
 
     const patch = resolveLoad({ category: "text", toolType: "text", arrowType: "sharp" });
+    // Resident keys are structurally impossible to surface: CATEGORY_KEYS["text"] is
+    // contended-only by construction, and resolveLoad reads only applicableKeys(target),
+    // which is a subset of it. See style-memory.test.ts for unit tests of the filter.
     expect(patch.currentItemFontSize).toBeUndefined();
     expect(patch.currentItemOpacity).toBe(50);
   });
