@@ -142,8 +142,7 @@ on. `3637fdd` is the commit that actually fixed them.
 
 A whole-branch review after the twelve feature commits landed found three
 more issues the task-scoped reviews couldn't see, plus two smaller doc/test
-fixes. Findings doc:
-`.superpowers/sdd/2026-08-07-tool-override/final-review-findings.md`.
+fixes.
 
 **The third auto-select/lock-conflation site.** `App.tsx`'s two sites (above)
 cover drag-created shapes and drag- or click-continued linear elements. There
@@ -227,8 +226,7 @@ has four — retitled, no assertion changed.
 ## Corrective pass (2026-08-07)
 
 A scoped re-review of the final-review fix wave above found two more
-problems, both now fixed. Full report:
-`.superpowers/sdd/2026-08-07-tool-override/corrective-pass-report.md`.
+problems, both now fixed.
 
 **`isTextEntry` didn't recognize `type="search"`.** The `Q` swallow above
 guards on `isTextEntry` (`src/lib/history-shortcuts.ts`), which only matched
@@ -309,7 +307,7 @@ drift capture by active tool rather than by selection when a drawing tool is
 active with elements selected — a restructuring of `useStyleMemory`'s drift
 capture that was explicitly out of scope. This residual is reachable only via
 the override and degrades to stock Excalidraw behavior (a style edit follows
-into the next drawn element). Full detail: `.superpowers/sdd/2026-08-07-tool-override/corrective-pass-report.md`.
+into the next drawn element).
 
 ## Tests
 - Unit: `src/ui/toolbar/tool-override.test.ts` (12 tests, covers every
