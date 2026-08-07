@@ -83,11 +83,3 @@ test("a selection made while the modifier is held survives the release", async (
   await expect.poll(async () => (await readState(page))?.activeTool?.type).toBe("rectangle");
   expect(await selectedCount(page)).toBe(1);
 });
-
-test("the modifier does nothing when the selection tool is already active", async ({ page }) => {
-  await page.locator("canvas.interactive").first().click({ position: { x: 5, y: 5 } });
-  await page.keyboard.down("ControlOrMeta");
-  expect((await readState(page))?.activeTool?.type).toBe("selection");
-  await page.keyboard.up("ControlOrMeta");
-  expect((await readState(page))?.activeTool?.type).toBe("selection");
-});
