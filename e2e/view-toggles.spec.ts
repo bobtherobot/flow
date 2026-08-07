@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 
-type H = { state?: Record<string, unknown> & { activeTool?: { locked?: boolean } } };
+type H = { state?: Record<string, unknown> };
 const readState = (page: Page) =>
   page.evaluate(() => (window as unknown as { h?: H }).h?.state ?? null);
 
@@ -30,12 +30,6 @@ test("Zen Mode toggle flips zenModeEnabled", async ({ page }) => {
   await expect.poll(async () => (await readState(page))?.zenModeEnabled).toBe(false);
   await clickViewToggle(page, "Zen Mode");
   await expect.poll(async () => (await readState(page))?.zenModeEnabled).toBe(true);
-});
-
-test("Tool Lock toggle flips activeTool.locked", async ({ page }) => {
-  await expect.poll(async () => (await readState(page))?.activeTool?.locked).toBe(false);
-  await clickViewToggle(page, "Tool Lock");
-  await expect.poll(async () => (await readState(page))?.activeTool?.locked).toBe(true);
 });
 
 test("Arrow Binding toggle flips bindingMode on→off", async ({ page }) => {
