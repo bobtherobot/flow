@@ -77,4 +77,28 @@ export function useToolOverride(api: ExcalidrawAPI | null): void {
       document.removeEventListener("visibilitychange", restore);
     };
   }, [api]);
+
+  // flow is a modal-tool app — the chosen tool stays chosen, and the override
+  // above is how you reach selection transiently. So `locked` has exactly one
+  // correct value and this effect re-asserts it against every source: the
+  // native `Q` shortcut, an opened document's appState, anything future.
+  //
+  // Chosen over swallowing `Q` at the window, which would also eat the letter
+  // in Excalidraw's text editor.
+  useEffect(() => {
+    if (!api) return;
+    const enforce = () => {
+      const { type, locked } = api.getAppState().activeTool;
+      // Converges: once locked, no further writes, so this cannot loop.
+      if (locked) return;
+      // Re-activating the image tool re-opens the OS file picker
+      // (vendor App.tsx:4741). An unlocked image tool is left alone.
+      if (type === "image") return;
+      api.setActiveTool({ type, locked: true } as SetToolArg);
+    };
+    // Run once up front: the api can be handed over already unlocked, and the
+    // first `onChange` may be many interactions away.
+    enforce();
+    return api.onChange(enforce);
+  }, [api]);
 }

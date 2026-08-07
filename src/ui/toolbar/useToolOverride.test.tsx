@@ -17,13 +17,17 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
     editingGroupId: null,
     ...overrides,
   };
+  const listeners: Array<() => void> = [];
   const api = {
     getAppState: () => state,
-    onChange: () => () => {},
+    onChange: (cb: () => void) => {
+      listeners.push(cb);
+      return () => {};
+    },
     setActiveTool: vi.fn(),
     updateScene: vi.fn(),
   } as unknown as ExcalidrawAPI;
-  return { api, state };
+  return { api, state, emit: () => listeners.forEach((cb) => cb()) };
 }
 
 /** jsdom's navigator.platform is "", so Control is the modifier here. */
@@ -145,5 +149,37 @@ describe("useToolOverride", () => {
   it("is inert until the api exists", () => {
     renderHook(() => useToolOverride(null));
     expect(() => press()).not.toThrow();
+  });
+});
+
+describe("useToolOverride — forced tool lock", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("locks an unlocked tool as soon as it mounts", () => {
+    const { api } = fakeApi({ activeTool: { type: "rectangle", locked: false } });
+    renderHook(() => useToolOverride(api));
+    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "rectangle", locked: true });
+  });
+
+  it("re-locks when something unlocks the tool, such as the native Q shortcut", () => {
+    const { api, state, emit } = fakeApi();
+    renderHook(() => useToolOverride(api));
+    state.activeTool = { type: "ellipse", locked: false };
+    emit();
+    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "ellipse", locked: true });
+  });
+
+  it("writes nothing while the tool is already locked, so it converges", () => {
+    const { api, emit } = fakeApi();
+    renderHook(() => useToolOverride(api));
+    emit();
+    emit();
+    expect(api.setActiveTool).not.toHaveBeenCalled();
+  });
+
+  it("never re-asserts the lock on the image tool, which would reopen the file picker", () => {
+    const { api } = fakeApi({ activeTool: { type: "image", locked: false } });
+    renderHook(() => useToolOverride(api));
+    expect(api.setActiveTool).not.toHaveBeenCalled();
   });
 });
