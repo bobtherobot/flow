@@ -4,16 +4,19 @@ Illustrator-style temporary tool override plus a permanently-on tool lock.
 Spec/plan: `docs/superpowers/specs/2026-08-07-tool-override-design.md`,
 `docs/superpowers/plans/2026-08-07-tool-override.md`. Branch `feat/tool-override`.
 
-**Status: code shipped (Tasks 1–7 committed, unit suite green), but Task 8's
-full-suite verification found a real regression the branch introduces across
-the wider app. NOT closed out — see "Known regression" below before this
-branch merges.**
+**Status: shipped.** Unit suite green (631/631), e2e fully green. A regression
+was found mid-branch (forcing the tool lock on silently killed auto-select-on-
+draw app-wide), root-caused, fixed with a deliberate two-site fork edit, and
+the four e2e tests it took down were updated to the new workflow. See "The
+regression and its fix" below — this is the highest-value section for anyone
+touching this feature again.
 
 ## Shipped
 - `src/ui/toolbar/tool-override.ts` — pure: `overrideKeyFor(platform)` (Meta on
-  Apple, Control elsewhere — mirrors the vendor's `KEYS.CTRL_OR_CMD`, and is
-  deliberately NOT "either key" because macOS Control is right-click emulation)
-  and `canEngage(state, target)`.
+  Apple, Control elsewhere — mirrors the vendor's `KEYS.CTRL_OR_CMD` at
+  `vendor/excalidraw/packages/excalidraw/keys.ts:38`, and its `isDarwin`
+  platform test at `constants.ts:5`; deliberately NOT "either key" because
+  macOS Control is right-click emulation) and `canEngage(state, target)`.
 - `src/ui/toolbar/useToolOverride.ts` — two effects: (1) capture-phase
   keydown/keyup on `window` + blur/visibilitychange, engaging the selection
   tool and restoring on release; (2) an `onChange` normalizer re-asserting
@@ -28,114 +31,151 @@ branch merges.**
   `src/ui/toolbar/icons.tsx` once `LOCK_ID` was gone — see task-order note below.
 
 ## Key facts / gotchas
-- **ZERO fork edits.** Everything routes through `setActiveTool` /
-  `getAppState` / `updateScene` / `onChange`.
+- **ZERO fork edits for the override mechanism itself.** Everything routes
+  through `setActiveTool` / `getAppState` / `updateScene` / `onChange`. (The
+  *lock decoupling* below did need a fork edit — see next section.)
 - **The restore is two calls, in this order.** `setActiveTool` gives the right
   cursor but clears the selection for any non-selection tool (vendor
-  `App.tsx:4758`, guarded on `nextActiveTool.type !== "selection"`); the
-  follow-up `updateScene({appState:{selectedElementIds, selectedGroupIds,
-  editingGroupId}})` puts it back. Selection is read FRESH at release — an
-  engage-time snapshot would clobber an undo made mid-hold.
+  `App.tsx`, the `nextActiveTool.type !== "selection"` guard inside
+  `setActiveTool`'s state updater); the follow-up `updateScene({appState:
+  {selectedElementIds, selectedGroupIds, editingGroupId}})` puts it back.
+  Selection is read FRESH at release — an engage-time snapshot would clobber
+  an undo made mid-hold.
 - **Never `setActiveTool({type:"image"})` from this feature** — it re-fires
-  `onImageAction` and re-opens the OS file picker (vendor `App.tsx:4741`). Both
-  the engage guard (`canEngage`) and the lock normalizer skip the image tool
-  for this reason.
+  `onImageAction` and re-opens the OS file picker (vendor `App.tsx:4741`,
+  inside `setActiveTool`'s `if (nextActiveTool.type === "image")` branch).
+  Both the engage guard (`canEngage`) and the lock normalizer skip the image
+  tool for this reason.
 - **Don't engage mid-gesture.** The vendor reads Cmd during a drag to bypass
   grid snapping and to close elbow arrows, so `canEngage` bails on
   `cursorButton === "down"`, `newElement`, and `multiElement`.
-- Accepted consequences (from the spec, all still true): Cmd+drag with a
-  *shape* tool no longer draws snap-free; Cmd-hold + click always drills into
-  groups (vendor `App.tsx:7223`, `if (event[KEYS.CTRL_OR_CMD])` inside
-  `handleSelectionOnPointerDown` — **not** `:6936` as an earlier draft of this
-  memory had it; that line is unrelated `withCmdOrCtrl` plumbing for elbow-arrow
-  grid snapping); every Cmd shortcut flaps the tool through selection and back.
 - Related: [[vertical-toolbar]] (the rail this padlock left),
   [[quick-actions-bar]], [[view-menu-toggles]].
 
-## Known regression (found in Task 8 full verification, unresolved)
+## The regression, and its fix
 
-**Forcing the tool lock permanently on silently disables auto-selecting a
-newly drawn element, breaking any workflow that draws a shape and immediately
-expects it selected.** This is vendor behavior, not a flow bug introduced by
-new code — it is an unconsidered *consequence* of Task 3's design decision.
+Forcing `activeTool.locked` permanently true (the whole point of this feature)
+turned out to gate **two** independent upstream behaviours behind one flag,
+not one:
 
-Root cause, read directly from `vendor/excalidraw/packages/excalidraw/components/App.tsx`:
-- ~line 9638, the generic-element pointerup path: `if (!activeTool.locked &&
-  activeTool.type !== "freedraw" && newElement) { ...selectedElementIds:
-  [...prevState.selectedElementIds, newElement.id]... }` — selecting the just-drawn
-  element is gated on the tool **not** being locked.
-- ~line 9693, right after: `if (!activeTool.locked && activeTool.type !==
-  "freedraw") { ...activeTool: updateActiveTool(..., {type:"selection"})... }`
-  — reverting to the selection tool is gated the same way.
-- The linear-element path (~line 9107) has the identical split: locked skips
-  straight to `{ newElement: null }` with no `selectedElementIds` update at all.
+1. "Revert the tool to Selection after drawing" — the behaviour flow wanted
+   off.
+2. "Auto-select the element you just drew" — a behaviour nobody had noticed
+   was bundled in, and flow did **not** want off.
 
-Both "stop reverting to selection after a draw" (intended, spec line 8–9) and
-"stop auto-selecting what you just drew" (not discussed anywhere in the spec's
-Decisions or Accepted-consequences tables) are bundled behind the same vendor
-`activeTool.locked` check. Task 3 turned the flag permanently on to get the
-first effect and got the second for free, uninspected.
+Read directly from `vendor/excalidraw/packages/excalidraw/components/App.tsx`
+before the fix: the generic-element pointerup path only added the drawn
+element to `selectedElementIds` inside an `if (!activeTool.locked && ...)`
+block, and the linear-element path had the identical split — locked skipped
+straight to `{ newElement: null }` with no selection update at all. Locking
+the tool permanently silently killed auto-select app-wide. This surfaced as
+**29 e2e failures across 9 spec files** in Task 8's full-suite run (every
+affected spec's own draw helper carried a comment stating the now-false "ends
+up selected" assumption) — not caught by the feature's own e2e coverage,
+which never draws-then-asserts-selected through a panel.
 
-**Confirmed via A/B against the pre-feature baseline** (`git worktree add` at
-`80e23b7`, the commit main was at when this branch forked — has the spec/plan
-docs but none of the feature's code): every one of the 29 e2e failures below
-passes cleanly on that baseline and fails identically, twice, reproducibly on
-`feat/tool-override`. This rules out flakiness/environment; it is a genuine
-regression from this branch.
+**Fixed with a deliberate two-site fork edit** in that same `App.tsx`,
+decoupling "stay locked" from "get selected":
+- **Shape site**: dropped the `!activeTool.locked &&` clause from the
+  auto-select `if`, so a drawn shape is now selected regardless of lock state.
+- **Linear-element site**: the `if (!activeTool.locked)` branch (revert to
+  Selection + open the point editor) was left **byte-identical to upstream**;
+  only the `else` branch gained a `selectedElementIds` update. Deliberately
+  does **not** set `selectedLinearElement` there — that would open the linear
+  point editor while the arrow tool is still active, which is only correct
+  once the tool has actually reverted to Selection.
 
-**29 e2e failures, all traceable to the same root cause** — every affected
-spec's own `draw`/`drawWith`/`drawRectangle` helper carries a comment stating
-the now-false assumption ("the new element ends up selected" / "leaves it
-selected"): `color-panel.spec.ts` (3), `drawing-defaults.spec.ts` (3, though
-note only 3 of its 5 tests — the other 2 don't depend on selection),
-`edit-actions.spec.ts` (1), `number-field.spec.ts` (2 chromium + 2 firefox),
-`selection-mode.spec.ts` (2), `stroke-panel.spec.ts` (6), `style-memory.spec.ts`
-(4), `text-panel.spec.ts` (4), `transform-panel.spec.ts` (3). Full names in
-the Task 8 report.
+Submodule commit `vendor/excalidraw@a9dcdb6f` ("fix: decouple
+auto-select-on-draw from the tool lock"); flow pointer bump `ca1ab3e`.
 
-**This was not caught by Tasks 4–7** because their own e2e coverage
-(`tool-override.spec.ts`, `view-toggles.spec.ts`) never draws-then-immediately-
-asserts-selected through a panel; the regression only surfaces once the whole
-suite runs together, which is exactly what Task 8 is for.
+**Second, deeper consequence — by design, not a bug:** because the tool no
+longer reverts after a draw, a plain click while a drawing tool is active no
+longer selects anything — it starts a new shape. Reaching the selection tool
+is now an explicit act (the rail button, or the Cmd/Ctrl hold itself). Four
+e2e tests had encoded the old auto-revert workflow and needed updating, not
+just the 29 from the direct regression:
+- `e2e/selection-mode.spec.ts` — a plain click after drawing no longer
+  deselects; a marquee drag while a drawing tool is still active draws a new
+  shape instead of marquee-selecting.
+- `e2e/style-memory.spec.ts` — same click-while-a-drawing-tool-is-active
+  issue.
+- `e2e/text-panel.spec.ts` (2 tests) — a downstream symptom of the same
+  cause: vendor's `handleCanvasDoubleClick` only adds bound text when
+  `activeTool.type === "selection"`, so with Rectangle still locked active,
+  the double-click silently no-op'd and a later test helper crashed reading
+  properties off the nonexistent text element.
 
-**Not fixed here.** The right fix is a design decision, not a mechanical
-patch: either (a) add a third `useToolOverride` responsibility that manually
-re-selects a just-finished element when locked (flow-level, no fork edit,
-plausible — `onChange` already sees `newElement` transition to `null`), or (b)
-accept the new interaction model (draw, then Cmd-click to grab what you drew)
-and update all nine affected spec files' `draw` helpers to Cmd-click for
-selection before asserting panel state, matching the real end-user workflow
-this feature now imposes. Both are real engineering work belonging to a
-follow-up task, not this verification pass.
+All four were fixed in `3637fdd` by inserting an explicit switch to the
+Selection tool at the point that used to rely on auto-revert, with no
+assertion weakened — verified by diffing that zero `expect(...)` lines
+changed, only setup/mechanics. A fifth test in the same file,
+`selection-mode.spec.ts`'s `"marquee touch selects an element the rectangle
+only intersects"` (not on the original failing list), turned out to be
+passing by coincidence under the old assumption and was fixed alongside the
+other four for the same reason.
+
+**On the historical record:** commit `ca1ab3e`'s message claims the four
+residual failures at that point were "confirmed pre-existing and orthogonal
+... untouched by this change." That framing is misleading if read as "these
+predate the whole branch" — they don't; they were themselves regressions
+introduced earlier in this branch (by Task 3's permanent-lock change), just
+not ones `ca1ab3e`'s own fork edit could have caused or fixed. The A/B behind
+that claim only stashed the fork edit while keeping the rest of the branch
+(including the permanent lock) in place, so it could only rule out "did
+Task 9 cause these" — it could not detect that they were branch regressions
+at all, because the baseline it compared against still had the permanent lock
+on. `3637fdd` is the commit that actually fixed them.
 
 ## Tests
-- Unit: `src/ui/toolbar/tool-override.test.ts` (11, covers every `canEngage`
-  guard, including "does not engage when the selection tool is already
-  active" — this is the ONLY coverage of that guard; see gotcha below),
-  `src/ui/toolbar/useToolOverride.test.tsx` (16, engage/restore/blur/
-  visibilitychange/lock-normalizer). Full unit suite after this branch:
+- Unit: `src/ui/toolbar/tool-override.test.ts` (12 tests, covers every
+  `canEngage` guard, including "does not engage when the selection tool is
+  already active" — this is the ONLY coverage of that guard; see gotcha
+  below), `src/ui/toolbar/useToolOverride.test.tsx` (16 tests: engage/restore/
+  blur/visibilitychange/lock-normalizer). Full unit suite after this branch:
   **631 tests / 69 files, all green.**
 - e2e: `e2e/tool-override.spec.ts`, **4 tests** (not 5 — see gotcha below).
+  Full e2e suite (111 tests) fully green as of `3637fdd`, including the flake
+  noted below.
 
 ## Gotchas for anyone touching this again
 
-- **A 5th e2e test was written and deliberately deleted** (`bf5ce4f`): "the
-  modifier does nothing when the selection tool is already active". It
-  asserted `activeTool.type` stayed `"selection"` across a held modifier — true
-  whether or not `useToolOverride` is mounted at all, since nothing in the app
-  would change it either way. Deleting `useToolOverride` from `App.tsx`
-  entirely would not have failed this test. The real guard
-  (`canEngage` rejecting an already-selection active tool) is covered at the
-  unit level instead. Do not re-add an e2e version of this without first
-  proving it can fail — mutate the guard away and confirm red before trusting
-  a new assertion here.
-- **`.at(-1)` does not typecheck in this repo.** `tsconfig.json` pins
-  `target`/`lib` to ES2020 and a prior commit (`9c1f515`, "drop tsconfig lib
-  bump") deliberately reverted an ES2022 bump added only to support `.at(-1)`
+- **The `locked` flag gates two behaviours upstream — auto-revert AND
+  auto-select.** Anyone re-locking, unlocking, or otherwise touching
+  `activeTool.locked` semantics must check both. This is the trap that cost
+  this branch a full rework (Tasks 9–10) after Task 8's full-suite
+  verification caught it.
+- **After any vendor rebuild, `rm -rf node_modules/.vite`.** Playwright's
+  `webServer.reuseExistingServer` (true outside CI) plus an uninvalidated Vite
+  dependency pre-bundle cache for the `file:`-linked fork package can keep
+  serving a stale bundle after a rebuild, making a correct fix look broken.
+  Confirmed during this branch's own verification — a first post-fix e2e run
+  showed extra failures that vanished once the dev server was killed and
+  `node_modules/.vite` cleared before rerunning.
+- **`npm run build:excalidraw` currently exits 1** on a pre-existing, unrelated
+  `tsc` type error in the fork's `packages/excalidraw/data/restore.ts` (a
+  `cornerRadius` field colliding with a generic constraint, from the earlier
+  `bcfbfff6` fork commit) — while the esbuild half still succeeds and `tsc`
+  still emits every `.d.ts` it can despite the error, so `dist/` output is
+  correct. Confirmed by reproducing the same failure with this branch's own
+  fork edit `git stash`ed. `npm run typecheck` in flow (which consumes the
+  emitted `.d.ts`) is clean. Worth a follow-up to fix the `restore.ts` typing
+  so the build script's exit code is trustworthy again.
+- **`.at(-1)` does not typecheck here** — `tsconfig.json` pins `target`/`lib`
+  to ES2020 and a prior commit (`9c1f515`, on this same branch) deliberately
+  reverted an ES2022 `lib` bump that had been added only to support `.at(-1)`
   in tests, on review grounds that widening `lib` project-wide is an
-  unreviewed side effect a test change shouldn't cause. `useToolOverride.test.tsx`
-  reads `arr[arr.length - 1]` instead, with a comment pointing at that commit.
-  Anyone reaching for `.at(-1)` in a new test here will hit the same wall.
+  unreviewed side effect a test change shouldn't cause. Use index arithmetic
+  (`arr[arr.length - 1]`) instead.
+- **A planned e2e test that passed with the feature deleted was dropped, not
+  added.** The plan called for "the modifier does nothing when the selection
+  tool is already active" as an e2e test; it asserted `activeTool.type` stayed
+  `"selection"` across a held modifier, which is true whether or not
+  `useToolOverride` is mounted at all — deleting the hook from `App.tsx`
+  entirely would not have failed it. Deleted in `bf5ce4f`. The real guard
+  (`canEngage` rejecting an already-selection active tool) is covered at the
+  unit level instead, as noted above. Do not re-add an e2e version of this
+  without first proving it can fail — mutate the guard away and confirm red
+  before trusting a new assertion here.
 - **Task order was swapped from the plan**: quickbar-toggle removal (`ca3cb1d`)
   landed *before* rail-padlock removal (`d969a01`), reversing the plan's Task
   5/6 order. Narrowing `TOOL_ICONS` to `Record<ToolId, ReactNode>` (part of the
@@ -143,3 +183,14 @@ follow-up task, not this verification pass.
   lookup until the quickbar's own `LOCK_ID` entry is gone too — the two files
   share that one coupling point despite `LOCK_ID` being two independent
   constants in two different modules.
+- **Known e2e flake, not caused by this branch:** `e2e/color-swatches.spec.ts:36`
+  ("a new palette + swatch persists across reload") fails occasionally under
+  8-worker parallel load and passes reliably on `--workers=1` — the same
+  parallel-load persistence flake class `playwright.config.ts` already
+  documents for `e2e/quickbar.spec.ts`'s arrow-binding persistence test.
+- Accepted trade-offs (from the spec, all still true): Cmd+drag with a
+  *shape* tool no longer draws snap-free; Cmd-hold + click always drills into
+  groups (vendor `App.tsx:7223`, `if (event[KEYS.CTRL_OR_CMD])` inside the
+  pointerdown hit-test handler — drilling into groups regardless of a normal
+  click's group-respecting behavior); every Cmd shortcut flaps the tool
+  through selection and back.
