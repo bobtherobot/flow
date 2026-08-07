@@ -79,7 +79,7 @@ test("a two-click elbow arrow ends up selected once it auto-finishes", async ({ 
   // `actionManager.executeAction(actionFinalize)` directly and skipping the
   // click-continuation selection code entirely. That makes a 2-click elbow
   // arrow the one reachable path where actionFinalize's OWN selection logic
-  // (`actionFinalize.tsx`) is the sole determinor of whether the element ends
+  // (`actionFinalize.tsx`) is the sole determiner of whether the element ends
   // up selected — verified by instrumenting actionFinalize directly: it runs
   // with `selectedElementIds: {}` here, unlike every other creation path in
   // this suite. See finding 1 in final-review-findings.md.
@@ -87,6 +87,21 @@ test("a two-click elbow arrow ends up selected once it auto-finishes", async ({ 
   await page.mouse.click(BOX[0], BOX[1]);
   await page.mouse.click(BOX[2], BOX[3]);
   await expect.poll(() => selectedCount(page)).toBe(1);
+});
+
+test("typing into the canvas search box reaches the field, letter q included", async ({ page }) => {
+  // useToolOverride.ts swallows a bare "q" keydown on the canvas (it would
+  // otherwise silently drop the user to the Selection tool, see the design
+  // spec), guarded by isTextEntry so the letter still reaches a real text
+  // field. flow's own search boxes (SearchControl.tsx, SearchPanel.tsx) are
+  // both type="search" — a type isTextEntry did not recognize until this
+  // fix, so "q" was eaten here too. A `.fill()`-based test (as
+  // e2e/bottombar.spec.ts's search test uses) sets the value directly with no
+  // per-key keydown, so it cannot see this bug; type per-key here instead.
+  const search = page.getByRole("searchbox", { name: "Search canvas", exact: true });
+  await search.click();
+  await page.keyboard.type("quick");
+  await expect(search).toHaveValue("quick");
 });
 
 test("a selection made while the modifier is held survives the release", async ({ page }) => {

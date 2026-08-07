@@ -4,15 +4,20 @@ Illustrator-style temporary tool override plus a permanently-on tool lock.
 Spec/plan: `docs/superpowers/specs/2026-08-07-tool-override-design.md`,
 `docs/superpowers/plans/2026-08-07-tool-override.md`. Branch `feat/tool-override`.
 
-**Status: shipped, including a final-review fix wave.** Unit suite green
-(635/635), e2e fully green. A regression was found mid-branch (forcing the
-tool lock on silently killed auto-select-on-draw app-wide), root-caused,
-fixed with a deliberate two-site fork edit, and the four e2e tests it took
-down were updated to the new workflow. See "The regression and its fix"
-below — this is the highest-value section for anyone touching this feature
-again. A later whole-branch review then found a **third** site with the same
-conflation, a `Q`-shortcut escape hatch, and a style-memory interaction the
-override made newly reachable — see "Final-review fix wave" below.
+**Status: shipped, including a final-review fix wave and a corrective pass on
+top of that.** Unit suite green (640/640), e2e fully green (113/113). A
+regression was found mid-branch (forcing the tool lock on silently killed
+auto-select-on-draw app-wide), root-caused, fixed with a deliberate two-site
+fork edit, and the four e2e tests it took down were updated to the new
+workflow. See "The regression and its fix" below — this is the highest-value
+section for anyone touching this feature again. A later whole-branch review
+then found a **third** site with the same conflation, a `Q`-shortcut escape
+hatch, and a style-memory interaction the override made newly reachable — see
+"Final-review fix wave" below. A **re-review of that wave** then found the
+`Q` swallow still ate the letter in flow's own search boxes, and — more
+seriously — that the style-memory fix in that wave did not work and opened a
+second corruption path; see "Corrective pass" below, which supersedes the
+"One known, accepted residual" paragraph in the final-review section.
 
 ## Shipped
 - `src/ui/toolbar/tool-override.ts` — pure: `overrideKeyFor(platform)` (Meta on
@@ -23,9 +28,11 @@ override made newly reachable — see "Final-review fix wave" below.
 - `src/ui/toolbar/useToolOverride.ts` — two effects: (1) capture-phase
   keydown/keyup on `window` + blur/visibilitychange, engaging the selection
   tool and restoring on release; (2) an `onChange` normalizer re-asserting
-  `activeTool.locked === true`. Mounted from `App.tsx` (`useToolOverride(excalidrawApi)`);
-  `initialData.appState` seeds `activeTool: {type:"selection", customType:null,
-  locked:true, lastActiveTool:null}`.
+  `activeTool.locked === true`. Mounted from `App.tsx` as
+  `useToolOverride(excalidrawApi, styleMemory)` — the second, optional arg is
+  `useStyleMemory`'s returned `StyleMemoryHandle` (added in the corrective
+  pass, see below); `initialData.appState` seeds `activeTool:
+  {type:"selection", customType:null, locked:true, lastActiveTool:null}`.
 - Tool-lock UI removed from all three surfaces: rail padlock (`ToolBar.tsx`,
   `LOCK_ID` gone from `tools.ts`), quick-actions toggle (`quickbar/actions.ts`),
   View ▸ Tool Lock (`MenuBar.tsx`, `useViewToggles.ts`). Native `Q` is now
@@ -202,21 +209,13 @@ leaves `currentItem*` holding the reselected element's own style — from
 whatever category *that* element belongs to — instead of the restored tool's
 bucket. If the user then edits a contended key with that element still
 selected, the edit folds into the wrong bucket, and the next same-tool draw
-picks it up. Fixed **inside `useToolOverride.ts`'s `restore()` only** (the
-human's ruling: treat the release like a tool change, confined to the
-override path, no changes to `useStyleMemory`'s own drift capture): after the
-existing two restore calls, look up `categoryOfTool` for the restored tool
-and, if it has one, `setActiveCategory` + write `resolveLoad`'s patch via
-`updateScene` with `CaptureUpdateAction.NEVER` — the same call
-`useStyleMemory`'s own tool-change branch makes. **One known, accepted
-residual**: this corrective write is itself visible to `useStyleMemory`'s
-drift capture, which can re-fold it into the still-selected element's
-(foreign) bucket. Harmless in practice — that bucket self-corrects the next
-time anything in its category is adopted — and a full fix would require
-`useStyleMemory` to distinguish "this write is a correction" from a user
-edit, which the human explicitly ruled out of scope for this wave. Unit
-regression: `useToolOverride.test.tsx` — "style memory reload on restore"
-(reload happens for a tool with a category; no extra write for one without).
+picks it up. This wave's fix (**superseded — see "Corrective pass" below**)
+tried to do this inside `useToolOverride.ts`'s `restore()` alone: look up
+`categoryOfTool` for the restored tool and, if it has one, `setActiveCategory`
++ write `resolveLoad`'s patch via a hand-rolled `updateScene` with
+`CaptureUpdateAction.NEVER`. It called the possibility of that write being
+re-folded into the still-selected element's foreign bucket a harmless,
+accepted residual. **That residual claim was wrong** — see below.
 
 **Also fixed, no design decisions:** `useToolOverride.ts`'s header comment
 claimed "no fork edits" while the very edit it points at (`actionFinalize.tsx`)
@@ -225,18 +224,99 @@ record this branch's fork work at all — added. `MenuBar.test.tsx`'s "shows
 the five canvas toggles" test title said five when the array it asserts over
 has four — retitled, no assertion changed.
 
+## Corrective pass (2026-08-07)
+
+A scoped re-review of the final-review fix wave above found two more
+problems, both now fixed. Full report:
+`.superpowers/sdd/2026-08-07-tool-override/corrective-pass-report.md`.
+
+**`isTextEntry` didn't recognize `type="search"`.** The `Q` swallow above
+guards on `isTextEntry` (`src/lib/history-shortcuts.ts`), which only matched
+`text` / `number` / `password` (plus textarea/contenteditable) — a list
+scoped to the vendor's own writable-element check. Both of flow's own search
+boxes (`SearchControl.tsx`, `SearchPanel.tsx`) are `type="search"`, so a bare
+"q" typed into either was silently eaten. Widened `isTextEntry` to also match
+`search`, `email`, `url` and `tel`, and corrected its doc comment, which had
+made the same "covers the input types that can actually occur in flow's own
+panels" claim `Q`'s swallow just proved false. A unit test on `isTextEntry`
+alone would not have caught the original bug (it's specifically about a real
+per-key `keydown`, which a `.fill()`-based test bypasses) — added
+`e2e/tool-override.spec.ts`'s "typing into the canvas search box reaches the
+field, letter q included", which types through a real search box via
+`page.keyboard.type`.
+
+**The final-review wave's style-memory fix didn't work, and added a second
+corruption path.** The human's ruling (treat the release like a tool change,
+reload the restored category) was correct; the previous wave's
+implementation of it was not. Root cause: the hand-rolled `updateScene` write
+bypassed `useStyleMemory`'s own `applyPatch` — the *only* thing that advances
+`prevContended` (`src/ui/useStyleMemory.ts`), which is what tells the drift
+watcher "this write already happened, don't re-fold it." Skip that
+bookkeeping and the very next `onChange` — fired by the reload's own write —
+reads the write as an unexplained edit and folds it into
+`categoriesInSelection`, which at that moment is the still-selected *foreign*
+element's category. Concretely: shape holds width 7, the user Cmd-clicks an
+arrow (linear, its own remembered width say 2), release — the reload
+correctly sets `currentItemStrokeWidth` back to 7 in `appState` (so it
+*looked* fixed), but the very next `onChange` folds that same 7 into the
+**linear** bucket, clobbering its own remembered width. No user edit needed.
+A later, unrelated draw of an arrow then loads the corrupted linear bucket —
+not self-healing, reinforcing the wrong value instead of correcting it.
+
+**Fix:** `useStyleMemory.ts` now returns a `StyleMemoryHandle` — `{
+reloadCategory(category, toolType, arrowType) }` — a stable-identity object
+(held in a `useRef`) whose method is (re)assigned inside the hook's effect to
+close over the *same* `applyPatch` the "load on tool change" branch of
+`sync()` already used; that branch was refactored to call `reloadCategory`
+too, so there is exactly one implementation of "run a load," used both for a
+genuine tool change and for `useToolOverride`'s imperative one.
+`App.tsx` passes `useStyleMemory`'s return value straight into
+`useToolOverride` as its new, optional second argument; `useToolOverride.ts`'s
+`restore()` calls `styleMemory.reloadCategory(category, type, arrowType)`
+instead of hand-rolling the write, and no longer imports
+`resolveLoad`/`setActiveCategory` from `style-memory-store.ts` at all — it
+only knows `categoryOfTool` (to decide *whether* to ask) and the handle (to
+ask). The hook stays usable with no handle supplied (skips the reload
+entirely), so its own pre-existing standalone unit tests are unaffected.
+`useStyleMemory`'s drift-capture logic itself was NOT touched, per the
+original ruling's constraint.
+
+Regression tests, both verified RED against the previous wave's
+implementation and GREEN after, in
+`src/ui/style-memory-tool-override.test.tsx` (mounts both real hooks against
+one fake canvas, unlike the wiring-only fake-handle tests in
+`useToolOverride.test.tsx`):
+- "does not overwrite the foreign element's own bucket" — the no-edit
+  opposite-corruption case above.
+- "closes the original repro: a later draw of the arrow's own category still
+  uses its own remembered value" — proves the fix is not just cosmetically
+  correct in `appState` right after release, but that the *bucket* itself
+  stays clean for a later, unrelated draw.
+
+`useToolOverride.test.tsx`'s own "style memory reload on restore" tests were
+rewritten in the same pass to assert against a fake `StyleMemoryHandle`
+(wiring-level: is `reloadCategory` called with the right args, after the
+selection-restore write, and not at all for a tool with no category) rather
+than against the old hand-rolled `updateScene` shape, since that shape no
+longer exists.
+
 ## Tests
 - Unit: `src/ui/toolbar/tool-override.test.ts` (12 tests, covers every
   `canEngage` guard, including "does not engage when the selection tool is
   already active" — this is the ONLY coverage of that guard; see gotcha
-  below), `src/ui/toolbar/useToolOverride.test.tsx` (20 tests as of the
-  final-review wave: the original 16 engage/restore/blur/visibilitychange/
-  lock-normalizer tests, plus 2 for the `Q` swallow and 2 for the
-  style-memory reload on restore). Full unit suite after the final-review
-  wave: **635 tests / 69 files, all green.**
-- e2e: `e2e/tool-override.spec.ts`, **5 tests** (the original 4 plus the
-  elbow-arrow multi-point regression from the final-review wave). Full e2e
-  suite (112 tests) fully green, including the flake noted below.
+  below), `src/ui/toolbar/useToolOverride.test.tsx` (22 tests as of the
+  corrective pass: engage/restore/blur/visibilitychange/lock-normalizer, the
+  `Q` swallow — including the search-field case added in the corrective
+  pass — and the style-memory reload wiring, now asserted against a fake
+  `StyleMemoryHandle`), plus `src/ui/style-memory-tool-override.test.tsx` (2
+  tests, corrective pass: both real hooks mounted together, the actual
+  release-time-reload corruption/fix). `src/lib/history-shortcuts.test.ts`
+  also gained a case for the widened `isTextEntry` input types. Full unit
+  suite after the corrective pass: **640 tests / 70 files, all green.**
+- e2e: `e2e/tool-override.spec.ts`, **6 tests** (the original 4, the
+  elbow-arrow multi-point regression from the final-review wave, and the
+  search-box typing regression from the corrective pass). Full e2e suite
+  (113 tests) fully green, including the flake noted below.
 
 ## Gotchas for anyone touching this again
 

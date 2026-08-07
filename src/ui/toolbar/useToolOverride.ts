@@ -1,15 +1,13 @@
 import { useEffect, useRef } from "react";
-import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import { canEngage, overrideKeyFor, type OverrideState } from "./tool-override";
 import { isTextEntry } from "../../lib/history-shortcuts";
 import { categoryOfTool } from "../../lib/style-memory";
-import { resolveLoad, setActiveCategory } from "../../lib/style-memory-store";
+import type { StyleMemoryHandle } from "../useStyleMemory";
 
 /** `setActiveTool` takes a discriminated union keyed on `type`; our string is a
  *  subset of it, so cast at this single boundary (mirrors useActiveTool). */
 type SetToolArg = Parameters<ExcalidrawAPI["setActiveTool"]>[0];
-type UpdateAppState = NonNullable<Parameters<ExcalidrawAPI["updateScene"]>[0]>["appState"];
 
 /**
  * Illustrator-style temporary tool override: hold Cmd (Ctrl off Apple
@@ -28,8 +26,15 @@ type UpdateAppState = NonNullable<Parameters<ExcalidrawAPI["updateScene"]>[0]>["
  * Listeners are capture-phase on `window`, the same placement as App's
  * Ctrl/Cmd+F repoint, so the decision is made before Excalidraw's own
  * container-bound handler sees the key.
+ *
+ * `styleMemory` is optional so the hook stays usable standalone (its own unit
+ * tests construct it that way); when supplied it corrects a style-memory
+ * corruption the restore step below causes — see the comment on `restore`.
  */
-export function useToolOverride(api: ExcalidrawAPI | null): void {
+export function useToolOverride(
+  api: ExcalidrawAPI | null,
+  styleMemory?: StyleMemoryHandle | null,
+): void {
   // The tool a held modifier is currently suspending, or null when idle. A ref
   // rather than state: nothing renders off it, and keyup must read what keydown
   // wrote without waiting for a re-render.
@@ -61,33 +66,22 @@ export function useToolOverride(api: ExcalidrawAPI | null): void {
       // "the override just restored what was already selected" apart from a
       // genuine new selection, so it re-fires here and leaves currentItem*
       // holding the reselected element's OWN style, from a possibly
-      // different category, instead of the restored tool's bucket. Re-run
-      // style memory's load for the restored tool's category — the same
-      // resolveLoad call useStyleMemory's own tool-change branch makes — so
-      // the invariant it depends on (a load always precedes a draw) holds
-      // again. Confined to this path deliberately; see [[style-memory]] and
-      // [[tool-override]] for the full trace and its one known residual
-      // (this write can itself be re-folded into the still-selected
-      // element's bucket by useStyleMemory's drift capture — harmless, since
-      // that bucket self-corrects the next time anything in its category is
-      // adopted, and out of scope for a fix confined to this file).
+      // different category, instead of the restored tool's bucket. Treat the
+      // release like a tool change and ask style memory to reload the
+      // restored tool's category — but through its own `reloadCategory`
+      // handle, NOT a hand-rolled `updateScene` here. A hand-rolled write
+      // (this file's first attempt) bypasses the bookkeeping that keeps
+      // useStyleMemory's drift watcher from re-reading the write as an
+      // unexplained edit, and folding it into whichever category the
+      // still-selected foreign element belongs to — corrupting THAT bucket
+      // instead. Routing through the handle is what avoids it: see
+      // [[style-memory]] and [[tool-override]] for the full trace.
       const category = categoryOfTool(type);
-      if (category) {
-        setActiveCategory(category);
+      if (category && styleMemory) {
         const { currentItemArrowType } = api.getAppState() as unknown as {
           currentItemArrowType?: string;
         };
-        const patch = resolveLoad({
-          category,
-          toolType: type,
-          arrowType: currentItemArrowType ?? "sharp",
-        });
-        if (Object.keys(patch).length > 0) {
-          api.updateScene({
-            appState: patch as UpdateAppState,
-            captureUpdate: CaptureUpdateAction.NEVER,
-          });
-        }
+        styleMemory.reloadCategory(category, type, currentItemArrowType ?? "sharp");
       }
     };
 
@@ -99,7 +93,10 @@ export function useToolOverride(api: ExcalidrawAPI | null): void {
       // below re-locks it — restoring `locked` but never the tool, so `Q`
       // silently dropped the user to Selection. Swallow it here instead,
       // guarded by isTextEntry so typing "q" into Excalidraw's own text
-      // editor (a <textarea>, element/textWysiwyg.tsx) is unaffected.
+      // editor (a <textarea>, element/textWysiwyg.tsx) or flow's own search
+      // boxes (both type="search" — SearchControl.tsx, SearchPanel.tsx) is
+      // unaffected. isTextEntry didn't recognize "search" until this wave;
+      // see [[tool-override]].
       if (e.key === "q" && !isTextEntry(e.target)) {
         e.preventDefault();
         e.stopPropagation();
@@ -132,7 +129,7 @@ export function useToolOverride(api: ExcalidrawAPI | null): void {
       window.removeEventListener("blur", restore);
       document.removeEventListener("visibilitychange", restore);
     };
-  }, [api]);
+  }, [api, styleMemory]);
 
   // flow is a modal-tool app — the chosen tool stays chosen, and the override
   // above is how you reach selection transiently. So `locked` has exactly one

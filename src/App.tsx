@@ -78,8 +78,10 @@ export default function App() {
   const provider = useMemo(() => new IndexedDbProvider(), []);
 
   // Per-category style memory: adopts the last selected/edited element's style
-  // and applies it to the next element drawn in that category. Renders nothing.
-  useStyleMemory(excalidrawApi);
+  // and applies it to the next element drawn in that category. Renders
+  // nothing, but returns a handle useToolOverride's release-time reload uses
+  // below — see useStyleMemory.ts's StyleMemoryHandle doc.
+  const styleMemory = useStyleMemory(excalidrawApi);
 
   const [currentId, setCurrentId] = useState<string | undefined>(undefined);
   const [currentName, setCurrentName] = useState("Untitled");
@@ -173,7 +175,7 @@ export default function App() {
   }, [excalidrawApi, bindingMode]);
 
   // Illustrator-style Cmd/Ctrl-hold override + the permanently-on tool lock.
-  useToolOverride(excalidrawApi);
+  useToolOverride(excalidrawApi, styleMemory);
 
   const [laserColor, setLaserColorState] = useState<string>(() => getLaserColor());
   const handleChangeLaserColor = useCallback((next: string) => {

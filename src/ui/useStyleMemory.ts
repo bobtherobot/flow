@@ -39,6 +39,29 @@ function changedKeys(prev: StyleBucket, next: StyleBucket): string[] {
 }
 
 /**
+ * Imperative escape hatch for callers that must trigger a style-memory load
+ * outside of a genuine tool-change edge. Currently used by only one caller —
+ * useToolOverride's release-time reload, which treats the modifier release
+ * like a tool change for the restored tool's category (see [[tool-override]]
+ * and [[style-memory]] for the full trace of why that reload has to exist).
+ *
+ * `reloadCategory` runs the exact same body sync()'s own "load on tool
+ * change" branch below calls — there is exactly one implementation, this
+ * hook's own `applyPatch`, so `prevContended` advances with the write and it
+ * is never re-read as drift on the next `onChange`. A hand-rolled write that
+ * bypasses this (as useToolOverride's first attempt did) leaves
+ * `prevContended` stale, so the write reads as an unexplained edit and gets
+ * folded into whatever category is currently selected — corrupting it.
+ *
+ * A no-op until the hook has a live `api`.
+ */
+export interface StyleMemoryHandle {
+  reloadCategory: (category: StyleCategory, toolType: string, arrowType: string) => void;
+}
+
+const NOOP_HANDLE: StyleMemoryHandle = { reloadCategory: () => {} };
+
+/**
  * Per-category style memory, wired to the live canvas.
  *
  * Renders nothing and holds no state — every prior observation lives in a ref,
@@ -61,15 +84,23 @@ function changedKeys(prev: StyleBucket, next: StyleBucket): string[] {
  * Every write goes through `updateScene`, which fires `onChange` again — so the
  * refs are updated *before* writing and each write is skipped when it would
  * change nothing, leaving the re-entrant callback a no-op.
+ *
+ * Returns a stable `StyleMemoryHandle` (same object identity every render) so
+ * a consumer can hold it in a ref/effect dependency without churn. See
+ * `StyleMemoryHandle` above for what it's for.
  */
-export function useStyleMemory(api: ExcalidrawAPI | null): void {
+export function useStyleMemory(api: ExcalidrawAPI | null): StyleMemoryHandle {
   const prevSelected = useRef<Set<string>>(new Set());
   const prevContended = useRef<StyleBucket>({});
   const prevToolKey = useRef<string>("");
   const primed = useRef(false);
+  const handle = useRef<StyleMemoryHandle>({ ...NOOP_HANDLE }).current;
 
   useEffect(() => {
-    if (!api) return;
+    if (!api) {
+      handle.reloadCategory = NOOP_HANDLE.reloadCategory;
+      return;
+    }
 
     /**
      * Write a `currentItem*` patch. Keys already holding that value are dropped,
@@ -100,6 +131,19 @@ export function useStyleMemory(api: ExcalidrawAPI | null): void {
         captureUpdate: CaptureUpdateAction.NEVER,
       });
     };
+
+    /**
+     * The load-on-tool-change body (sync()'s own branch 3 below calls this
+     * directly, so there is exactly one implementation). Exposed on `handle`
+     * as the one sanctioned way to trigger a load outside of a genuine
+     * tool-change edge — see `StyleMemoryHandle` above.
+     */
+    const reloadCategory = (category: StyleCategory, toolType: string, arrowType: string) => {
+      const appState = api.getAppState() as unknown as Record<string, unknown>;
+      setActiveCategory(category);
+      applyPatch(resolveLoad({ category, toolType, arrowType }), appState);
+    };
+    handle.reloadCategory = reloadCategory;
 
     const sync = () => {
       const appState = api.getAppState() as unknown as Record<string, unknown>;
@@ -177,14 +221,19 @@ export function useStyleMemory(api: ExcalidrawAPI | null): void {
       if (toolChanged) {
         const category = categoryOfTool(toolType);
         if (!category) return;
-        setActiveCategory(category);
-        applyPatch(resolveLoad({ category, toolType, arrowType }), appState);
+        reloadCategory(category, toolType, arrowType);
       }
     };
 
     sync();
-    return api.onChange(sync);
-  }, [api]);
+    const unsubscribe = api.onChange(sync);
+    return () => {
+      handle.reloadCategory = NOOP_HANDLE.reloadCategory;
+      unsubscribe();
+    };
+  }, [api, handle]);
+
+  return handle;
 }
 
 /** The categories represented by the currently selected elements. */
