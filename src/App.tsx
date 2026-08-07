@@ -62,6 +62,7 @@ import { PropertiesDialog } from "./ui/PropertiesDialog";
 import { AboutDialog } from "./ui/AboutDialog";
 import type { SaveDestination } from "./ui/dialog-types";
 import { useStyleMemory } from "./ui/useStyleMemory";
+import { useToolOverride } from "./ui/toolbar/useToolOverride";
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -170,6 +171,9 @@ export default function App() {
       appState: { bindingMode },
     } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
   }, [excalidrawApi, bindingMode]);
+
+  // Illustrator-style Cmd/Ctrl-hold override + the permanently-on tool lock.
+  useToolOverride(excalidrawApi);
 
   const [laserColor, setLaserColorState] = useState<string>(() => getLaserColor());
   const handleChangeLaserColor = useCallback((next: string) => {
@@ -436,6 +440,17 @@ export default function App() {
               // rounding still lives in the Transform panel. Native field;
               // no cast.
               currentItemRoundness: "sharp",
+              // flow is a modal-tool app: the chosen tool stays chosen and
+              // Cmd/Ctrl-hold gives a momentary selection tool. Seed the lock
+              // on so the first tool use is already sticky — useToolOverride's
+              // normalizer would otherwise correct it a frame later. Shape
+              // matches the vendor default (appState.ts:59). Native field.
+              activeTool: {
+                type: "selection",
+                customType: null,
+                locked: true,
+                lastActiveTool: null,
+              },
             },
           } as ComponentProps<typeof Excalidraw>["initialData"]}
         />
