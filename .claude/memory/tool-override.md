@@ -300,6 +300,17 @@ selection-restore write, and not at all for a tool with no category) rather
 than against the old hand-rolled `updateScene` shape, since that shape no
 longer exists.
 
+**Surviving residual:** After the modifier release, a genuine style edit made
+while the foreign-category element is still selected folds into that element's
+category and stays live in `currentItem*`. Drawing the restored tool's category
+with no tool change in between then picks up that value, and adopt-on-select
+records it into the restored tool's bucket. Closing this would require routing
+drift capture by active tool rather than by selection when a drawing tool is
+active with elements selected — a restructuring of `useStyleMemory`'s drift
+capture that was explicitly out of scope. This residual is reachable only via
+the override and degrades to stock Excalidraw behavior (a style edit follows
+into the next drawn element). Full detail: `.superpowers/sdd/2026-08-07-tool-override/corrective-pass-report.md`.
+
 ## Tests
 - Unit: `src/ui/toolbar/tool-override.test.ts` (12 tests, covers every
   `canEngage` guard, including "does not engage when the selection tool is

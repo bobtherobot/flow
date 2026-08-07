@@ -187,7 +187,7 @@ describe("useToolOverride + useStyleMemory — release-time reload (blocker B)",
     ).toMatchObject({ currentItemStrokeWidth: 1 });
   });
 
-  it("closes the original repro: a later draw of the arrow's own category still uses its own remembered value, not a value leaked in by the override", () => {
+  it("after release, a later arrow tool selection loads the arrow's own remembered value", () => {
     // Same setup as above: shape remembers 7, the arrow's own width is 2.
     const h = makeApi([rect("r"), arrow("a", { strokeWidth: 2 })]);
     mountBoth(h.api);
