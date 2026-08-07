@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
+
+// The hook now imports CaptureUpdateAction from the Excalidraw package (the
+// style-memory reload on restore, finding 2); loading the real package in
+// jsdom runs module-level UI code that throws. Stub the one export it uses —
+// same pattern as useStyleMemory.test.tsx and useSelectionStyle.test.tsx.
+vi.mock("@excalidraw/excalidraw", () => ({
+  CaptureUpdateAction: { IMMEDIATELY: "IMMEDIATELY", EVENTUALLY: "EVENTUALLY", NEVER: "NEVER" },
+}));
+
 import { useToolOverride } from "./useToolOverride";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
+import { adopt, resetStyleMemory } from "../../lib/style-memory-store";
 
 /** Mutable appState behind the fake api, so a test can model the canvas
  *  changing between engage and restore (an undo landing mid-hold). */
@@ -181,5 +191,67 @@ describe("useToolOverride — forced tool lock", () => {
     const { api } = fakeApi({ activeTool: { type: "image", locked: false } });
     renderHook(() => useToolOverride(api));
     expect(api.setActiveTool).not.toHaveBeenCalled();
+  });
+});
+
+describe("useToolOverride — swallowing native Q", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("swallows Q on the canvas, so Excalidraw's own tool-lock toggle never sees it", () => {
+    const { api } = fakeApi();
+    renderHook(() => useToolOverride(api));
+    const event = new KeyboardEvent("keydown", { key: "q", bubbles: true, cancelable: true });
+    const stopPropagation = vi.spyOn(event, "stopPropagation");
+    window.dispatchEvent(event);
+    expect(stopPropagation).toHaveBeenCalled();
+  });
+
+  it("does not swallow Q typed into a text field", () => {
+    const { api } = fakeApi();
+    renderHook(() => useToolOverride(api));
+    const input = document.createElement("input");
+    input.type = "text";
+    document.body.appendChild(input);
+    const event = new KeyboardEvent("keydown", { key: "q", bubbles: true, cancelable: true });
+    const stopPropagation = vi.spyOn(event, "stopPropagation");
+    input.dispatchEvent(event);
+    expect(stopPropagation).not.toHaveBeenCalled();
+    document.body.removeChild(input);
+  });
+});
+
+describe("useToolOverride — style memory reload on restore", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetStyleMemory();
+  });
+
+  it("reloads the restored tool's category style after the selection is reapplied", () => {
+    // The shape bucket remembers a stroke width from earlier in the session.
+    adopt("shape", { currentItemStrokeWidth: 7 });
+    const { api } = fakeApi();
+    renderHook(() => useToolOverride(api));
+
+    press();
+    release();
+
+    // The LAST updateScene call (after the selection-restore call) must carry
+    // the shape bucket's value — proving the reload ran after the reselect,
+    // not before it (a reload issued before the reselect would be clobbered
+    // by useStyleMemory's own re-adopt, which is exactly finding 2's bug).
+    const calls = (api.updateScene as ReturnType<typeof vi.fn>).mock.calls;
+    const lastCall = calls[calls.length - 1][0] as { appState?: Record<string, unknown> };
+    expect(lastCall.appState?.currentItemStrokeWidth).toBe(7);
+  });
+
+  it("does not attempt a reload for a tool with no style category", () => {
+    const { api } = fakeApi({ activeTool: { type: "frame", locked: true } });
+    renderHook(() => useToolOverride(api));
+
+    press();
+    release();
+
+    // Only the selection-restore call — "frame" has nothing to reload.
+    expect(api.updateScene).toHaveBeenCalledTimes(1);
   });
 });

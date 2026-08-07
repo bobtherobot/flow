@@ -67,6 +67,28 @@ test("holding the modifier suspends the tool and releasing restores it", async (
   await expect.poll(async () => (await readState(page))?.activeTool?.type).toBe("rectangle");
 });
 
+test("a two-click elbow arrow ends up selected once it auto-finishes", async ({ page }) => {
+  // Every other line/arrow test in this suite drag-creates (mousedown, move,
+  // mouseup) or click-continues (a 2nd, 3rd, ... click while already
+  // mid-line), both of which route through vendor App.tsx sites that
+  // unconditionally select the in-progress element regardless of the tool
+  // lock (already patched by commit a9dcdb6f). An elbow arrow is different:
+  // vendor App.tsx auto-finalizes it the instant its second point commits
+  // (the `isElbowArrow(multiElement) && multiElement.points.length > 1`
+  // branch in `handleLinearElementOnPointerDown`), calling
+  // `actionManager.executeAction(actionFinalize)` directly and skipping the
+  // click-continuation selection code entirely. That makes a 2-click elbow
+  // arrow the one reachable path where actionFinalize's OWN selection logic
+  // (`actionFinalize.tsx`) is the sole determinor of whether the element ends
+  // up selected — verified by instrumenting actionFinalize directly: it runs
+  // with `selectedElementIds: {}` here, unlike every other creation path in
+  // this suite. See finding 1 in final-review-findings.md.
+  await pickTool(page, "Elbow arrow");
+  await page.mouse.click(BOX[0], BOX[1]);
+  await page.mouse.click(BOX[2], BOX[3]);
+  await expect.poll(() => selectedCount(page)).toBe(1);
+});
+
 test("a selection made while the modifier is held survives the release", async ({ page }) => {
   await drawBox(page);
   await pickTool(page, "Rectangle");

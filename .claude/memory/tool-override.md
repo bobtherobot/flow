@@ -4,12 +4,15 @@ Illustrator-style temporary tool override plus a permanently-on tool lock.
 Spec/plan: `docs/superpowers/specs/2026-08-07-tool-override-design.md`,
 `docs/superpowers/plans/2026-08-07-tool-override.md`. Branch `feat/tool-override`.
 
-**Status: shipped.** Unit suite green (631/631), e2e fully green. A regression
-was found mid-branch (forcing the tool lock on silently killed auto-select-on-
-draw app-wide), root-caused, fixed with a deliberate two-site fork edit, and
-the four e2e tests it took down were updated to the new workflow. See "The
-regression and its fix" below — this is the highest-value section for anyone
-touching this feature again.
+**Status: shipped, including a final-review fix wave.** Unit suite green
+(635/635), e2e fully green. A regression was found mid-branch (forcing the
+tool lock on silently killed auto-select-on-draw app-wide), root-caused,
+fixed with a deliberate two-site fork edit, and the four e2e tests it took
+down were updated to the new workflow. See "The regression and its fix"
+below — this is the highest-value section for anyone touching this feature
+again. A later whole-branch review then found a **third** site with the same
+conflation, a `Q`-shortcut escape hatch, and a style-memory interaction the
+override made newly reachable — see "Final-review fix wave" below.
 
 ## Shipped
 - `src/ui/toolbar/tool-override.ts` — pure: `overrideKeyFor(platform)` (Meta on
@@ -25,8 +28,10 @@ touching this feature again.
   locked:true, lastActiveTool:null}`.
 - Tool-lock UI removed from all three surfaces: rail padlock (`ToolBar.tsx`,
   `LOCK_ID` gone from `tools.ts`), quick-actions toggle (`quickbar/actions.ts`),
-  View ▸ Tool Lock (`MenuBar.tsx`, `useViewToggles.ts`). Native `Q` still fires
-  and the normalizer undoes it.
+  View ▸ Tool Lock (`MenuBar.tsx`, `useViewToggles.ts`). Native `Q` is now
+  swallowed outright (final-review wave, below) rather than left to fire and
+  be cleaned up after — see "Final-review fix wave" for why the original
+  fire-then-undo approach was itself buggy.
 - `TOOL_ICONS` narrowed from a partial map to `Record<ToolId, ReactNode>` in
   `src/ui/toolbar/icons.tsx` once `LOCK_ID` was gone — see task-order note below.
 
@@ -126,16 +131,112 @@ Task 9 cause these" — it could not detect that they were branch regressions
 at all, because the baseline it compared against still had the permanent lock
 on. `3637fdd` is the commit that actually fixed them.
 
+## Final-review fix wave (2026-08-07)
+
+A whole-branch review after the twelve feature commits landed found three
+more issues the task-scoped reviews couldn't see, plus two smaller doc/test
+fixes. Findings doc:
+`.superpowers/sdd/2026-08-07-tool-override/final-review-findings.md`.
+
+**The third auto-select/lock-conflation site.** `App.tsx`'s two sites (above)
+cover drag-created shapes and drag- or click-continued linear elements. There
+is a third: a click-committed multi-point line/arrow finished via
+`actionManager.executeAction(actionFinalize)` — vendor
+`actions/actionFinalize.tsx`'s own `selectedElementIds` computation, gated on
+the identical `!appState.activeTool.locked` clause. Missed in the original
+two-site fix because every existing spec drag-creates or click-continues
+(which route through the already-patched `App.tsx` sites); nothing exercised
+a creation path that reaches `actionFinalize` *without* first passing through
+one of those two. **The concrete, verified repro is an elbow arrow, two
+clicks** (start, end) — `handleLinearElementOnPointerDown`'s
+`isElbowArrow(multiElement) && multiElement.points.length > 1` branch
+auto-finalizes an elbow arrow on its second point by calling
+`actionManager.executeAction(actionFinalize)` directly, which is the *one*
+reachable path that never touches the click-continuation code that
+unconditionally selects every other in-progress multi-point element as you
+draw it. Confirmed by instrumenting `actionFinalize.perform` directly: it ran
+with `appState.selectedElementIds: {}` when locked. A plain multi-point
+*line*, finished via repeated single clicks then Enter/Escape, does **not**
+reproduce this — every click after the first already runs
+`App.tsx`'s always-unconditional click-continuation select
+(`handleLinearElementOnPointerDown`'s non-early-return branch), so the
+element is already selected by the time `actionFinalize` runs regardless of
+its own gate. (The final-review findings doc's suggested repro described this
+literal line/Enter sequence; it does not reproduce as written — the
+underlying diagnosis, that `actionFinalize`'s condition is a dead-branch twin
+of the two already-patched sites, is correct and independently proven by the
+elbow-arrow repro.) Fix: drop `!appState.activeTool.locked &&` from
+`actionFinalize.tsx`'s `selectedElementIds` ternary, `flow:`-commented,
+leaving the `multiPointElement &&` / `!== "freedraw"` clauses and everything
+else byte-identical to upstream. e2e regression:
+`e2e/tool-override.spec.ts` — "a two-click elbow arrow ends up selected once
+it auto-finishes".
+
+**`Q` now silently dropped the user to Selection.** `App.tsx`'s `toggleLock`
+branches on the *current* lock state: with it permanently true, `Q` sets
+`{type: "selection", locked: false}`, not just `{locked: false}`. The
+lock-normalizer effect (second effect in `useToolOverride.ts`) restores
+`locked` but has no way to know what tool to restore, so it stayed on
+Selection — a real, silent tool change in an app whose whole premise is that
+the tool stays put. Fixed by swallowing `q` in the same capture-phase
+`keydown` listener the modifier override already uses, guarded by
+`isTextEntry` (verified against vendor's actual text editor —
+`element/textWysiwyg.tsx` creates a real `<textarea>`, which `isTextEntry`
+matches — so typing "q" into canvas text is unaffected). This reverses the
+original spec's explicit rejection of swallowing `Q`; the `isTextEntry` guard
+is exactly what resolves the concern that rejection was based on. The vendor
+`HelpDialog.tsx` row advertising the `Q` shortcut (`toolBar.lock`) is removed
+too, one line, `flow:`-commented — it described a shortcut that no longer
+does what it says. Unit regression: `useToolOverride.test.tsx` — "swallowing
+native Q" (canvas swallowed, text field not swallowed).
+
+**Style memory can learn a foreign category's value across an override
+cycle.** The override's restore path is the first place in the app where a
+drawing tool becomes active *while elements stay selected* —
+`setActiveTool` clears the selection for every non-selection tool, and before
+this branch a tool pick always preceded every draw, so this combination was
+previously unreachable. `useStyleMemory`'s adopt-on-select cannot tell "the
+override just restored a selection that was already there" apart from a
+genuine new selection, so restoring the selection re-fires adopt-on-select and
+leaves `currentItem*` holding the reselected element's own style — from
+whatever category *that* element belongs to — instead of the restored tool's
+bucket. If the user then edits a contended key with that element still
+selected, the edit folds into the wrong bucket, and the next same-tool draw
+picks it up. Fixed **inside `useToolOverride.ts`'s `restore()` only** (the
+human's ruling: treat the release like a tool change, confined to the
+override path, no changes to `useStyleMemory`'s own drift capture): after the
+existing two restore calls, look up `categoryOfTool` for the restored tool
+and, if it has one, `setActiveCategory` + write `resolveLoad`'s patch via
+`updateScene` with `CaptureUpdateAction.NEVER` — the same call
+`useStyleMemory`'s own tool-change branch makes. **One known, accepted
+residual**: this corrective write is itself visible to `useStyleMemory`'s
+drift capture, which can re-fold it into the still-selected element's
+(foreign) bucket. Harmless in practice — that bucket self-corrects the next
+time anything in its category is adopted — and a full fix would require
+`useStyleMemory` to distinguish "this write is a correction" from a user
+edit, which the human explicitly ruled out of scope for this wave. Unit
+regression: `useToolOverride.test.tsx` — "style memory reload on restore"
+(reload happens for a tool with a category; no extra write for one without).
+
+**Also fixed, no design decisions:** `useToolOverride.ts`'s header comment
+claimed "no fork edits" while the very edit it points at (`actionFinalize.tsx`)
+proves otherwise — corrected. `.claude/memory/flow-fork-strategy.md` didn't
+record this branch's fork work at all — added. `MenuBar.test.tsx`'s "shows
+the five canvas toggles" test title said five when the array it asserts over
+has four — retitled, no assertion changed.
+
 ## Tests
 - Unit: `src/ui/toolbar/tool-override.test.ts` (12 tests, covers every
   `canEngage` guard, including "does not engage when the selection tool is
   already active" — this is the ONLY coverage of that guard; see gotcha
-  below), `src/ui/toolbar/useToolOverride.test.tsx` (16 tests: engage/restore/
-  blur/visibilitychange/lock-normalizer). Full unit suite after this branch:
-  **631 tests / 69 files, all green.**
-- e2e: `e2e/tool-override.spec.ts`, **4 tests** (not 5 — see gotcha below).
-  Full e2e suite (111 tests) fully green as of `3637fdd`, including the flake
-  noted below.
+  below), `src/ui/toolbar/useToolOverride.test.tsx` (20 tests as of the
+  final-review wave: the original 16 engage/restore/blur/visibilitychange/
+  lock-normalizer tests, plus 2 for the `Q` swallow and 2 for the
+  style-memory reload on restore). Full unit suite after the final-review
+  wave: **635 tests / 69 files, all green.**
+- e2e: `e2e/tool-override.spec.ts`, **5 tests** (the original 4 plus the
+  elbow-arrow multi-point regression from the final-review wave). Full e2e
+  suite (112 tests) fully green, including the flake noted below.
 
 ## Gotchas for anyone touching this again
 

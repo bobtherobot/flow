@@ -146,7 +146,7 @@ describe("MenuBar", () => {
     expect(onResetLayout).toHaveBeenCalledOnce();
   });
 
-  it("shows the five canvas toggles in the View menu", async () => {
+  it("shows the four canvas toggles in the View menu", async () => {
     const user = userEvent.setup();
     render(<MenuBar {...props} api={fakeApi()} />);
     await user.click(screen.getByRole("menuitem", { name: "View" }));
