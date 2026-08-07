@@ -3,7 +3,7 @@ import "./toolbar.css";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { MenuPoint } from "../panels/dock/menu-position";
 import { useDrag } from "../panels/dock/useDrag";
-import { TOOLS, LOCK_ID } from "./tools";
+import { TOOLS } from "./tools";
 import { TOOL_ICONS } from "./icons";
 import { ToolButton } from "./ToolButton";
 import { ToolbarConfigMenu } from "./ToolbarConfigMenu";
@@ -36,7 +36,7 @@ function configAnchor(el: HTMLElement | null): MenuPoint {
  * public Excalidraw API; the native island is hidden via CSS.
  */
 export function ToolBar({ api, state, onChange }: ToolBarProps) {
-  const { activeType, arrowType, locked, setTool, toggleLock } = useActiveTool(api);
+  const { activeType, arrowType, setTool } = useActiveTool(api);
   const [menuOpen, setMenuOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const origin = useRef({ x: 0, y: 0 });
@@ -107,17 +107,6 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
           ☰
         </button>
       </div>
-
-      {!state.hiddenTools.includes(LOCK_ID) && (
-        <div className="flow-toolbar__lock">
-          <ToolButton
-            icon={TOOL_ICONS[LOCK_ID]}
-            label="Keep tool active"
-            active={locked}
-            onClick={toggleLock}
-          />
-        </div>
-      )}
 
       <div className="flow-toolbar__tools">
         {TOOLS.filter((t) => !state.hiddenTools.includes(t.id)).map((t) => {

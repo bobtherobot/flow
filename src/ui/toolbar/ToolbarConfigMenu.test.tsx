@@ -20,10 +20,10 @@ describe("ToolbarConfigMenu", () => {
     expect(screen.getByRole("menuitem", { name: "Dock toolbar" })).toBeInTheDocument();
   });
 
-  it("renders a checked row per visible tool and Lock", () => {
+  it("renders a checked row per visible tool", () => {
     render(<ToolbarConfigMenu {...base} />);
     expect(screen.getByRole("checkbox", { name: "Rectangle" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Lock" })).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Lock" })).toBeNull();
   });
 
   it("unchecks a hidden tool", () => {

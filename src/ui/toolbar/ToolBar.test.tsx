@@ -22,10 +22,10 @@ describe("ToolBar", () => {
     expect(screen.queryByRole("toolbar", { name: "Tools" })).toBeNull();
   });
 
-  it("renders a button for every visible tool plus lock", () => {
+  it("renders a button for every visible tool", () => {
     render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
     expect(screen.getByRole("button", { name: "Rectangle" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Keep tool active" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Keep tool active" })).toBeNull();
   });
 
   it("omits a hidden tool", () => {

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import type { ToolId } from "./tools";
-import { LOCK_ID } from "./tools";
 
 /** Shared wrapper: 20×20, stroked with currentColor so the button controls color. */
 function Svg({ children }: { children: ReactNode }) {
@@ -21,9 +20,9 @@ function Svg({ children }: { children: ReactNode }) {
   );
 }
 
-/** Inline SVG icon per tool (+ lock). Hand-rolled to stay fork-independent,
+/** Inline SVG icon per tool. Hand-rolled to stay fork-independent,
  *  matching the AlignPanel/TextPanel convention. */
-export const TOOL_ICONS: Record<ToolId | typeof LOCK_ID, ReactNode> = {
+export const TOOL_ICONS: Record<ToolId, ReactNode> = {
   selection: (
     <Svg>
       <path fill="currentColor" stroke="none" d="M5 3l0 12 3-3 2 4 2-1-2-4 4 0z" />
@@ -126,12 +125,6 @@ export const TOOL_ICONS: Record<ToolId | typeof LOCK_ID, ReactNode> = {
     <Svg>
       <path d="M13 4l3 3-7 7-3 1 1-3z" />
       <path d="M4 4l2.5 2.5M4 9h2.5M9 4v2.5" />
-    </Svg>
-  ),
-  [LOCK_ID]: (
-    <Svg>
-      <rect x="5" y="9" width="10" height="7" rx="1" />
-      <path d="M7 9V7a3 3 0 016 0v2" />
     </Svg>
   ),
 };

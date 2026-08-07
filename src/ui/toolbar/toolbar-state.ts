@@ -7,7 +7,7 @@ export interface ToolbarState {
   /** Floating top-left, viewport pixels. Ignored while docked. */
   x: number;
   y: number;
-  /** Tool ids (and LOCK_ID) the user has hidden from the rail. */
+  /** Tool ids the user has hidden from the rail. */
   hiddenTools: string[];
 }
 

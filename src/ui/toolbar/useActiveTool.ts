@@ -13,13 +13,9 @@ export interface ActiveTool {
   /** The current new-arrow shape default (`appState.currentItemArrowType`);
    *  drives which arrow variant the rail highlights. */
   arrowType: string;
-  /** Whether "keep selected tool active" is on. */
-  locked: boolean;
   /** Switch the active tool. For arrow variants, pass the shape to apply as the
    *  new-arrow default before activating the shared "arrow" tool. */
   setTool: (type: ToolId, arrowType?: ArrowType) => void;
-  /** Toggle the lock flag on the current tool. */
-  toggleLock: () => void;
 }
 
 /**
@@ -40,7 +36,6 @@ export function useActiveTool(api: ExcalidrawAPI | null): ActiveTool {
   const at = state?.activeTool;
   const activeType = at?.type ?? "selection";
   const arrowType = state?.currentItemArrowType ?? "sharp";
-  const locked = at?.locked ?? false;
 
   const setTool = (type: ToolId, nextArrowType?: ArrowType) => {
     // Arrow variants share the "arrow" tool; set the new-arrow default first so
@@ -51,9 +46,5 @@ export function useActiveTool(api: ExcalidrawAPI | null): ActiveTool {
     api?.setActiveTool({ type } as SetToolArg);
   };
 
-  const toggleLock = () => {
-    api?.setActiveTool({ type: activeType, locked: !locked } as SetToolArg);
-  };
-
-  return { activeType, arrowType, locked, setTool, toggleLock };
+  return { activeType, arrowType, setTool };
 }
