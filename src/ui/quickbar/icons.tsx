@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { TOOL_ICONS } from "../toolbar/icons";
-import { LOCK_ID, BINDING_ID } from "./actions";
+import { BINDING_ID } from "./actions";
 
 /** 20×20 stroked wrapper (matches toolbar/icons.tsx so buttons control color). */
 function Svg({ children }: { children: ReactNode }) {
@@ -109,8 +109,6 @@ const ACTION_ICONS: Record<string, ReactNode> = {
       <path d="M3 7V3h4" />
     </Svg>
   ),
-  // Tool lock: reuse the rail's padlock glyph.
-  [LOCK_ID]: TOOL_ICONS[LOCK_ID],
   // Zen mode: focus frame with a center dot.
   zenMode: (
     <Svg>

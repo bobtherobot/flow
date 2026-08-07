@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { QUICK_ITEMS, TOOL_ITEM_IDS, quickItem, LOCK_ID, BINDING_ID } from "./actions";
+import { QUICK_ITEMS, TOOL_ITEM_IDS, quickItem, BINDING_ID } from "./actions";
 import { TOOLS } from "../toolbar/tools";
 
 describe("QUICK_ITEMS registry", () => {
@@ -31,11 +31,13 @@ describe("QUICK_ITEMS registry", () => {
     }
   });
 
-  it("marks the two special toggles (lock, binding) without an actionName", () => {
-    expect(quickItem(LOCK_ID)?.kind).toBe("toggle");
-    expect(quickItem(LOCK_ID)?.actionName).toBeUndefined();
-    expect(quickItem(BINDING_ID)?.kind).toBe("toggle");
+  it("marks the arrow-binding toggle without an actionName", () => {
     expect(quickItem(BINDING_ID)?.actionName).toBeUndefined();
+    expect(quickItem(BINDING_ID)?.kind).toBe("toggle");
+  });
+
+  it("no longer registers a tool-lock item", () => {
+    expect(quickItem("lock")).toBeUndefined();
   });
 
   it("gives generic toggles a toggleFlag that names an appState boolean", () => {

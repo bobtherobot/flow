@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useQuickActions } from "./useQuickActions";
-import { quickItem, LOCK_ID, BINDING_ID } from "./actions";
+import { quickItem, BINDING_ID } from "./actions";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
 function fakeApi(appState: Record<string, unknown> = {}) {
@@ -41,14 +41,6 @@ describe("useQuickActions", () => {
     const { result } = renderHook(() => useQuickActions(api, "on", () => {}));
     act(() => result.current.trigger(item("zenMode")));
     expect(api.executeAction).toHaveBeenCalledWith("zenMode");
-  });
-
-  it("reflects and toggles the tool lock via setActiveTool", () => {
-    const api = fakeApi({ activeTool: { type: "rectangle", locked: true } });
-    const { result } = renderHook(() => useQuickActions(api, "on", () => {}));
-    expect(result.current.isActive(item(LOCK_ID))).toBe(true);
-    act(() => result.current.trigger(item(LOCK_ID)));
-    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "rectangle", locked: false });
   });
 
   it("selects a tool and reflects the active tool", () => {

@@ -1,6 +1,6 @@
 import { useEffect, useReducer } from "react";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
-import { type QuickItem, LOCK_ID, BINDING_ID } from "./actions";
+import { type QuickItem, BINDING_ID } from "./actions";
 import type { ToolId } from "../toolbar/tools";
 import { type BindingMode, isBindingActive } from "../../lib/binding-mode";
 
@@ -36,11 +36,9 @@ export function useQuickActions(
 
   const appState = api?.getAppState();
   const activeToolType = appState?.activeTool?.type ?? "selection";
-  const locked = appState?.activeTool?.locked ?? false;
 
   const isActive = (item: QuickItem): boolean => {
     if (item.id === BINDING_ID) return isBindingActive(bindingMode);
-    if (item.id === LOCK_ID) return locked;
     if (item.kind === "tool") return activeToolType === item.id;
     if (item.toggleFlag) return Boolean(appState?.[item.toggleFlag]);
     return false; // fire-and-forget actions never look "on"
@@ -50,10 +48,6 @@ export function useQuickActions(
     if (!api) return;
     if (item.id === BINDING_ID) {
       onSetBindingMode(isBindingActive(bindingMode) ? "off" : "on");
-      return;
-    }
-    if (item.id === LOCK_ID) {
-      api.setActiveTool({ type: activeToolType, locked: !locked } as SetToolArg);
       return;
     }
     if (item.kind === "tool") {
