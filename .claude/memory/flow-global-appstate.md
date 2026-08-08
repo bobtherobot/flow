@@ -1,11 +1,11 @@
 ---
 name: flow-global-appstate
-description: "flow-owned global appState keys must be stripped from a scene's appState on document open"
+description: "flow-owned global appState: stripped on document open, and re-seeded after File ▸ New's resetScene"
 metadata:
   type: project
 ---
 
-# Flow-owned global appState (doc-open protection)
+# Flow-owned global appState (doc-open protection + New re-seed)
 
 Shipped 2026-08-04. Fixes the long-standing "opening a doc clobbers my
 preferences" bug tracked in [[pending-followups]].
@@ -25,6 +25,35 @@ control.
 merges the partial it is handed, so an omitted key leaves the live
 (preference-driven) value alone. Used at the single restore site,
 `applyContentsToScene` (`src/lib/excalidraw-scene.ts`).
+
+## The second consumer: `flowSeedAppState` (added 2026-08-08)
+
+`flowSeedAppState(prefs)` in the same file is the **single source of truth for
+every appState value flow seeds into the canvas**. Two callers: `initialData.appState`
+at mount, and `handleNew` (File ▸ New). Both must stay on it.
+
+**Why New needs it:** `handleNew` calls Excalidraw's `resetScene()`, which does
+`setState({...getDefaultAppState(), …})` — it replaces appState *wholesale*, so
+every flow-seeded value reverts to Excalidraw's. flow's per-pref `useEffect`s do
+not re-run (their deps didn't change), so nothing put them back.
+
+**That was not cosmetic — it broke drawing outright.** `currentItemRoughness`
+reverted to Excalidraw's 1 while `sloppinessRef.current` stayed at the flow
+preference (0), so `App.handleChange`'s stray-roughness normalizer matched on the
+very first onChange of a drag and called `updateScene({elements: normalizeRoughness(…)})`.
+That pushes a **cloned** element array into the scene, while `appState.newElement`
+still references the pre-clone object — so every later drag mutation landed on an
+orphan and the box in the scene stayed **0×0**. Symptom as reported: "after File ▸
+New the height is zero and things don't work right at all."
+
+**Latent hazard, still open:** that normalizer can clone mid-drag for its *intended*
+trigger too (a foreign pasted element whose roughness differs). Guarding it — skip
+while `appState.newElement` is in flight — was left out of this fix deliberately.
+
+The seed is also why the list below matters twice over: a key missing from
+`FLOW_GLOBAL_APP_STATE_KEYS` is clobbered by opening a doc, and a value missing
+from `flowSeedAppState` is lost on File ▸ New. A unit test asserts the seed covers
+every key in the list.
 
 ## Deliberate exclusions
 
@@ -48,7 +77,14 @@ merges the partial it is handed, so an omitted key leaves the live
 
 ## Tests
 
-- `src/lib/flow-app-state.test.ts` — the pure helper.
+- `src/lib/flow-app-state.test.ts` — the pure helpers. Note it must
+  `vi.mock("@excalidraw/excalidraw")` now that the module imports `FONT_FAMILY`:
+  the barrel drags in `ImageExportDialog`, which throws on import under jsdom
+  ("Cannot use 'in' operator to search for 'filter' in null"). Same stub approach
+  as `excalidraw-scene.test.ts`.
+- `e2e/new-document.spec.ts` — File ▸ New: a box drawn afterwards gets its dragged
+  dimensions, every seeded pref survives, and the canvas still clears. There was
+  **zero** coverage of File ▸ New before 2026-08-08, which is how this shipped.
 - `src/lib/excalidraw-scene.test.ts` — new; mocks `loadFromBlob` via
   `vi.hoisted` (the real package throws in jsdom), asserts the four keys never
   reach `updateScene` while doc-owned state still does.

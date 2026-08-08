@@ -6,7 +6,7 @@ import {
   useState,
   type ComponentProps,
 } from "react";
-import { Excalidraw, FONT_FAMILY } from "@excalidraw/excalidraw";
+import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 
 import { loadConfig } from "./app/config";
@@ -24,6 +24,7 @@ import { type Unit } from "./lib/units";
 import { type BindingMode, isBindingActive, toggledBindingMode } from "./lib/binding-mode";
 import { type SelectionMode } from "./lib/selection-mode";
 import { clampGridSize } from "./lib/grid";
+import { flowSeedAppState } from "./lib/flow-app-state";
 import { IndexedDbProvider } from "./storage/indexeddb-provider";
 import type { DocumentSummary } from "./storage/types";
 import { downloadFile, openLocalFile } from "./storage/local-file-provider";
@@ -224,6 +225,13 @@ export default function App() {
     excalidrawApi.updateScene({ appState: { gridSize } });
   }, [excalidrawApi, gridSize]);
 
+  // The app-wide preferences that get seeded into appState, gathered in one
+  // place. `initialData` reads it at mount; File ▸ New re-seeds from the ref
+  // (its callback is stable, and the values must be current at click time).
+  const appStatePrefs = { sloppiness, bindingMode, laserColor, selectionMode, gridSize };
+  const appStatePrefsRef = useRef(appStatePrefs);
+  appStatePrefsRef.current = appStatePrefs;
+
   // Google Drive is wired in a later phase; sign-in is not available yet.
   const isGoogleConnected = false;
   const googleComingSoon = () =>
@@ -328,7 +336,17 @@ export default function App() {
   );
 
   const handleNew = useCallback(() => {
-    apiRef.current?.resetScene();
+    const api = apiRef.current;
+    if (!api) return;
+    api.resetScene();
+    // resetScene replaces appState wholesale with Excalidraw's defaults, which
+    // drops every flow preference seeded at mount. Re-seed the same values, or
+    // the new document silently draws with Excalidraw's roughness, round
+    // corners, snapping off and binding unlocked — and the roughness mismatch
+    // alone breaks drawing outright (see flowSeedAppState).
+    api.updateScene({
+      appState: flowSeedAppState(appStatePrefsRef.current),
+    } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
     setCurrentId(undefined);
     setCurrentName("Untitled");
   }, []);
@@ -416,47 +434,11 @@ export default function App() {
           theme="light"
           onChange={handleChange}
           initialData={{
-            appState: {
-              currentItemRoughness: sloppiness,
-              currentItemFontFamily: FONT_FAMILY.Nunito,
-              // Seed the arrow-binding lock at init so the fork's selector honors
-              // it immediately (an effect-driven apply races initialData restore).
-              // bindingMode is a fork addition not yet in the vendor .d.ts.
-              bindingMode,
-              // Seed the laser color at init too (same fork-field/race rationale
-              // as bindingMode above); flow owns its persistence.
-              laserColor,
-              // Seed the marquee selection mode at init (same fork-field rationale).
-              selectionMode,
-              // Seed the grid size at init so the grid renders at the preferred
-              // cell size on first paint (native field; no cast needed).
-              gridSize,
-              // flow defaults object-snapping ON (Excalidraw ships it off).
-              // Users can still toggle it off in-canvas (Alt+S); saved docs
-              // restore their own value. Native field; no cast needed.
-              objectsSnapModeEnabled: true,
-              // flow draws new shapes with square corners. Excalidraw ships
-              // "round", whose adaptive algorithm sizes the radius from the
-              // shape's own dimensions (a rectangle measured 32px, a diamond
-              // 35px) and reads as enormous on small boxes. Per-object
-              // rounding still lives in the Transform panel. Native field;
-              // no cast.
-              currentItemRoundness: "sharp",
-              // flow is a modal-tool app: the chosen tool stays chosen and
-              // Cmd/Ctrl-hold gives a momentary selection tool. Seed the lock
-              // on so the first tool use is already sticky — useToolOverride's
-              // normalizer would otherwise correct it a frame later. Shape
-              // matches the vendor default (appState.ts:59). Native field.
-              activeTool: {
-                type: "selection",
-                customType: null,
-                locked: true,
-                lastActiveTool: null,
-              },
-            },
+            // Shared with File ▸ New — see flowSeedAppState.
+            appState: flowSeedAppState(appStatePrefs),
           } as ComponentProps<typeof Excalidraw>["initialData"]}
         />
-        <PanelsRoot api={excalidrawApi} units={units} search={search} onChangeLaserColor={handleChangeLaserColor} />
+        <PanelsRoot api={excalidrawApi} units={units} search={search} />
       </div>
 
       <ToolBar api={excalidrawApi} state={toolbar} onChange={setToolbar} />
@@ -509,6 +491,8 @@ export default function App() {
           onChangeSelectionMode={handleChangeSelectionMode}
           gridSize={gridSize}
           onChangeGridSize={handleChangeGridSize}
+          laserColor={laserColor}
+          onChangeLaserColor={handleChangeLaserColor}
           onShowShortcuts={handleShowShortcuts}
           onClose={() => setPrefsOpen(false)}
         />

@@ -27,8 +27,6 @@ interface PanelsRootProps {
   units: Unit;
   /** Drives the Search sub-panel; bumping its nonce opens the panel. */
   search: SearchSignal;
-  /** Sets the global laser-pointer color (persist + live-update). */
-  onChangeLaserColor: (color: string) => void;
 }
 
 /**
@@ -36,12 +34,12 @@ interface PanelsRootProps {
  * The selection-style subscription is created once here and shared by every
  * panel, so the whole dock re-renders together as the selection changes.
  */
-export function PanelsRoot({ api, units, search, onChangeLaserColor }: PanelsRootProps) {
+export function PanelsRoot({ api, units, search }: PanelsRootProps) {
   const sel = useSelectionStyle(api);
 
   const defs: PanelDef[] = [
     { id: "transform", label: "Transform", render: () => <TransformPanel sel={sel} api={api} /> },
-    { id: "color", label: "Color", render: () => <ColorPanel sel={sel} onChangeLaserColor={onChangeLaserColor} /> },
+    { id: "color", label: "Color", render: () => <ColorPanel sel={sel} /> },
     { id: "swatches", label: "Color Swatches", render: () => <SwatchesPanel /> },
     { id: "stroke", label: "Stroke", render: () => <StrokePanel sel={sel} units={units} /> },
     { id: "text", label: "Text", render: () => <TextPanel sel={sel} api={api} /> },

@@ -7,6 +7,11 @@ metadata:
 
 Shipped 2026-08-04. Four asks, one of which turned out to be a no-op.
 
+**The 0–10px stroke slider has been the most expensive of the four by far**: allowing a
+0 stroke width has now required three separate fork edits (`scene/Shape.ts` fill-maths
+floor, `scene/Shape.ts` transparent stroke, `data/restore.ts` `??`), each because some
+upstream code treats 0 as absent or as a no-op. Expect more; see the gotchas below.
+
 - **Square corners** — `src/App.tsx` seeds `currentItemRoundness: "sharp"` in
   `initialData.appState`. Excalidraw ships `"round"`, whose ADAPTIVE_RADIUS
   algorithm sizes the radius from the shape's own dimensions — not a fixed
@@ -34,9 +39,24 @@ Shipped 2026-08-04. Four asks, one of which turned out to be a no-op.
   eslint runs `--max-warnings=0`, so they must be deleted.
 - **A 0 stroke width needs two guards** (`scene/Shape.ts`): floor `fillWeight`/
   `hachureGap` at 1px, or roughjs clamps the hachure gap to 0.1px and hangs on
-  hachure/cross-hatch elements from opened docs; and map a 0 width to
-  `stroke: "none"`, because canvas ignores a non-positive `lineWidth` and keeps
-  the previous draw's value.
+  hachure/cross-hatch elements from opened docs; and map a 0 width to a
+  **`stroke: "transparent"`**, because canvas ignores a non-positive `lineWidth`
+  and keeps the previous draw's value, painting a stray hairline.
+- **That second guard must be `"transparent"`, NEVER roughjs's own `"none"`**
+  (was "none" until 2026-08-08; fixed after a crash report). roughjs's *canvas
+  renderer* paints "none" as transparent, so the pixels are identical — but its
+  *generator* reads "none" as "emit no stroke path at all". `curve()` (curved
+  arrows/lines) then returns a Drawable with an empty `sets`, while
+  `linearPath()` (sharp arrows) still emits one — which is why only the curved
+  variants broke. Everything downstream derives geometry from that Drawable:
+  `getCurvePathOps` (`packages/utils/geometry/shape.ts`) reads `shape.sets[0].ops`
+  unguarded → **"Cannot read properties of undefined (reading 'ops')"** thrown
+  out of the render loop via `getArrowheadPoints`, and the bounds/hit-test call
+  sites would otherwise reduce over zero ops and collapse to the ±Infinity seed.
+  Repro: any 0-width curved arrow (e.g. set a shape's width to 0, which drifts
+  into the tool defaults, then draw one). Locked by two e2e tests in
+  `drawing-defaults.spec.ts` — one for the crash, one that the outline still
+  paints nothing.
 - **Linear elements are the ONE exception to the tight chrome — deliberately.**
   `LINEAR_SELECTION_SPACING = 10` (fixed 2026-08-05). A linear element's bounding-box
   corners often ARE its vertices (always so for a 2-point line), and a vertex wins the
@@ -69,6 +89,30 @@ Shipped 2026-08-04. Four asks, one of which turned out to be a no-op.
 
 Render and hit-test can't drift: `getTransformHandles` feeds both the renderer
 and `resizeTest.ts`, and the shared default params feed both multi-select paths.
+
+- **A 0 stroke width is a *legitimate value*, and upstream code does not expect one.**
+  Audit falsy coercions (`||`, `!x`, truthiness guards) on `strokeWidth` whenever
+  touching vendor code. Found 2026-08-08 in `data/restore.ts`:
+  `strokeWidth: element.strokeWidth || DEFAULT_ELEMENT_PROPS.strokeWidth` rewrote every
+  legitimate 0 to 2 — **third fork edit from this feature**, now `??` (every sibling field
+  on that object already used `??`/`== null`). `restoreElement` runs on **paste, on file
+  open, and on library insert**, so a 0-width shape lost its styling on copy/paste *and*
+  a saved flow document came back at 2px on reload. Upstream never hit it because its own
+  picker only offers 1/2/4. Reported as a paste bug; the file-open half was found by
+  checking the other callers of the same line. Checked and clean in the same file: flow's
+  own added props (`cornerRadius`, `padding`, `startArrowheadSize`, `endArrowheadSize`)
+  are passed straight through, and `opacity` uses an `== null` test, so a 0 survives.
+  Locked by two e2e tests in `drawing-defaults.spec.ts`.
+
+## Rebuilding the vendor dist
+
+`cd vendor/excalidraw/packages/excalidraw && node ../../scripts/buildPackage.js`
+— cwd matters (from the submodule root esbuild fails with "entry point
+index.tsx cannot be marked as external"). Do **not** reach for `yarn build:esm`:
+it wraps the same call in `rm -rf dist` plus a `gen:types` tail that fails on
+pre-existing fork type debt (`data/restore.ts` `cornerRadius` vs `Required<…>`),
+so it leaves the build looking broken when it is not. The `dist/types` that
+flow's own `tsc` consumes comes from `buildPackage.js`, not `gen:types`.
 
 ## Vendor suite baseline (measured 2026-08-05)
 

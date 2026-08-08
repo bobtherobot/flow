@@ -11,8 +11,13 @@ import {
   type SelectionMode,
 } from "../lib/selection-mode";
 import { MIN_GRID_SIZE, MAX_GRID_SIZE, GRID_SIZE_STEP } from "../lib/grid";
+import { splitColorAlpha, combineColorAlpha } from "../lib/color-alpha";
 import { NumberInput } from "./panels/controls/NumberInput";
+import { ColorSwatch } from "./panels/controls/ColorSwatch";
 import "./dialogs.css";
+// ColorSwatch/NumberInput carry their .flow-ctl-* styles in panels.css; import
+// it here too so the dialog doesn't depend on the panels being mounted.
+import "./panels/panels.css";
 import "./preferences-dialog.css";
 
 export interface PreferencesDialogProps {
@@ -24,6 +29,10 @@ export interface PreferencesDialogProps {
   onChangeSelectionMode: (value: SelectionMode) => void;
   gridSize: number;
   onChangeGridSize: (value: number) => void;
+  /** Laser-trail color as `#rrggbb` or `#rrggbbaa` — a global preference, never
+   *  a per-element property, which is why it lives here and not in the Color panel. */
+  laserColor: string;
+  onChangeLaserColor: (value: string) => void;
   onShowShortcuts: () => void;
   onClose: () => void;
 }
@@ -47,6 +56,8 @@ export function PreferencesDialog({
   onChangeSelectionMode,
   gridSize,
   onChangeGridSize,
+  laserColor,
+  onChangeLaserColor,
   onShowShortcuts,
   onClose,
 }: PreferencesDialogProps) {
@@ -54,6 +65,7 @@ export function PreferencesDialog({
   const titleId = useId();
   const unitsId = useId();
   const gridSizeId = useId();
+  const laser = splitColorAlpha(laserColor);
 
   return (
     <div
@@ -185,6 +197,33 @@ export function PreferencesDialog({
                   // while dragging.
                   onChange={(n) => onChangeGridSize(n)}
                 />
+              </div>
+            )}
+
+            {category === "general" && (
+              <div className="flow-num flow-prefs__laser">
+                <span className="flow-num__label">Laser pointer</span>
+                <div className="flow-prefs__laser-control">
+                  <ColorSwatch
+                    value={laser.hex}
+                    onChange={(hex) =>
+                      onChangeLaserColor(combineColorAlpha(hex, laser.alpha > 0 ? laser.alpha : 100))
+                    }
+                    ariaLabel="Laser color"
+                  />
+                  <NumberInput
+                    className="flow-num__control"
+                    value={laser.alpha}
+                    min={0}
+                    max={100}
+                    unit="%"
+                    ariaLabel="Laser opacity"
+                    // Same reasoning as Grid size: a preference write, so the
+                    // `transient` flag is dropped and every frame of a scrub
+                    // recolors the trail live.
+                    onChange={(n) => onChangeLaserColor(combineColorAlpha(laser.hex, n))}
+                  />
+                </div>
               </div>
             )}
 

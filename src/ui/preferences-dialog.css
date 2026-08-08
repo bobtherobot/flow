@@ -138,3 +138,22 @@
   font-size: 0.8125rem;
   color: #6b7280;
 }
+
+/* Laser pointer: swatch + opacity on one line. */
+.flow-prefs__laser-control {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.flow-prefs__laser .flow-ctl-color__swatch {
+  width: 34px;
+  height: 30px;
+  border-radius: 8px;
+  border-color: #d6dae4;
+}
+/* `.flow-dialog` is `overflow: clip`, so a popover opening downward off the
+   last field would be cut off. Open it upward — there is always panel above. */
+.flow-prefs__laser .flow-ctl-color__popover {
+  top: auto;
+  bottom: calc(100% + 6px);
+}

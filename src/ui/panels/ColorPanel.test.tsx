@@ -11,7 +11,6 @@ function makeSel(overrides: Partial<SelectionStyle> = {}): SelectionStyle {
       currentItemBackgroundColor: "transparent",
       currentItemStrokeColor: "#1e1e1e",
       currentItemTextColor: "#1e1e1e",
-      laserColor: "#ff0000",
     } as unknown as SelectionStyle["appState"],
     selectedIds: {},
     textTargetIds: {},
@@ -26,23 +25,33 @@ function makeSel(overrides: Partial<SelectionStyle> = {}): SelectionStyle {
   };
 }
 
-describe("ColorPanel laser row", () => {
-  it("renders a Laser swatch and opacity control", () => {
-    render(<ColorPanel sel={makeSel()} onChangeLaserColor={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Laser color" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Laser opacity")).toBeInTheDocument();
+describe("ColorPanel", () => {
+  it("renders the three per-element color rows", () => {
+    render(<ColorPanel sel={makeSel()} />);
+    for (const label of ["Fill", "Stroke", "Text"]) {
+      expect(screen.getByRole("button", { name: `${label} color` })).toBeInTheDocument();
+      expect(screen.getByLabelText(`${label} opacity`)).toBeInTheDocument();
+    }
   });
 
-  it("calls onChangeLaserColor with combined hex when opacity changes, not setProp", () => {
-    const onChangeLaserColor = vi.fn();
+  it("writes an opacity change to the selection", () => {
     const sel = makeSel();
-    render(<ColorPanel sel={sel} onChangeLaserColor={onChangeLaserColor} />);
+    render(<ColorPanel sel={sel} />);
 
-    const opacity = screen.getByLabelText("Laser opacity");
+    const opacity = screen.getByLabelText("Stroke opacity");
     fireEvent.change(opacity, { target: { value: "50" } });
     fireEvent.blur(opacity);
 
-    expect(onChangeLaserColor).toHaveBeenCalledWith("#ff000080");
-    expect(sel.setProp).not.toHaveBeenCalled();
+    expect(sel.setProp).toHaveBeenCalledWith(
+      expect.objectContaining({ prop: "strokeColor", value: "#1e1e1e80" }),
+    );
+  });
+
+  // The laser trail is a global preference, not an element property — it moved
+  // to File ▸ Preferences. See PreferencesDialog.test.tsx.
+  it("no longer renders a Laser row", () => {
+    render(<ColorPanel sel={makeSel()} />);
+    expect(screen.queryByRole("button", { name: "Laser color" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Laser opacity")).not.toBeInTheDocument();
   });
 });

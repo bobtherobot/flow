@@ -8,6 +8,7 @@ function setup(overrides = {}) {
   const onChangeUnits = vi.fn();
   const onChangeSelectionMode = vi.fn();
   const onChangeGridSize = vi.fn();
+  const onChangeLaserColor = vi.fn();
   const onShowShortcuts = vi.fn();
   const onClose = vi.fn();
   render(
@@ -20,6 +21,8 @@ function setup(overrides = {}) {
       onChangeSelectionMode={onChangeSelectionMode}
       gridSize={20}
       onChangeGridSize={onChangeGridSize}
+      laserColor="#ff0000"
+      onChangeLaserColor={onChangeLaserColor}
       onShowShortcuts={onShowShortcuts}
       onClose={onClose}
       {...overrides}
@@ -30,6 +33,7 @@ function setup(overrides = {}) {
     onChangeUnits,
     onChangeSelectionMode,
     onChangeGridSize,
+    onChangeLaserColor,
     onShowShortcuts,
     onClose,
   };
@@ -116,7 +120,8 @@ describe("PreferencesDialog", () => {
 
   it("scrubs the grid size, snapped to the step", () => {
     const { onChangeGridSize } = setup();
-    const field = document.querySelector(".flow-ctl-num__input")!;
+    // By label, not `.flow-ctl-num__input` — the panel has more than one now.
+    const field = screen.getByLabelText("Grid size");
 
     fireEvent.pointerDown(field, { clientY: 300, button: 0 });
     // span 95 over 150px → 20px = +12.67, from 20 → 32.67.
@@ -126,6 +131,33 @@ describe("PreferencesDialog", () => {
     fireEvent.pointerUp(window, { clientY: 280 });
 
     expect(onChangeGridSize).toHaveBeenLastCalledWith(35);
+  });
+
+  it("shows the laser swatch and opacity reflecting the current color", () => {
+    setup({ laserColor: "#2f9e44cc" });
+    expect(screen.getByRole("button", { name: "Laser color" })).toHaveAttribute(
+      "title",
+      "#2f9e44",
+    );
+    expect(screen.getByLabelText("Laser opacity")).toHaveValue(80);
+  });
+
+  it("fires onChangeLaserColor with the picked hue, preserving opacity", async () => {
+    const { onChangeLaserColor } = setup({ laserColor: "#ff000080" });
+    await userEvent.click(screen.getByRole("button", { name: "Laser color" }));
+    // A preset from the default (Pastel) palette the picker seeds itself with.
+    await userEvent.click(screen.getByRole("button", { name: "#a9def9" }));
+    expect(onChangeLaserColor).toHaveBeenCalledWith("#a9def980");
+  });
+
+  it("fires onChangeLaserColor with the combined hex when opacity changes", async () => {
+    const user = userEvent.setup();
+    const { onChangeLaserColor } = setup({ laserColor: "#ff0000" });
+    const opacity = screen.getByLabelText("Laser opacity");
+    await user.clear(opacity);
+    await user.type(opacity, "50");
+    await user.tab();
+    expect(onChangeLaserColor).toHaveBeenLastCalledWith("#ff000080");
   });
 
   it("switches to the Keyboard category and fires onShowShortcuts", async () => {

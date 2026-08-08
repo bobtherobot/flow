@@ -2,7 +2,6 @@ import { ColorSwatch } from "./controls/ColorSwatch";
 import { NumberInput } from "./controls/NumberInput";
 import { MIXED, readFormValue, type SelectedElementIds } from "../../lib/selection-style";
 import { splitColorAlpha, combineColorAlpha } from "../../lib/color-alpha";
-import { DEFAULT_LASER_HEX } from "../../lib/laser-color";
 import type { SelectionStyle } from "./useSelectionStyle";
 
 interface ColorRowProps {
@@ -18,9 +17,6 @@ interface ColorRowProps {
   ids: SelectedElementIds;
   allowTransparent?: boolean;
   disabled?: boolean;
-  /** When set, replaces the default per-element write — used by the always-global
-   *  Laser row to persist + live-update instead of writing element props. */
-  onWrite?: (color: string) => void;
 }
 
 /**
@@ -40,7 +36,6 @@ function ColorRow({
   ids,
   allowTransparent = false,
   disabled = false,
-  onWrite,
 }: ColorRowProps) {
   const fallback = splitColorAlpha(fallbackColor);
   const hue = readFormValue(sel.elements, ids, (el) => splitColorAlpha(colorOf(el)).hex, fallback.hex);
@@ -49,11 +44,8 @@ function ColorRow({
   const isTransparent = hue === "transparent";
   const currentAlpha = alpha === MIXED ? 100 : alpha;
 
-  // `onWrite` (the always-global laser row) deliberately drops `transient`:
-  // it persists + live-updates a preference rather than writing element props,
-  // so there's no scene history to defer either.
   const write = (color: string, transient = false) =>
-    onWrite ? onWrite(color) : sel.setProp({ prop, value: color, currentItemKey, ids, transient });
+    sel.setProp({ prop, value: color, currentItemKey, ids, transient });
 
   const onColor = (hex: string) => {
     if (hex === "transparent") return write("transparent");
@@ -95,13 +87,7 @@ function ColorRow({
  * the selection has none. With an empty selection the rows edit the tool
  * defaults, Illustrator-style.
  */
-export function ColorPanel({
-  sel,
-  onChangeLaserColor,
-}: {
-  sel: SelectionStyle;
-  onChangeLaserColor: (color: string) => void;
-}) {
+export function ColorPanel({ sel }: { sel: SelectionStyle }) {
   const a = sel.appState;
   return (
     <div className="flow-color-panel">
@@ -133,16 +119,6 @@ export function ColorPanel({
         fallbackColor={a?.currentItemTextColor ?? "#1e1e1e"}
         ids={sel.textTargetIds}
         disabled={!sel.hasText}
-      />
-      <ColorRow
-        sel={sel}
-        label="Laser"
-        colorOf={() => DEFAULT_LASER_HEX}
-        prop="laserColor"
-        currentItemKey="laserColor"
-        fallbackColor={(a as { laserColor?: string } | null)?.laserColor ?? DEFAULT_LASER_HEX}
-        ids={{}}
-        onWrite={onChangeLaserColor}
       />
     </div>
   );
