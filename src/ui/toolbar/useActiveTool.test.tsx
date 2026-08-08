@@ -16,17 +16,15 @@ function fakeApi(
 }
 
 describe("useActiveTool", () => {
-  it("reads the active tool type and lock flag", () => {
+  it("reads the active tool type", () => {
     const api = fakeApi({ type: "rectangle", locked: true });
     const { result } = renderHook(() => useActiveTool(api));
     expect(result.current.activeType).toBe("rectangle");
-    expect(result.current.locked).toBe(true);
   });
 
-  it("defaults to selection/unlocked when api is null", () => {
+  it("defaults to selection when api is null", () => {
     const { result } = renderHook(() => useActiveTool(null));
     expect(result.current.activeType).toBe("selection");
-    expect(result.current.locked).toBe(false);
   });
 
   it("setTool dispatches setActiveTool with the type", () => {
@@ -57,12 +55,5 @@ describe("useActiveTool", () => {
     const { result } = renderHook(() => useActiveTool(api));
     act(() => result.current.setTool("rectangle"));
     expect(api.updateScene).not.toHaveBeenCalled();
-  });
-
-  it("toggleLock flips the lock flag on the current tool", () => {
-    const api = fakeApi({ type: "arrow", locked: false });
-    const { result } = renderHook(() => useActiveTool(api));
-    act(() => result.current.toggleLock());
-    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "arrow", locked: true });
   });
 });

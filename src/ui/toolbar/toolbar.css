@@ -81,15 +81,6 @@
   padding: 4px 0;
   overflow-y: auto;
 }
-/* Lock row: pinned above the tool column. Framed by the topbar's bottom border
-   (separator above) and its own bottom border (separator below). */
-.flow-toolbar__lock {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  padding: 4px 0;
-  border-bottom: 1px solid var(--flow-border);
-}
 .flow-toolbar__btn {
   display: inline-flex;
   align-items: center;

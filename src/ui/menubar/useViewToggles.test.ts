@@ -27,7 +27,6 @@ describe("useViewToggles", () => {
     expect(result.current.grid.checked).toBe(true);
     expect(result.current.objectsSnap.checked).toBe(false);
     expect(result.current.zenMode.checked).toBe(true);
-    expect(result.current.toolLock.checked).toBe(true);
   });
 
   it("dispatches the matching action for grid/snap/zen toggles", () => {
@@ -41,20 +40,11 @@ describe("useViewToggles", () => {
     expect(api.executeAction).toHaveBeenCalledWith("zenMode");
   });
 
-  it("toggles the tool lock via setActiveTool with the flipped locked flag", () => {
-    const api = fakeApi(baseState);
-    const { result } = renderHook(() => useViewToggles(api as unknown as Api));
-    result.current.toolLock.toggle();
-    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "rectangle", locked: false });
-  });
-
   it("is inert when api is null (checked false, toggles no-op)", () => {
     const { result } = renderHook(() => useViewToggles(null));
     expect(result.current.grid.checked).toBe(false);
-    expect(result.current.toolLock.checked).toBe(false);
     expect(() => {
       result.current.grid.toggle();
-      result.current.toolLock.toggle();
     }).not.toThrow();
   });
 

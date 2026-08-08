@@ -33,6 +33,15 @@ async function draw(page: Page, tool: string, x1: number, y1: number, x2: number
   await page.mouse.up();
 }
 
+/** Switch to the Selection tool. flow keeps the drawing tool active after a
+ *  draw (permanent tool lock), so selecting must be explicit. */
+async function pickSelection(page: Page) {
+  await page
+    .getByRole("toolbar", { name: "Tools" })
+    .getByRole("button", { name: "Selection", exact: true })
+    .click();
+}
+
 /** Place a loose text element. Leaves the text tool having been active. */
 async function addText(page: Page, text: string) {
   await page
@@ -106,8 +115,11 @@ test("selecting an element adopts its style for the next one of that kind", asyn
   await expect(second).toHaveValue("3");
 
   // Click BOX_A's outline — adopting it must restore 8 as the shape default.
-  // The active tool is already Selection after drawing BOX_B, so this click
-  // replaces the current selection outright; no explicit deselect needed.
+  // flow keeps Rectangle active after drawing BOX_B (permanent tool lock),
+  // so reaching Selection for this click must be explicit; a plain click
+  // while a drawing tool is still active would start a new shape instead of
+  // selecting BOX_A.
+  await pickSelection(page);
   await page.mouse.click(BOX_A_EDGE[0], BOX_A_EDGE[1]);
   await expect(page.getByLabel("Stroke width")).toHaveValue("8");
 

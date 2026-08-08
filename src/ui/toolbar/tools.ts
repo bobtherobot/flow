@@ -58,7 +58,3 @@ export const TOOLS: readonly ToolDef[] = [
   { id: "frame", label: "Frame", shortcut: "F" },
   { id: "laser", label: "Laser pointer", shortcut: "K" },
 ];
-
-/** Membership key for the lock toggle within `hiddenTools` (lock is not a
- *  drawing tool, so it is not part of `ToolId`). */
-export const LOCK_ID = "lock";

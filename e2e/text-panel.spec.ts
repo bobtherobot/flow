@@ -107,6 +107,10 @@ test("changing size recenters text bound to a container (no resize needed)", asy
   await page.mouse.down();
   await page.mouse.move(820, 460, { steps: 8 });
   await page.mouse.up();
+  // flow keeps Rectangle active after the draw above (permanent tool lock),
+  // but double-click-to-add-bound-text only fires when Selection is active
+  // (the vendor's handleCanvasDoubleClick bails otherwise) — switch first.
+  await page.getByRole("button", { name: "Selection" }).click();
   await page.mouse.dblclick(690, 380);
   await page.keyboard.type("Hi");
   await page.keyboard.press("Escape");
@@ -145,6 +149,10 @@ test("changing font family recenters text bound to a container", async ({ page }
   await page.mouse.down();
   await page.mouse.move(820, 460, { steps: 8 });
   await page.mouse.up();
+  // flow keeps Rectangle active after the draw above (permanent tool lock),
+  // but double-click-to-add-bound-text only fires when Selection is active
+  // (the vendor's handleCanvasDoubleClick bails otherwise) — switch first.
+  await page.getByRole("button", { name: "Selection" }).click();
   await page.mouse.dblclick(690, 380);
   await page.keyboard.type("Hi");
   await page.keyboard.press("Escape");

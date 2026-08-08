@@ -138,8 +138,17 @@ modifier is held).
 `normalizeToolbarState` keeps unknown strings
 (`src/ui/toolbar/toolbar-state.ts:36`) and rendering is driven off `TOOLS`.
 
-The native `Q` shortcut is not removed; it toggles the lock off and the
-normalizer immediately puts it back, which is a no-op with one wasted render.
+The native `Q` shortcut is swallowed, not left to the normalizer. `toggleLock`
+(vendor `App.tsx`) branches on the *current* lock state: with it permanently
+true, `Q` doesn't just toggle `locked` off — it also sets the tool to
+`{type: "selection"}`. The normalizer restores `locked` but never the tool, so
+letting `Q` through and cleaning up after it would still silently drop the
+user to Selection. `useToolOverride.ts`'s capture-phase keydown listener
+swallows `q` before Excalidraw's own container-bound handler sees it, guarded
+by `isTextEntry` so typing "q" into Excalidraw's own text editor (a
+`<textarea>`) is unaffected. The original rejection of swallowing `Q` — that
+it would eat the letter in Excalidraw's text editor — is resolved by that
+guard, not overridden.
 
 ## Testing
 

@@ -19,7 +19,7 @@ export interface QuickItem {
   kind: QuickItemKind;
   group: QuickGroup;
   /** Excalidraw action name for `action`/`toggle` items dispatched via
-   *  `executeAction`. Absent for tool-lock and arrow-binding (handled specially)
+   *  `executeAction`. Absent for arrow-binding (handled specially)
    *  and for `tool` items (which call `setActiveTool`). */
   actionName?: string;
   /** For generic toggles: the `appState` boolean that reflects the on-state. */
@@ -28,8 +28,7 @@ export interface QuickItem {
   shortcut?: string;
 }
 
-/** Membership ids for the two specially-handled toggles. */
-export const LOCK_ID = "lock";
+/** Membership id for the specially-handled arrow-binding toggle. */
 export const BINDING_ID = "binding";
 
 /** Tool items derived from the rail's TOOLS (DRY) — same ids/labels/shortcuts. */
@@ -78,7 +77,6 @@ export const QUICK_ITEMS: readonly QuickItem[] = [
   { id: "objectsSnapMode", label: "Snap to objects", kind: "toggle", group: "toggle", actionName: "objectsSnapMode", toggleFlag: "objectsSnapModeEnabled", shortcut: "Alt+S" },
   { id: "gridMode", label: "Toggle grid", kind: "toggle", group: "toggle", actionName: "gridMode", toggleFlag: "gridModeEnabled", shortcut: "Ctrl+'" },
   { id: BINDING_ID, label: "Arrow binding", kind: "toggle", group: "toggle" },
-  { id: LOCK_ID, label: "Tool lock", kind: "toggle", group: "toggle", shortcut: "Q" },
   { id: "zenMode", label: "Zen mode", kind: "toggle", group: "toggle", actionName: "zenMode", toggleFlag: "zenModeEnabled", shortcut: "Alt+Z" },
   // History
   { id: "undo", label: "Undo", kind: "action", group: "history", actionName: "undo", shortcut: "Ctrl+Z" },

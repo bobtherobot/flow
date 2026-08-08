@@ -18,6 +18,16 @@ async function marquee(page: Page, x1: number, y1: number, x2: number, y2: numbe
   await page.mouse.up();
 }
 
+/** Switch to the Selection tool. flow keeps the drawing tool active after a
+ *  draw (permanent tool lock), so a subsequent click/drag meant to select or
+ *  deselect — rather than draw another shape — must switch tools explicitly. */
+async function pickSelection(page: Page) {
+  await page
+    .getByRole("toolbar", { name: "Tools" })
+    .getByRole("button", { name: "Selection", exact: true })
+    .click();
+}
+
 async function setSelectionMode(page: Page, label: "marquee touch" | "marquee enclose") {
   await page.getByRole("menuitem", { name: "File" }).click();
   await page.getByRole("menuitem", { name: "Preferences…" }).click();
@@ -32,6 +42,9 @@ test("marquee touch selects an element the rectangle only intersects", async ({ 
   await setSelectionMode(page, "marquee touch");
 
   await drawRectangle(page);
+  // flow keeps Rectangle active after the draw (permanent tool lock), so
+  // reaching Selection for the click/marquee below must be explicit.
+  await pickSelection(page);
   await page.mouse.click(300, 250); // click empty canvas to deselect
   const width = page.getByRole("spinbutton", { name: "Width", exact: true });
   await expect(width).toBeDisabled();
@@ -45,6 +58,10 @@ test("marquee enclose ignores a mere intersect but selects a full enclosure", as
   await page.goto("/"); // default mode = enclose
 
   await drawRectangle(page);
+  // flow keeps Rectangle active after the draw (permanent tool lock); without
+  // this, the "empty canvas" click/marquees below would draw more rectangles
+  // instead of selecting or deselecting.
+  await pickSelection(page);
   await page.mouse.click(300, 250); // click empty canvas to deselect
   const width = page.getByRole("spinbutton", { name: "Width", exact: true });
   await expect(width).toBeDisabled();

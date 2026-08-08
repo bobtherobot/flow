@@ -146,11 +146,11 @@ describe("MenuBar", () => {
     expect(onResetLayout).toHaveBeenCalledOnce();
   });
 
-  it("shows the five canvas toggles in the View menu", async () => {
+  it("shows the four canvas toggles in the View menu", async () => {
     const user = userEvent.setup();
     render(<MenuBar {...props} api={fakeApi()} />);
     await user.click(screen.getByRole("menuitem", { name: "View" }));
-    for (const name of ["Grid", "Snap to Objects", "Arrow Binding", "Tool Lock", "Zen Mode"]) {
+    for (const name of ["Grid", "Snap to Objects", "Arrow Binding", "Zen Mode"]) {
       expect(await screen.findByRole("menuitemcheckbox", { name })).toBeInTheDocument();
     }
   });
@@ -190,13 +190,11 @@ describe("MenuBar", () => {
     expect(api.executeAction).toHaveBeenCalledWith("zenMode");
   });
 
-  it("flips the tool lock via setActiveTool when Tool Lock is clicked", async () => {
+  it("no longer offers a Tool Lock item", async () => {
     const user = userEvent.setup();
-    const api = fakeApi({ activeTool: { type: "selection", locked: false } });
-    render(<MenuBar {...props} api={api} />);
+    render(<MenuBar {...props} api={fakeApi()} />);
     await user.click(screen.getByRole("menuitem", { name: "View" }));
-    await user.click(await screen.findByRole("menuitemcheckbox", { name: "Tool Lock" }));
-    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "selection", locked: true });
+    expect(screen.queryByRole("menuitemcheckbox", { name: "Tool Lock" })).toBeNull();
   });
 
   it("fires onToggleArrowBinding when Arrow Binding is clicked", async () => {

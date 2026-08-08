@@ -226,14 +226,6 @@ export function MenuBar(props: MenuBarProps) {
             </Menubar.CheckboxItem>
             <Menubar.CheckboxItem
               className="flow-menu__item flow-menu__item--check"
-              checked={view.toolLock.checked}
-              onCheckedChange={view.toolLock.toggle}
-            >
-              <Menubar.ItemIndicator className="flow-menu__check" aria-hidden="true">✓</Menubar.ItemIndicator>
-              Tool Lock
-            </Menubar.CheckboxItem>
-            <Menubar.CheckboxItem
-              className="flow-menu__item flow-menu__item--check"
               checked={view.zenMode.checked}
               onCheckedChange={view.zenMode.toggle}
             >

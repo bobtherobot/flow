@@ -36,6 +36,17 @@ describe("isTextEntry", () => {
     }
   });
 
+  it("treats search, email, url and tel inputs as text entry", () => {
+    // flow's own search boxes (SearchControl.tsx, SearchPanel.tsx) are
+    // type="search" — the vendor's own writable-element list doesn't cover
+    // it, since Excalidraw has no search input of its own. See blocker A:
+    // a "q" typed here was silently eaten by the Q swallow before this list
+    // included "search".
+    for (const type of ["search", "email", "url", "tel"]) {
+      expect(isTextEntry(input(type))).toBe(true);
+    }
+  });
+
   it("does not treat a range slider as text entry", () => {
     expect(isTextEntry(input("range"))).toBe(false);
   });

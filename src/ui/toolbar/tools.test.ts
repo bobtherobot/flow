@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { TOOLS, LOCK_ID } from "./tools";
+import { TOOLS } from "./tools";
 
 describe("TOOLS", () => {
   it("lists the native tools with three arrow variants plus laser, in order", () => {
@@ -31,9 +31,5 @@ describe("TOOLS", () => {
     const arrows = TOOLS.filter((t) => (t.toolType ?? t.id) === "arrow");
     expect(arrows.map((t) => t.id)).toEqual(["arrow", "arrow-curved", "arrow-elbow"]);
     expect(arrows.map((t) => t.arrowType)).toEqual(["sharp", "round", "elbow"]);
-  });
-
-  it("exposes the lock id constant", () => {
-    expect(LOCK_ID).toBe("lock");
   });
 });
