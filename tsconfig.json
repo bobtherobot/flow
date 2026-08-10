@@ -15,7 +15,19 @@
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    // The vendored fork carries its own @types/react (19.0.10) alongside flow's
+    // (19.2.17). Two copies mean two distinct `ReactNode` identities, so any
+    // vendor .d.ts exposing one (e.g. AppState.errorMessage) fails to typecheck
+    // against flow's. Pin both to flow's copy for flow's compilation only --
+    // the fork's own `yarn gen:types` still resolves its nested copy.
+    "paths": {
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "react-dom/*": ["./node_modules/@types/react-dom/*"]
+    }
   },
   "include": ["src"]
 }

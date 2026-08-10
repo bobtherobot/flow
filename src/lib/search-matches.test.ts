@@ -14,7 +14,7 @@ function fakeApi(elements: { id: string }[] = []) {
   return {
     getSceneElements: () => elements,
     updateScene: vi.fn(),
-    scrollToContent: vi.fn(),
+    setViewport: vi.fn(),
   } as unknown as ExcalidrawAPI;
 }
 
@@ -44,10 +44,13 @@ describe("applyMatches", () => {
     applyMatches(api, [result("a"), result("b")], 1);
     expect(api.updateScene).toHaveBeenCalledWith({
       appState: {
-        searchMatches: [
-          { id: "a", focus: false, matchedLines: [{ offsetX: 1, offsetY: 2, width: 3, height: 4 }] },
-          { id: "b", focus: true, matchedLines: [{ offsetX: 1, offsetY: 2, width: 3, height: 4 }] },
-        ],
+        searchMatches: {
+          focusedId: "b",
+          matches: [
+            { id: "a", focus: false, matchedLines: [{ offsetX: 1, offsetY: 2, width: 3, height: 4, showOnCanvas: true }] },
+            { id: "b", focus: true, matchedLines: [{ offsetX: 1, offsetY: 2, width: 3, height: 4, showOnCanvas: true }] },
+          ],
+        },
       },
     });
   });
@@ -57,7 +60,9 @@ describe("clearMatches", () => {
   it("empties the canvas searchMatches", () => {
     const api = fakeApi();
     clearMatches(api);
-    expect(api.updateScene).toHaveBeenCalledWith({ appState: { searchMatches: [] } });
+    expect(api.updateScene).toHaveBeenCalledWith({
+      appState: { searchMatches: { focusedId: null, matches: [] } },
+    });
   });
 });
 
@@ -66,12 +71,14 @@ describe("scrollToMatch", () => {
     const el = { id: "b" };
     const api = fakeApi([{ id: "a" }, el]);
     scrollToMatch(api, result("b"));
-    expect(api.scrollToContent).toHaveBeenCalledWith(el, expect.objectContaining({ fitToContent: true }));
+    expect(api.setViewport).toHaveBeenCalledWith(
+      expect.objectContaining({ target: el, fit: "scale-down" }),
+    );
   });
 
   it("is a no-op when the element is gone", () => {
     const api = fakeApi([{ id: "a" }]);
     scrollToMatch(api, result("zzz"));
-    expect(api.scrollToContent).not.toHaveBeenCalled();
+    expect(api.setViewport).not.toHaveBeenCalled();
   });
 });

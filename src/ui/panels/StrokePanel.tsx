@@ -1,6 +1,7 @@
 import { IconToggleGroup, type IconOption } from "./controls/IconToggleGroup";
 import { NumberInput } from "./controls/NumberInput";
 import { SliderInput } from "./controls/SliderInput";
+import { getStrokeWidthByKey } from "@excalidraw/excalidraw";
 import { MIXED, readFormValue, type SelectedElementIds } from "../../lib/selection-style";
 import {
   radiusTargetIds,
@@ -156,7 +157,12 @@ export function StrokePanel({ sel, units }: { sel: SelectionStyle; units: Unit }
     sel.elements,
     sel.selectedIds,
     (el) => el.strokeWidth,
-    a?.currentItemStrokeWidth ?? DEFAULT_STROKE_PX,
+    // Upstream replaced the free-number `currentItemStrokeWidth` with a keyed
+    // system; derive the px value so flow's continuous slider still has a
+    // sensible tool-default fallback.
+    (a?.currentItemStrokeWidthKey
+      ? getStrokeWidthByKey("rectangle", a.currentItemStrokeWidthKey)
+      : undefined) ?? DEFAULT_STROKE_PX,
   );
   const widthDisplay = widthPx === MIXED ? null : displayValue(widthPx, units);
 

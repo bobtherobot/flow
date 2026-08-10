@@ -3,10 +3,10 @@ import { zoomIn, zoomOut, resetZoom, zoomToFit } from "./view-actions";
 
 function mockApi(state: { zoom?: number; grid?: boolean } = {}) {
   const updateScene = vi.fn();
-  const scrollToContent = vi.fn();
+  const setViewport = vi.fn();
   const api = {
     updateScene,
-    scrollToContent,
+    setViewport,
     getSceneElements: () => [] as unknown[],
     getAppState: () => ({
       zoom: { value: state.zoom ?? 1 },
@@ -14,7 +14,7 @@ function mockApi(state: { zoom?: number; grid?: boolean } = {}) {
     }),
   };
   // Cast: the real ExcalidrawAPI has many more members we don't exercise here.
-  return { api: api as never, updateScene, scrollToContent };
+  return { api: api as never, updateScene, setViewport };
 }
 
 describe("view-actions", () => {
@@ -49,9 +49,15 @@ describe("view-actions", () => {
     expect(updateScene).toHaveBeenCalledWith({ appState: { zoom: { value: 1 } } });
   });
 
-  it("zoomToFit scrolls to content with fitToContent", () => {
-    const { api, scrollToContent } = mockApi();
+  it("zoomToFit fits the scene into the viewport", () => {
+    // Upstream replaced scrollToContent with setViewport; "scale-down" is the
+    // fit upstream's own Zoom-to-Fit uses (never zoom past 100%).
+    const { api, setViewport } = mockApi();
     zoomToFit(api);
-    expect(scrollToContent).toHaveBeenCalledWith([], { fitToContent: true, animate: true });
+    expect(setViewport).toHaveBeenCalledWith({
+      target: [],
+      fit: "scale-down",
+      animation: true,
+    });
   });
 });
