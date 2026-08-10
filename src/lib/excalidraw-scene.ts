@@ -11,9 +11,13 @@ import { withoutFlowGlobals } from "./flow-app-state";
 
 export { ARCHITECT_ROUGHNESS, normalizeRoughness } from "./roughness";
 
-/** The imperative handle Excalidraw hands us via the `excalidrawAPI` prop. */
+/** The imperative handle Excalidraw hands us via the `onExcalidrawAPI` prop.
+ *  (Upstream renamed it from `excalidrawAPI` and now also passes null on
+ *  unmount, hence the NonNullable.) */
 type ExcalidrawImperativeHandle = NonNullable<
-  Parameters<NonNullable<ComponentProps<typeof Excalidraw>["excalidrawAPI"]>>[0]
+  Parameters<
+    NonNullable<ComponentProps<typeof Excalidraw>["onExcalidrawAPI"]>
+  >[0]
 >;
 
 /**

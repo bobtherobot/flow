@@ -424,10 +424,15 @@ export default function App() {
         }}
       >
         <Excalidraw
-          excalidrawAPI={(instance) => {
+          // Upstream renamed this prop from `excalidrawAPI` to `onExcalidrawAPI`
+          // and dropped the old one entirely — silently, since an unknown prop
+          // is simply ignored. Under the old name flow's api handle stayed null
+          // forever, so every control that drives the canvas through it became a
+          // no-op. It can now be called with null on unmount.
+          onExcalidrawAPI={(instance) => {
             // `executeAction` exists at runtime (fork addition) but not yet in the
             // vendor .d.ts, so narrow the handle to flow's augmented type here.
-            const api = instance as ExcalidrawAPI;
+            const api = instance as ExcalidrawAPI | null;
             apiRef.current = api;
             setExcalidrawApi(api);
           }}
