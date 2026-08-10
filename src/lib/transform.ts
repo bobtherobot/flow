@@ -75,29 +75,33 @@ export function setContainerPadding(
   transient = false,
 ): void {
   const elements = api.getSceneElements();
-  const map = new Map<string, SceneElement>(elements.map((el) => [el.id, { ...el }]));
-  const origMap = new Map<string, SceneElement>(elements.map((el) => [el.id, { ...el }]));
+  const padding = Math.max(0, value);
+  const byId = new Map(elements.map((el) => [el.id, el]));
 
   let touched = false;
   for (const id of ids) {
-    const current = map.get(id);
-    const orig = origMap.get(id);
-    if (!current || !orig) continue;
-    // Write padding through `newElementWith` so version/versionNonce bump. A raw
-    // assignment leaves the container's version untouched and the history diff
-    // never sees it: the rewrapped text got captured (its own version bumps),
-    // the padding didn't, so undo restored the wrap but not the value.
-    const padded = newElementWith(current, { padding: Math.max(0, value) } as Partial<SceneElement>);
-    map.set(id, padded);
-    resizeSingleElement(padded.width, padded.height, padded, orig, map, origMap, "e");
+    const container = byId.get(id);
+    if (!container) continue;
+    // Write through the vendor's own mutateElement so version/versionNonce bump
+    // and the history diff sees the padding. (A raw assignment leaves the
+    // version untouched: the rewrapped text got captured, its own version
+    // having bumped, but the padding didn't, so undo restored the wrap and not
+    // the value.) Padding is not a dimension, so nothing rewraps the bound text
+    // on its own -- redrawBoundText does that, and needs the Scene the vendor
+    // holds. This replaced a resizeSingleElement call whose signature upstream
+    // changed (it now takes a Scene where flow passed an elements map), which
+    // made the whole write silently do nothing.
+    api.mutateElement(container as Parameters<ExcalidrawAPI["mutateElement"]>[0], {
+      padding,
+    });
+    api.redrawBoundText(container);
     touched = true;
   }
   if (!touched) return;
 
-  const next = elements.map((el) => map.get(el.id) ?? el);
   if (transient) markDeferred();
   api.updateScene({
-    elements: next,
+    elements: api.getSceneElements(),
     // flow: currentItemPadding is a resident appState key (see
     // style-memory.ts's CATEGORY_KEYS doc) — only the "shape" category ever
     // creates a container with one, so there is no per-category bucket to
