@@ -2,11 +2,13 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import "./toolbar.css";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { MenuPoint } from "../panels/dock/menu-position";
+import { useSelectionStyle } from "../panels/useSelectionStyle";
 import { useDrag } from "../panels/dock/useDrag";
 import { TOOLS } from "./tools";
 import { TOOL_ICONS } from "./icons";
 import { ToolButton } from "./ToolButton";
 import { ToolbarConfigMenu } from "./ToolbarConfigMenu";
+import { RailColorControl } from "./RailColorControl";
 import { useActiveTool } from "./useActiveTool";
 import { shouldRedock, withHiddenToggled, type ToolbarState } from "./toolbar-state";
 
@@ -40,6 +42,15 @@ function configAnchor(el: HTMLElement | null): MenuPoint {
  */
 export function ToolBar({ api, state, onChange }: ToolBarProps) {
   const { activeType, arrowType, setTool } = useActiveTool(api);
+  // Owned here rather than threaded down from App: App is the ancestor that
+  // owns <Excalidraw>, and an onChange-driven bump living there re-renders
+  // Excalidraw on every commit, which re-fires its onChange in
+  // componentDidUpdate regardless of whether anything actually changed —
+  // a tight, un-terminating loop. Every other onChange-driven bump in this
+  // codebase (useActiveTool right above, useViewToggles, useBottomActions,
+  // useQuickActions) already lives in a sibling of <Excalidraw>, never in App,
+  // for exactly this reason; this one follows the same rule.
+  const sel = useSelectionStyle(api);
   const [menuOpen, setMenuOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const origin = useRef({ x: 0, y: 0 });
@@ -129,6 +140,8 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
           );
         })}
       </div>
+
+      <RailColorControl sel={sel} />
 
       {menuOpen && (
         <ToolbarConfigMenu

@@ -446,3 +446,82 @@
 .flow-clr-panel__top > .flow-clr-satbox {
   flex: 1 1 auto;
 }
+
+/* The rail's compact picker (Task 16): saturation box, eyedropper/preview/hue/
+   alpha, then six recents — no numeric fields, no palette section. Anchored as
+   a fixed-position portal beside the rail, so it needs to sit above both the
+   rail (z-index 90) and the menu bar (z-index 100) — matched to
+   `.flow-pnl-config`'s 130 rather than invented fresh. */
+
+.flow-clr-popup {
+  position: fixed;
+  z-index: 130;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 280px;
+  padding: 12px;
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-md);
+  box-shadow: var(--flow-shadow);
+}
+
+.flow-clr-popup__close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--flow-ink);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: 50%;
+  box-shadow: var(--flow-shadow);
+}
+
+.flow-clr-popup__close:hover {
+  background: var(--flow-hover);
+}
+
+.flow-clr-recents {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.flow-clr-recents__slot {
+  aspect-ratio: 1;
+  padding: 0;
+  cursor: pointer;
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-sm);
+}
+
+.flow-clr-recents__slot:disabled {
+  cursor: default;
+}
+
+/* The quartet at its default 22px chip doesn't fit the rail's compact chooser
+   (88px rail − 1px border − 8px padding = 79px usable; 4×22 + 3×4 gaps = 100px).
+   Same technique as `--flow-clr-part-size` (Task 12): a custom property on the
+   chooser, overridden under `--compact`. 16px chips at a 3px gap measure 73px
+   in the running rail (getBoundingClientRect, Chromium) — 6px of headroom
+   against the 79px usable width. */
+.flow-clr-quartet {
+  --flow-clr-chip-size: 22px;
+}
+
+.flow-clr-chooser--compact .flow-clr-quartet {
+  --flow-clr-chip-size: 16px;
+  gap: 3px;
+}
+
+.flow-clr-chip {
+  width: var(--flow-clr-chip-size);
+  height: var(--flow-clr-chip-size);
+}

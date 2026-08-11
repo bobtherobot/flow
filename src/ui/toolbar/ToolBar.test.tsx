@@ -7,7 +7,18 @@ import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
 function fakeApi(type = "selection", locked = false, currentItemArrowType = "sharp") {
   return {
-    getAppState: () => ({ activeTool: { type, locked }, currentItemArrowType }),
+    // Task 16's RailColorControl derives its own selection-style bridge from
+    // this same api (useSelectionStyle), so the fake needs the scene/appState
+    // reads that hook makes, not just the tool-activation surface above.
+    getSceneElements: () => [],
+    getAppState: () => ({
+      activeTool: { type, locked },
+      currentItemArrowType,
+      currentItemBackgroundColor: "transparent",
+      currentItemStrokeColor: "#1e1e1e",
+      currentItemTextColor: "#1e1e1e",
+      selectedElementIds: {},
+    }),
     onChange: () => () => {},
     setActiveTool: vi.fn(),
     updateScene: vi.fn(),
@@ -134,8 +145,15 @@ describe("ToolBar", () => {
   });
 
   it("reserves nothing while floating", () => {
-    render(<ToolBar api={fakeApi()} state={{ ...DEFAULT_TOOLBAR_STATE, floating: true }} onChange={() => {}} />);
+    render(
+      <ToolBar api={fakeApi()} state={{ ...DEFAULT_TOOLBAR_STATE, floating: true }} onChange={() => {}} />,
+    );
     expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
       .toBe("0px");
+  });
+
+  it("mounts the rail's color control beneath the tool grid", () => {
+    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    expect(screen.getByRole("radiogroup", { name: /color target/i })).toBeInTheDocument();
   });
 });
