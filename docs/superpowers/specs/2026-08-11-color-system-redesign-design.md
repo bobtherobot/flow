@@ -1,7 +1,7 @@
 # Color system redesign — design
 
 **Date:** 2026-08-11
-**Status:** approved, ready to plan
+**Status:** shipped 2026-08-11
 
 One Color panel that owns everything about color — an Illustrator-style part
 chooser, a real HSV picker with eyedropper and alpha, numeric entry in
@@ -189,8 +189,9 @@ canvas gutter needs no separate change. The part chooser pins to the bottom via
 Clicking the frontmost box opens the popup in a portal anchored right of the
 rail, dismissed on outside pointerdown or Esc — mirroring `ToolbarConfigMenu`
 and `PanelShell`. A floating rail anchors off its own rect.
-`shouldRedock` (`ToolBar.tsx:79`) is tuned against a 48px rail and needs
-retuning for 88.
+`shouldRedock` (`ToolBar.tsx:79`) is tuned against a 48px rail. **Correction
+(shipped):** it tests the left edge of the rail, not its width, so it needed no
+retuning for 88 — this risk dissolved on inspection.
 
 ### 8. Eyedropper
 
@@ -204,6 +205,10 @@ shows the payload.
 
 Fallback if the export needs more than an index re-export: the browser
 `EyeDropper` API behind a support check, with the button hidden where absent.
+**Correction (shipped):** the fallback was never needed — both symbols
+(`activeEyeDropperAtom`, `editorJotaiStore`) were already exported from their
+own modules, so the fork edit is a two-line additive re-export in
+`packages/excalidraw/index.tsx`.
 
 ### 9. Palette section
 
@@ -226,7 +231,7 @@ Renaming is in-place: double-click the select and it swaps for a text input.
 | `src/ui/panels/SwatchGrid.tsx` | absorbed into `PaletteSection` |
 | `ColorPanel`'s three rows + opacity `NumberInput`s | deleted — alpha lives in the picker |
 | `src/ui/panels/controls/ColorSwatch.tsx` | **kept** — `PreferencesDialog.tsx:207` and `BackgroundControl.tsx:15` use it as the generic small well for non-element colors |
-| Saved dock layouts naming `swatches` | no-op migration in `panel-dock-state` so a stale id doesn't break restore |
+| Saved dock layouts naming `swatches` | **Correction (shipped):** no `panel-dock-state` migration was written or needed — `syncPanelDefs` already drops unknown panel ids on load, so a stale `swatches` entry is silently dropped by existing code |
 | `flow.defaultPaletteId` | reused as the active-palette id; no migration needed |
 
 ## Testing
@@ -246,11 +251,21 @@ survives a reload; the widened rail still docks and floats.
 
 ## Risks
 
-1. **Eyedropper fork export** — the only item not verified end-to-end. Fallback
-   specified above.
-2. **`shouldRedock` at 88px** — needs retuning, easy to miss.
-3. **Stale `swatches` in persisted dock layouts** — covered by the migration.
+1. ~~**Eyedropper fork export** — the only item not verified end-to-end.~~
+   **Dissolved (shipped):** both symbols were already exported from their own
+   modules; the fork edit is a two-line additive re-export, verified
+   end-to-end in Task 18.
+2. ~~**`shouldRedock` at 88px** — needs retuning, easy to miss.~~ **Dissolved
+   (shipped):** `shouldRedock` tests the rail's left edge, not its width, and
+   is width-independent — no retuning was needed.
+3. ~~**Stale `swatches` in persisted dock layouts** — covered by the
+   migration.~~ **Dissolved (shipped):** no migration was written; `syncPanelDefs`
+   already drops unknown panel ids, so this was already covered by existing code.
 4. **`strokeWidth` falsy coercions** — see the [[drawing-defaults]] warning.
+   **Materialized:** the plan's own reference implementation for Task 11 wired
+   the fix/revival coupling in only one direction, breaking the empty-selection
+   tool-defaults path outright until review caught it. Fixed via a shared
+   `needsRevival()` used by all four write paths, `??` not `||`.
 
 ## Out of scope
 
