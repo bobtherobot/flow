@@ -56,6 +56,12 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
   // added on top so the popup is keyboard-dismissable like any other overlay.
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
+      // The trigger box lives OUTSIDE this portal, so a press on it would
+      // close here on pointerdown and the click that follows would reopen —
+      // the toggle's close branch becomes unreachable, and the remount
+      // re-seeds useColorDraft, discarding an in-progress hue. Same guard
+      // ToolBar uses for its hamburger (ToolBar.tsx's config-menu effect).
+      if ((e.target as HTMLElement).closest(".flow-toolbar__color")) return;
       if (!ref.current?.contains(e.target as Node)) onClose();
     };
     const onKey = (e: KeyboardEvent) => {

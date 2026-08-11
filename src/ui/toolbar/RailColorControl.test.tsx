@@ -112,7 +112,14 @@ describe("RailColorControl", () => {
     render(<RailColorControl sel={sel} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
     fireEvent.click(screen.getByRole("button", { name: "Recent color #00ff00" }));
-    expect(sel.update).toHaveBeenCalled();
+    // Asserting only `toHaveBeenCalled()` would pass even if the wrong recent
+    // (or a hardcoded color) were applied — check the actual payload: the fill
+    // default is set to the clicked recent, and the element patch carries the
+    // same hex.
+    expect(sel.update).toHaveBeenCalledTimes(1);
+    const [, updater, currentItems] = vi.mocked(sel.update).mock.calls[0];
+    expect(currentItems).toEqual({ currentItemBackgroundColor: "#00ff00" });
+    expect(updater(rect as never)).toEqual({ backgroundColor: "#00ff00" });
   });
 
   it("closes on Escape", () => {
@@ -172,5 +179,29 @@ describe("RailColorControl", () => {
     fireEvent.keyDown(fillBox, { key: "ArrowRight" });
     expect(screen.getByRole("radio", { name: /stroke/i })).toBeChecked();
     expect(screen.queryByRole("dialog", { name: /color picker/i })).not.toBeInTheDocument();
+  });
+
+  it("closes on a second press of the active box", () => {
+    // fireEvent.click alone never fires pointerdown, so this interleaving is
+    // invisible to a click-only test: the popup's outside-press handler closes
+    // on pointerdown (the trigger box lives outside the portal) and the click
+    // that follows then reopens it, making the toggle's close branch dead.
+    render(<RailColorControl sel={fakeSel()} />);
+    const box = screen.getByRole("radio", { name: /fill/i });
+    fireEvent.click(box);
+    expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
+    fireEvent.pointerDown(box);
+    fireEvent.click(box);
+    expect(screen.queryByRole("dialog", { name: /color picker/i })).not.toBeInTheDocument();
+  });
+
+  it("a stray arrow key on a quartet chip does not swallow the next open", () => {
+    // The chips sit outside the radiogroup, so an arrow key pressed there has
+    // no setPart call to consume the arrow-nav flag; if it latched, the next
+    // click on the active box would be silently eaten.
+    render(<RailColorControl sel={fakeSel()} />);
+    fireEvent.keyDown(screen.getByRole("button", { name: /^white$/i }), { key: "ArrowRight" });
+    fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
+    expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
   });
 });

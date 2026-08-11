@@ -10,8 +10,6 @@ import type { SelectionStyle } from "../panels/useSelectionStyle";
 /** Gap between the rail's right edge and the popup. */
 const POPUP_GAP = 8;
 
-const ARROW_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
-
 /**
  * The rail's color control: the same part chooser the panel uses, with one
  * extra behaviour — clicking the box that is *already* active opens the compact
@@ -59,14 +57,21 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
     },
   };
 
+  // Arrow-key navigation also calls setPart, and on a single-part selection it
+  // re-selects the part already active — indistinguishable from a click unless
+  // marked. The flag is set only for arrow keys pressed inside the radiogroup:
+  // the quartet chips sit outside it and are independently focusable, so an
+  // arrow pressed on a chip has no setPart call to consume the flag — left
+  // unscoped, it would latch and silently swallow the next click on the
+  // active box.
+  const onKeyDownCapture = (e: React.KeyboardEvent) => {
+    if (!e.key.startsWith("Arrow")) return;
+    if (!(e.target as HTMLElement).closest('[role="radiogroup"]')) return;
+    arrowNavRef.current = true;
+  };
+
   return (
-    <div
-      className="flow-toolbar__color"
-      ref={wrapRef}
-      onKeyDownCapture={(e) => {
-        if (ARROW_KEYS.has(e.key)) arrowNavRef.current = true;
-      }}
-    >
+    <div className="flow-toolbar__color" ref={wrapRef} onKeyDownCapture={onKeyDownCapture}>
       <PartChooser target={chooserTarget} compact />
       {open && <ColorPopup target={target} anchor={anchor()} onClose={closePopup} />}
     </div>

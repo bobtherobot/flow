@@ -153,7 +153,17 @@ describe("ToolBar", () => {
   });
 
   it("mounts the rail's color control beneath the tool grid", () => {
-    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
-    expect(screen.getByRole("radiogroup", { name: /color target/i })).toBeInTheDocument();
+    // Asserting only that the radiogroup exists would pass even if it were
+    // mounted above the tool grid instead of pinned below it — check DOM order.
+    const { container } = render(
+      <ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />,
+    );
+    const tools = container.querySelector(".flow-toolbar__tools");
+    const colorControl = container.querySelector(".flow-toolbar__color");
+    expect(tools).toBeInTheDocument();
+    expect(colorControl).toBeInTheDocument();
+    expect(
+      tools!.compareDocumentPosition(colorControl!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });
