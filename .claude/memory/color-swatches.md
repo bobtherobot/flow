@@ -1,3 +1,7 @@
+> **Superseded 2026-08-11:** the Swatches *panel* is gone, merged into the Color
+> panel — see [[color-system]]. `palette-store` and the seeded palettes below
+> are unchanged and still current.
+
 # Color Swatches (palette manager panel)
 
 A **Color Swatches** dock sub-panel to manage persisted color palettes; the
