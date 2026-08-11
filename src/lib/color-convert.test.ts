@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   hexToRgb, rgbToHex, rgbToHsv, hsvToRgb, rgbToHsl, hslToRgb,
-  hexToHsv, hsvToHex, hexToHsl, hslToHex,
+  hexToHsv, hsvToHex, hexToHsl, hslToHex, hsvToHsl, hslToHsv,
 } from "./color-convert";
 
 describe("hexToRgb", () => {
@@ -87,5 +87,17 @@ describe("float fidelity", () => {
     // #2091c2 has a fractional hue; rounding here would break the draft round-trip.
     const hsv = hexToHsv("#2091c2")!;
     expect(Number.isInteger(hsv.h)).toBe(false);
+  });
+});
+
+describe("hsv <-> hsl", () => {
+  it("round-trips a mid tone", () => {
+    const hsv = hexToHsv("#2091c2")!;
+    const back = hslToHsv(hsvToHsl(hsv));
+    expect(hsvToHex(back)).toBe("#2091c2");
+  });
+
+  it("reads a pure hue as 50% lightness", () => {
+    expect(hsvToHsl({ h: 0, s: 100, v: 100 })).toEqual({ h: 0, s: 100, l: 50 });
   });
 });

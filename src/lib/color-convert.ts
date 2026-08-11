@@ -149,3 +149,13 @@ export function hexToHsl(hex: string): Hsl | null {
 export function hslToHex(hsl: Hsl): string {
   return rgbToHex(hslToRgb(hsl));
 }
+
+/** Going through RGB is exact enough and avoids a second pair of formulas to
+ *  keep correct alongside the RGB-based ones above. */
+export function hsvToHsl(hsv: Hsv): Hsl {
+  return rgbToHsl(hsvToRgb(hsv));
+}
+
+export function hslToHsv(hsl: Hsl): Hsv {
+  return rgbToHsv(hslToRgb(hsl));
+}

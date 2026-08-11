@@ -136,3 +136,49 @@
   cursor: default;
   opacity: 0.4;
 }
+
+.flow-clr-numrow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.flow-clr-num {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+/* Drawn as a compact chevron stack; still a real select underneath. */
+.flow-clr-mode {
+  width: 22px;
+  height: 28px;
+  flex: 0 0 auto;
+  padding: 0;
+  cursor: pointer;
+  color: transparent;
+  background: transparent
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='16' fill='none' stroke='%23868e96' stroke-width='1.5'><path d='M2 6 5 3l3 3M2 10l3 3 3-3'/></svg>")
+    no-repeat center;
+  border: none;
+  appearance: none;
+}
+
+.flow-clr-mode:focus-visible {
+  outline: 2px solid var(--flow-accent);
+  outline-offset: 1px;
+}
+
+/* The options themselves must stay readable when the closed control is not. */
+.flow-clr-mode option {
+  color: var(--flow-ink);
+}
+
+.flow-clr-hex {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 28px;
+  padding: 0 6px;
+  font-family: inherit;
+  border: 1px solid var(--flow-border);
+  border-radius: 4px;
+}
