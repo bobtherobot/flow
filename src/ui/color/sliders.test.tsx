@@ -22,7 +22,9 @@ describe("HueSlider", () => {
     render(<HueSlider hue={0} onChange={onChange} />);
     const el = screen.getByRole("slider", { name: /hue/i });
     stubBox(el);
-    fireEvent.pointerDown(el, { clientX: 100, clientY: 6, button: 0 });
+    // clientY deliberately gives a DIFFERENT fraction than clientX (0.25 vs 0.5)
+    // on the 200x12 stub: if the slider ever read pos.y, this must fail.
+    fireEvent.pointerDown(el, { clientX: 100, clientY: 3, button: 0 });
     expect(onChange).toHaveBeenCalledWith(180, true);
   });
 
