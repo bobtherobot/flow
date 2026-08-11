@@ -2681,19 +2681,29 @@ const NEUTRAL: Hsv = { h: 0, s: 0, v: 0 };
 interface Draft {
   hsv: Hsv;
   alpha: number;
-  /** The (hex, alpha) pair this draft was seeded from OR last emitted. */
-  fromHex: string;
-  fromAlpha: number;
+  /** The (hex, alpha) prop pair we last OBSERVED — updated only on a render
+   *  that actually sees a new prop pair. Drives "did the props change at all". */
+  seenHex: string;
+  seenAlpha: number;
+  /** The (hex, alpha) pair we last EMITTED, or null before the first emit.
+   *  Used only to recognize an incoming prop change as our own echo.
+   *
+   *  These are two fields, not one, because `onCommit` updates this draft's
+   *  state before the parent can feed the new hex back as a prop: React
+   *  re-renders with the SAME, STILL-STALE props right after. One field doing
+   *  both jobs would see its own fresh emitted value disagree with the stale
+   *  prop, misread that as an outside change, and re-seed from the stale hex —
+   *  destroying the hue it just set, before the real echo ever arrives. */
+  emittedHex: string | null;
+  emittedAlpha: number | null;
 }
 
-function seed(hex: string, alpha: number): Draft {
+function seedHsv(hex: string, alpha: number): { hsv: Hsv; alpha: number } {
   return {
     hsv: hexToHsv(hex) ?? NEUTRAL,
     // "transparent" carries alpha 0, but a picker parked at zero opacity is a
     // dead control — the first move should produce a visible color.
     alpha: hex === "transparent" ? 100 : alpha,
-    fromHex: hex,
-    fromAlpha: alpha,
   };
 }
 
@@ -2713,21 +2723,37 @@ function seed(hex: string, alpha: number): Draft {
  * popup. That single rule is what makes two surfaces safe to bind to one value.
  */
 export function useColorDraft({ hex, alpha, onCommit }: UseColorDraftOptions) {
-  const [draft, setDraft] = useState<Draft>(() => seed(hex, alpha));
+  const [draft, setDraft] = useState<Draft>(() => ({
+    ...seedHsv(hex, alpha),
+    seenHex: hex,
+    seenAlpha: alpha,
+    emittedHex: null,
+    emittedAlpha: null,
+  }));
 
   // Adjusting state during render (React's documented pattern) rather than in
   // an effect: an effect would paint one frame of the stale color first.
   let current = draft;
-  if (draft.fromHex !== hex || draft.fromAlpha !== alpha) {
-    current = seed(hex, alpha);
+  if (draft.seenHex !== hex || draft.seenAlpha !== alpha) {
+    const isEcho = hex === draft.emittedHex && alpha === draft.emittedAlpha;
+    current = isEcho
+      ? { ...draft, seenHex: hex, seenAlpha: alpha }
+      : {
+          ...seedHsv(hex, alpha),
+          seenHex: hex,
+          seenAlpha: alpha,
+          emittedHex: null,
+          emittedAlpha: null,
+        };
     setDraft(current);
   }
 
   const emit = (hsv: Hsv, nextAlpha: number, transient: boolean) => {
     const nextHex = hsvToHex(hsv);
     // Record what we produced so the echo back through props is not treated as
-    // an outside change — this is what preserves the hue.
-    setDraft({ hsv, alpha: nextAlpha, fromHex: nextHex, fromAlpha: nextAlpha });
+    // an outside change — this is what preserves the hue. `seenHex`/`seenAlpha`
+    // are deliberately NOT touched here; see the Draft doc comment.
+    setDraft({ ...current, hsv, alpha: nextAlpha, emittedHex: nextHex, emittedAlpha: nextAlpha });
     onCommit(nextHex, nextAlpha, transient);
   };
 
