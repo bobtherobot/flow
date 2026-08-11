@@ -196,41 +196,35 @@
   position: relative;
   width: 74px;
   height: 74px;
+  --flow-clr-part-size: 46px;
 }
 
 .flow-clr-chooser--compact .flow-clr-chooser__stack {
   width: 52px;
   height: 52px;
+  --flow-clr-part-size: 32px;
 }
 
+/*
+ * Boxes step down the diagonal by their index among the VISIBLE parts (set
+ * from `--flow-clr-part-offset`, 0..1), so two parts sit at the corners and
+ * three spread evenly between them. Driven by a custom property rather than
+ * per-part `top`/`left`/`right`/`bottom` rules because `stroke` and `text`
+ * are never both visible at once as siblings of a two-part stack, but they
+ * ARE both visible in the three-part (labeled container) case — fixed
+ * per-part offsets there gave them the identical position, so whichever sat
+ * behind was completely covered and unclickable.
+ */
 .flow-clr-part {
   position: absolute;
-  width: 46px;
-  height: 46px;
+  top: calc(var(--flow-clr-part-offset, 0) * (100% - var(--flow-clr-part-size)));
+  left: calc(var(--flow-clr-part-offset, 0) * (100% - var(--flow-clr-part-size)));
+  width: var(--flow-clr-part-size);
+  height: var(--flow-clr-part-size);
   padding: 0;
   cursor: pointer;
   background: var(--flow-clr-part-color, #fff);
   border: 2px solid var(--flow-ink);
-}
-
-.flow-clr-chooser--compact .flow-clr-part {
-  width: 32px;
-  height: 32px;
-}
-
-.flow-clr-part--fill {
-  top: 0;
-  left: 0;
-}
-
-.flow-clr-part--stroke {
-  right: 0;
-  bottom: 0;
-}
-
-.flow-clr-part--text {
-  right: 0;
-  bottom: 0;
 }
 
 /*

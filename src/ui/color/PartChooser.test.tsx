@@ -105,6 +105,31 @@ describe("PartChooser", () => {
     expect(screen.getByRole("radio", { name: /stroke/i })).not.toHaveClass("flow-clr-part--mixed");
   });
 
+  it("gives every visible part a distinct diagonal offset", () => {
+    // stroke and text once shared right:0/bottom:0, which made whichever sat
+    // behind unclickable in the three-part case.
+    render(<PartChooser target={target({ available: ["fill", "stroke", "text"] })} />);
+    const offsets = screen
+      .getAllByRole("radio")
+      .map((el) => (el as HTMLElement).style.getPropertyValue("--flow-clr-part-offset"));
+    expect(new Set(offsets).size).toBe(3);
+  });
+
+  it("moves the active part with arrow keys and wraps", () => {
+    const t = target({ available: ["fill", "stroke", "text"] });
+    render(<PartChooser target={t} />);
+    fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowRight" });
+    expect(t.setPart).toHaveBeenCalledWith("stroke");
+    fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowLeft" });
+    expect(t.setPart).toHaveBeenLastCalledWith("text");
+  });
+
+  it("keeps only the active box in the tab order", () => {
+    render(<PartChooser target={target()} />);
+    expect(screen.getByRole("radio", { name: /fill/i })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("radio", { name: /stroke/i })).toHaveAttribute("tabindex", "-1");
+  });
+
   it("fires quickSet from the quartet", () => {
     const t = target();
     render(<PartChooser target={t} />);
