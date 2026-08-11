@@ -75,10 +75,10 @@
 
 /* Tool button column. */
 .flow-toolbar__tools {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 2px;
-  padding: 4px 0;
+  padding: 4px;
   overflow-y: auto;
 }
 .flow-toolbar__btn {

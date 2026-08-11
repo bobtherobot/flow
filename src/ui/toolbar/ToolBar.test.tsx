@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ToolBar } from "./ToolBar";
+import { ToolBar, RAIL_WIDTH } from "./ToolBar";
 import { DEFAULT_TOOLBAR_STATE } from "./toolbar-state";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
@@ -121,5 +121,21 @@ describe("ToolBar", () => {
     const next = onChange.mock.calls[0][0];
     expect(next.floating).toBe(true);
     expect(next.y).toBeGreaterThanOrEqual(36);
+  });
+
+  it("is 88px wide so the tools sit in two columns", () => {
+    expect(RAIL_WIDTH).toBe(88);
+  });
+
+  it("reserves the canvas gutter at the docked width", () => {
+    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
+      .toBe("88px");
+  });
+
+  it("reserves nothing while floating", () => {
+    render(<ToolBar api={fakeApi()} state={{ ...DEFAULT_TOOLBAR_STATE, floating: true }} onChange={() => {}} />);
+    expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
+      .toBe("0px");
   });
 });
