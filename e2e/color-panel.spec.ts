@@ -213,17 +213,44 @@ test("recents accumulate and survive a reload", async ({ page }) => {
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
-  await page.locator(panel).getByRole("button", { name: "Black" }).click();
-  await page.locator(panel).getByRole("button", { name: "White" }).click();
+  // NOT Black/White/Grey: the quartet's quick colors are deliberately excluded
+  // from recents (useColorTarget.quickSet routes them through `applyColor`,
+  // not `setColor`) — they already have permanent dedicated chips one click
+  // away, so caching them would just evict colors the user actually chose.
+  // Real, non-quartet colors go through the numeric fields' Hex commit path
+  // instead, which does record.
+  await page.locator(panel).getByLabel("Color format").selectOption("hex");
+  const hex = page.locator(panel).getByLabel("Hex", { exact: true });
+
+  await hex.fill("#ff00ff");
+  await hex.press("Enter");
+  await hex.fill("#00ffff");
+  await hex.press("Enter");
 
   await page.locator(".flow-toolbar__color").getByRole("radio", { name: /Fill/ }).click();
-  await expect(page.locator(popup).getByRole("button", { name: "Recent color #ffffff" })).toBeVisible();
-  await expect(page.locator(popup).getByRole("button", { name: "Recent color #000000" })).toBeVisible();
+  await expect(page.locator(popup).getByRole("button", { name: "Recent color #00ffff" })).toBeVisible();
+  await expect(page.locator(popup).getByRole("button", { name: "Recent color #ff00ff" })).toBeVisible();
 
   await page.reload();
   await page.waitForSelector(".flow-pnl");
   await page.locator(".flow-toolbar__color").getByRole("radio", { name: /Fill/ }).click();
-  await expect(page.locator(popup).getByRole("button", { name: "Recent color #ffffff" })).toBeVisible();
+  await expect(page.locator(popup).getByRole("button", { name: "Recent color #00ffff" })).toBeVisible();
+});
+
+test("quickSet white/grey/black does not pollute recents", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await drawRect(page, 560, 300, 680, 380);
+
+  await page.locator(panel).getByRole("button", { name: "Black" }).click();
+  await page.locator(panel).getByRole("button", { name: "White" }).click();
+  await page.locator(panel).getByRole("button", { name: "Grey" }).click();
+
+  await page.locator(".flow-toolbar__color").getByRole("radio", { name: /Fill/ }).click();
+  await expect(page.locator(popup).getByRole("button", { name: "Recent color #000000" })).toHaveCount(0);
+  await expect(page.locator(popup).getByRole("button", { name: "Recent color #ffffff" })).toHaveCount(0);
+  await expect(page.locator(popup).getByRole("button", { name: "Recent color #808080" })).toHaveCount(0);
+  await expect(page.locator(popup).getByRole("button", { name: /Recent color slot 1, empty/ })).toBeVisible();
 });
 
 test("selecting text collapses the chooser to the text part", async ({ page }) => {

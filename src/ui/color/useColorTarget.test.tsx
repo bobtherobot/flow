@@ -288,4 +288,25 @@ describe("quick colors", () => {
     fireEvent.click(screen.getByText("none"));
     expect(sel.update).not.toHaveBeenCalled();
   });
+
+  it("does not add white/grey/black to recents, unlike an ordinary setColor", () => {
+    // The quartet's colors already have permanent dedicated chips one click
+    // away; recording them would evict colors the user actually chose from
+    // the six-slot recents strip.
+    const sel = fakeSel();
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("grey"));
+    expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([]);
+    fireEvent.click(screen.getByText("set green"));
+    expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual(["#00ff00"]);
+  });
+
+  it("does not bump version/undo when clicking none on an already-none stroke", () => {
+    const sel = fakeSel({ elements: [{ ...rect, strokeColor: "transparent", strokeWidth: 0 }] as never });
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("use stroke"));
+    fireEvent.click(screen.getByText("none"));
+    const [, updater] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(updater({ ...rect, strokeColor: "transparent", strokeWidth: 0 })).toBeNull();
+  });
 });

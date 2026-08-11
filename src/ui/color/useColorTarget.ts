@@ -112,8 +112,13 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
    * same element write — otherwise the two would split into two undo steps,
    * or a first write's width bump could be clobbered by a second write that
    * only knows about color.
+   *
+   * Split out from `setColor` so `quickSet`'s white/grey/black chips can reuse
+   * the write + revival logic without also recording a recent — those three
+   * colors already have permanent dedicated chips, so caching them would just
+   * evict colors the user actually chose.
    */
-  const setColor: ColorTarget["setColor"] = (nextHex, nextAlpha, transient) => {
+  const applyColor = (nextHex: string, nextAlpha: number, transient: boolean) => {
     const value = combineColorAlpha(nextHex, nextAlpha);
     const isStroke = part === "stroke";
 
@@ -139,7 +144,10 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
         : { [spec.currentItemKey]: value },
       transient,
     );
+  };
 
+  const setColor: ColorTarget["setColor"] = (nextHex, nextAlpha, transient) => {
+    applyColor(nextHex, nextAlpha, transient);
     // Mid-drag writes are noise; only a settled color joins the recents.
     if (!transient) recordRecent(nextHex);
   };
@@ -179,7 +187,10 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
 
   const quickSet: ColorTarget["quickSet"] = (kind) => {
     if (kind !== "none") {
-      setColor(QUICK_HEX[kind], 100, false);
+      // Goes through `applyColor`, not `setColor`: white/grey/black already
+      // have permanent dedicated chips one click away, so recording them into
+      // recents would just evict colors the user actually chose.
+      applyColor(QUICK_HEX[kind], 100, false);
       return;
     }
     // Invisible text is a footgun, not a feature.
@@ -188,7 +199,12 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
     if (part === "stroke") {
       sel.update(
         spec.ids,
-        () => ({ strokeColor: "transparent", strokeWidth: 0 }),
+        (el) => {
+          const record = el as unknown as Record<string, unknown>;
+          return record.strokeColor === "transparent"
+            ? null
+            : { strokeColor: "transparent", strokeWidth: 0 };
+        },
         { currentItemStrokeColor: "transparent", currentItemStrokeWidth: 0 },
       );
       return;
