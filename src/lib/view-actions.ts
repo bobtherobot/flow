@@ -25,5 +25,12 @@ export function resetZoom(api: ExcalidrawAPI): void {
 }
 
 export function zoomToFit(api: ExcalidrawAPI): void {
-  api.scrollToContent(api.getSceneElements(), { fitToContent: true, animate: true });
+  // Upstream replaced scrollToContent with the viewport API. "scale-down" is
+  // what upstream's own Zoom-to-Fit action uses: fit the content, never zooming
+  // past 100%, which is what the old `fitToContent: true` did.
+  api.setViewport({
+    target: api.getSceneElements(),
+    fit: "scale-down",
+    animation: true,
+  });
 }
