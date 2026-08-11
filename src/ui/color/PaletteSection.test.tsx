@@ -112,6 +112,17 @@ describe("PaletteSection", () => {
     expect(onPick).not.toHaveBeenCalled();
   });
 
+  it("selects rather than applies on shift-click", () => {
+    // Shift-click was SwatchGrid's original (and only) multi-select gesture
+    // for this exact grid. A habitual shift-click must select, not fall
+    // through to "apply" and silently overwrite the live color.
+    const { onPick } = setup();
+    const first = screen.getAllByRole("button", { name: /^swatch /i })[0];
+    fireEvent.click(first, { shiftKey: true });
+    expect(first).toHaveAttribute("aria-pressed", "true");
+    expect(onPick).not.toHaveBeenCalled();
+  });
+
   it("removes the selected swatch via Delete keydown", () => {
     setup();
     const first = screen.getAllByRole("button", { name: /^swatch /i })[0];
@@ -164,6 +175,44 @@ describe("PaletteSection", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     expect((screen.getByLabelText("Palette") as HTMLSelectElement).selectedOptions[0].textContent)
       .toBe("Mine");
+  });
+
+  it("abandons a rename on Escape", () => {
+    // Unmounting a focused input can fire blur on the way out; without an
+    // explicit abandon flag that blur commits the edit Escape just cancelled.
+    setup();
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    const input = screen.getByLabelText("Palette name");
+    fireEvent.change(input, { target: { value: "Discarded" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect((screen.getByLabelText("Palette") as HTMLSelectElement).selectedOptions[0].textContent)
+      .toBe("Pastel");
+  });
+
+  it("leaves rename mode when the palette is switched", () => {
+    setup();
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    expect(screen.getByLabelText("Palette name")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText("Palette name"), { key: "Escape" });
+    const select = screen.getByLabelText("Palette") as HTMLSelectElement;
+    const vibrant = [...select.options].find((o) => o.textContent === "Vibrant")!;
+    fireEvent.change(select, { target: { value: vibrant.value } });
+    expect(screen.queryByLabelText("Palette name")).not.toBeInTheDocument();
+  });
+
+  it("leaves rename mode when a palette is switched via Add palette mid-rename", () => {
+    // The select is hidden while renaming, so the only way to invoke
+    // choosePalette() without going through Escape first is the "Add
+    // palette" button — it stays mounted in the same row throughout. This is
+    // the actual regression path: the test above always clears `renaming`
+    // via Escape before switching, so it can't tell whether choosePalette
+    // itself resets rename mode.
+    setup();
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    expect(screen.getByLabelText("Palette name")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /add palette/i }));
+    expect(screen.queryByLabelText("Palette name")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Palette")).toBeInTheDocument();
   });
 
   it("has no set-as-default control", () => {

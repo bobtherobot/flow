@@ -27,9 +27,12 @@ interface PaletteSectionProps {
  * The dropdown selection *is* the active palette: there is no separate
  * "default" concept anymore, so choosing a palette here is what
  * `useDefaultPaletteColors` elsewhere resolves to. A plain click applies a
- * swatch via `onPick`; ⌘/Ctrl-click selects it for the trash instead. That
- * split keeps the common action (apply a color) one click, and the
- * destructive one (queue for deletion) deliberate.
+ * swatch via `onPick`; ⌘/Ctrl/Shift-click selects it for the trash instead
+ * (shift is `SwatchGrid`'s original multi-select gesture for this exact grid,
+ * carried forward rather than dropped — a habitual shift-click falling
+ * through to "apply" would silently overwrite the live color instead of
+ * just doing nothing). That split keeps the common action (apply a color)
+ * one click, and the destructive one (queue for deletion) deliberate.
  */
 export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   const { palettes, defaultPaletteId } = usePaletteState();
@@ -37,6 +40,8 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   const [confirming, setConfirming] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const dragFrom = useRef<number | null>(null);
+  /** Set by Escape so the input's blur-on-unmount does not commit the edit. */
+  const abandonRename = useRef(false);
 
   // Resolve defensively: defaultPaletteId can point at a just-deleted palette
   // for one render (e.g. right after removePalette reseeds).
@@ -44,8 +49,12 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
 
   const choosePalette = (id: string) => {
     setDefaultPalette(id);
+    // Every piece of transient state tied to "which palette is current" resets
+    // together — leaving `renaming` set would edit the new palette's name in an
+    // input seeded from the old one's.
     setSelected([]);
     setConfirming(false);
+    setRenaming(false);
   };
 
   const onTrash = () => {
@@ -58,7 +67,7 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   };
 
   const onSwatchClick = (index: number, e: React.MouseEvent) => {
-    if (e.metaKey || e.ctrlKey) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey) {
       setSelected((prev) =>
         prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index],
       );
@@ -123,17 +132,32 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
       <div className="flow-clr-palette__row">
         {renaming ? (
           <input
+            // Keyed so switching palettes rebuilds the field from the new name
+            // instead of carrying the old one's text across.
+            key={current.id}
             className="flow-clr-palette__name"
             aria-label="Palette name"
             autoFocus
             defaultValue={current.name}
             onBlur={(e) => {
+              // Escape sets this first. Unmounting a focused input can fire a
+              // blur on the way out, which would commit the very edit Escape
+              // was meant to discard — so abandonment is an explicit flag, not
+              // an assumption about event ordering.
+              if (abandonRename.current) {
+                abandonRename.current = false;
+                setRenaming(false);
+                return;
+              }
               renamePalette(current.id, e.target.value);
               setRenaming(false);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-              if (e.key === "Escape") setRenaming(false);
+              if (e.key === "Escape") {
+                abandonRename.current = true;
+                setRenaming(false);
+              }
             }}
           />
         ) : (
