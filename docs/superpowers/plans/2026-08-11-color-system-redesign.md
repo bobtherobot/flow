@@ -2646,6 +2646,18 @@ describe("useColorDraft", () => {
     expect(onCommit).toHaveBeenLastCalledWith("#ff00ff", 40, false);
   });
 
+  it("keeps the hue when only the alpha changes from outside at an achromatic hex", () => {
+    // The rail popup (or an undo) changing opacity while the draft sits at black
+    // must not discard the hue — re-seeding from "#000000" would lose it.
+    const onCommit = vi.fn();
+    const { rerender } = render(<Harness hex="#0000ff" alpha={100} onCommit={onCommit} />);
+    fireEvent.click(screen.getByText("to black"));
+    rerender(<Harness hex="#000000" alpha={100} onCommit={onCommit} />);
+    rerender(<Harness hex="#000000" alpha={40} onCommit={onCommit} />);
+    fireEvent.click(screen.getByText("to bright"));
+    expect(onCommit).toHaveBeenLastCalledWith("#0000ff", 40, false);
+  });
+
   it("leaves the none state as soon as a control moves", () => {
     const onCommit = vi.fn();
     render(<Harness hex="transparent" alpha={0} onCommit={onCommit} />);
@@ -2736,15 +2748,26 @@ export function useColorDraft({ hex, alpha, onCommit }: UseColorDraftOptions) {
   let current = draft;
   if (draft.seenHex !== hex || draft.seenAlpha !== alpha) {
     const isEcho = hex === draft.emittedHex && alpha === draft.emittedAlpha;
-    current = isEcho
-      ? { ...draft, seenHex: hex, seenAlpha: alpha }
-      : {
-          ...seedHsv(hex, alpha),
-          seenHex: hex,
-          seenAlpha: alpha,
-          emittedHex: null,
-          emittedAlpha: null,
-        };
+    // An alpha-only change must not re-seed: the color itself did not move, so
+    // discarding the HSV would kill the hue at an achromatic hex — the exact
+    // failure this hook exists to prevent. Reachable whenever the other surface
+    // (or an undo) changes opacity while the draft sits at #000000.
+    const alphaOnly = hex === draft.seenHex;
+    current =
+      isEcho || alphaOnly
+        ? {
+            ...draft,
+            alpha: hex === "transparent" ? 100 : alpha,
+            seenHex: hex,
+            seenAlpha: alpha,
+          }
+        : {
+            ...seedHsv(hex, alpha),
+            seenHex: hex,
+            seenAlpha: alpha,
+            emittedHex: null,
+            emittedAlpha: null,
+          };
     setDraft(current);
   }
 
