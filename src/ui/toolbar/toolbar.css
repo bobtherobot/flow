@@ -80,6 +80,8 @@
   gap: 2px;
   padding: 4px;
   overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .flow-toolbar__btn {
   display: inline-flex;
