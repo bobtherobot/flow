@@ -7,7 +7,6 @@ import { historyShortcutFor, isTextEntry } from "../../lib/history-shortcuts";
 import { useSelectionStyle } from "./useSelectionStyle";
 import { TransformPanel } from "./TransformPanel";
 import { ColorPanel } from "./ColorPanel";
-import { SwatchesPanel } from "./SwatchesPanel";
 import { StrokePanel } from "./StrokePanel";
 import { TextPanel } from "./TextPanel";
 import { AlignPanel } from "./AlignPanel";
@@ -40,7 +39,6 @@ export function PanelsRoot({ api, units, search }: PanelsRootProps) {
   const defs: PanelDef[] = [
     { id: "transform", label: "Transform", render: () => <TransformPanel sel={sel} api={api} /> },
     { id: "color", label: "Color", render: () => <ColorPanel sel={sel} /> },
-    { id: "swatches", label: "Color Swatches", render: () => <SwatchesPanel /> },
     { id: "stroke", label: "Stroke", render: () => <StrokePanel sel={sel} units={units} /> },
     { id: "text", label: "Text", render: () => <TextPanel sel={sel} api={api} /> },
     { id: "align", label: "Align", render: () => <AlignPanel sel={sel} /> },

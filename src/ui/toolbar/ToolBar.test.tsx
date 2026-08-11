@@ -2,12 +2,24 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToolBar } from "./ToolBar";
+import { RAIL_WIDTH } from "./rail-layout";
 import { DEFAULT_TOOLBAR_STATE } from "./toolbar-state";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
 function fakeApi(type = "selection", locked = false, currentItemArrowType = "sharp") {
   return {
-    getAppState: () => ({ activeTool: { type, locked }, currentItemArrowType }),
+    // Task 16's RailColorControl derives its own selection-style bridge from
+    // this same api (useSelectionStyle), so the fake needs the scene/appState
+    // reads that hook makes, not just the tool-activation surface above.
+    getSceneElements: () => [],
+    getAppState: () => ({
+      activeTool: { type, locked },
+      currentItemArrowType,
+      currentItemBackgroundColor: "transparent",
+      currentItemStrokeColor: "#1e1e1e",
+      currentItemTextColor: "#1e1e1e",
+      selectedElementIds: {},
+    }),
     onChange: () => () => {},
     setActiveTool: vi.fn(),
     updateScene: vi.fn(),
@@ -121,5 +133,38 @@ describe("ToolBar", () => {
     const next = onChange.mock.calls[0][0];
     expect(next.floating).toBe(true);
     expect(next.y).toBeGreaterThanOrEqual(36);
+  });
+
+  it("is 88px wide so the tools sit in two columns", () => {
+    expect(RAIL_WIDTH).toBe(88);
+  });
+
+  it("reserves the canvas gutter at the docked width", () => {
+    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
+      .toBe("88px");
+  });
+
+  it("reserves nothing while floating", () => {
+    render(
+      <ToolBar api={fakeApi()} state={{ ...DEFAULT_TOOLBAR_STATE, floating: true }} onChange={() => {}} />,
+    );
+    expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
+      .toBe("0px");
+  });
+
+  it("mounts the rail's color control beneath the tool grid", () => {
+    // Asserting only that the radiogroup exists would pass even if it were
+    // mounted above the tool grid instead of pinned below it — check DOM order.
+    const { container } = render(
+      <ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />,
+    );
+    const tools = container.querySelector(".flow-toolbar__tools");
+    const colorControl = container.querySelector(".flow-toolbar__color");
+    expect(tools).toBeInTheDocument();
+    expect(colorControl).toBeInTheDocument();
+    expect(
+      tools!.compareDocumentPosition(colorControl!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

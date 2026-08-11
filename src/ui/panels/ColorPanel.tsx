@@ -1,124 +1,80 @@
-import { ColorSwatch } from "./controls/ColorSwatch";
-import { NumberInput } from "./controls/NumberInput";
-import { MIXED, readFormValue, type SelectedElementIds } from "../../lib/selection-style";
-import { splitColorAlpha, combineColorAlpha } from "../../lib/color-alpha";
+import { useEffect, useRef } from "react";
+import "../color/color.css";
+import { PartChooser } from "../color/PartChooser";
+import { SaturationBox } from "../color/SaturationBox";
+import { PickerRow } from "../color/PickerRow";
+import { NumericFields } from "../color/NumericFields";
+import { PaletteSection } from "../color/PaletteSection";
+import { useColorTarget } from "../color/useColorTarget";
+import { useColorDraft } from "../color/useColorDraft";
+import { useColorUiState, setNumericMode } from "../../lib/color-store";
+import { hsvToHex } from "../../lib/color-convert";
+import { openEyeDropper, cancelEyeDropper, type EyeDropperHandle } from "../../lib/eyedropper";
 import type { SelectionStyle } from "./useSelectionStyle";
 
-interface ColorRowProps {
-  sel: SelectionStyle;
-  label: string;
-  /** Reads the raw color string off an element. */
-  colorOf: (el: SelectionStyle["elements"][number]) => string;
-  /** The element property to write and its currentItem* default key. */
-  prop: string;
-  currentItemKey: string;
-  /** currentItem default color when nothing is selected. */
-  fallbackColor: string;
-  ids: SelectedElementIds;
-  allowTransparent?: boolean;
-  disabled?: boolean;
-}
-
 /**
- * One "color + opacity" row. The swatch edits hue only; opacity is a separate
- * drag-to-scrub field. They are combined into an 8-digit hex written to the
- * element so each color carries its own opacity (Excalidraw's element `opacity`
- * is a single value and can't do this). MIXED selections show an indeterminate
- * swatch and an empty opacity field.
- */
-function ColorRow({
-  sel,
-  label,
-  colorOf,
-  prop,
-  currentItemKey,
-  fallbackColor,
-  ids,
-  allowTransparent = false,
-  disabled = false,
-}: ColorRowProps) {
-  const fallback = splitColorAlpha(fallbackColor);
-  const hue = readFormValue(sel.elements, ids, (el) => splitColorAlpha(colorOf(el)).hex, fallback.hex);
-  const alpha = readFormValue(sel.elements, ids, (el) => splitColorAlpha(colorOf(el)).alpha, fallback.alpha);
-
-  const isTransparent = hue === "transparent";
-  const currentAlpha = alpha === MIXED ? 100 : alpha;
-
-  const write = (color: string, transient = false) =>
-    sel.setProp({ prop, value: color, currentItemKey, ids, transient });
-
-  const onColor = (hex: string) => {
-    if (hex === "transparent") return write("transparent");
-    write(combineColorAlpha(hex, currentAlpha > 0 ? currentAlpha : 100));
-  };
-  const onOpacity = (next: number, transient: boolean) => {
-    const base = hue === MIXED || isTransparent ? "#1e1e1e" : hue;
-    write(combineColorAlpha(base, next), transient);
-  };
-
-  return (
-    <div className="flow-ctl-row" aria-disabled={disabled || undefined}>
-      <span className="flow-ctl-row__label">{label}</span>
-      <div className="flow-ctl-row__control">
-        <ColorSwatch
-          value={hue}
-          onChange={onColor}
-          ariaLabel={`${label} color`}
-          allowTransparent={allowTransparent}
-          disabled={disabled}
-        />
-        <NumberInput
-          value={isTransparent ? 0 : alpha === MIXED ? null : alpha}
-          min={0}
-          max={100}
-          unit="%"
-          onChange={onOpacity}
-          ariaLabel={`${label} opacity`}
-          disabled={disabled || isTransparent}
-        />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Color panel: background / stroke / text color, each with its own opacity. Text
- * color targets selected text (and bound container text) and is disabled when
- * the selection has none. With an empty selection the rows edit the tool
- * defaults, Illustrator-style.
+ * The one place color is edited. The part chooser picks which of the
+ * selection's colors every other control below it is aimed at; the picker reads
+ * and writes that color live through `useColorTarget`, so the panel is always a
+ * view of the current object rather than a form you submit.
  */
 export function ColorPanel({ sel }: { sel: SelectionStyle }) {
-  const a = sel.appState;
+  const target = useColorTarget(sel);
+  const { numericMode } = useColorUiState();
+
+  // Channel-level edits only: the draft holds hue/alpha/saturation drags and
+  // the numeric fields, none of which are a whole colour on their own — see
+  // `useColorTarget.adjustColor`. The HEX field and palette/eyedropper picks
+  // below call `target.setColor` directly instead.
+  const draft = useColorDraft({
+    hex: target.hex,
+    alpha: target.alpha,
+    onCommit: target.adjustColor,
+  });
+
+  // The accordion can collapse this panel (or swap it for another) while a
+  // pick is in flight. The overlay lives outside this component's subtree
+  // (LayerUI mounts it globally), so it would otherwise survive the unmount
+  // with `onSelect` closing over a `target`/`draft` that no longer exists.
+  // `cancelEyeDropper` only clears the atom if it's still this panel's own
+  // handle — the rail popup shares the same global atom and can have its own
+  // pick in flight when this panel happens to unmount.
+  const pick = useRef<EyeDropperHandle | null>(null);
+  useEffect(() => () => cancelEyeDropper(pick.current), []);
+
   return (
-    <div className="flow-color-panel">
-      <ColorRow
-        sel={sel}
-        label="Fill"
-        colorOf={(el) => el.backgroundColor}
-        prop="backgroundColor"
-        currentItemKey="currentItemBackgroundColor"
-        fallbackColor={a?.currentItemBackgroundColor ?? "transparent"}
-        ids={sel.selectedIds}
-        allowTransparent
+    <div className="flow-clr-panel">
+      <div className="flow-clr-panel__top">
+        <PartChooser target={target} />
+        <SaturationBox hsv={draft.hsv} onChange={draft.setSv} />
+      </div>
+
+      <PickerRow
+        hsv={draft.hsv}
+        alpha={draft.alpha}
+        isNone={draft.isNone}
+        onHue={draft.setHue}
+        onAlpha={draft.setAlpha}
+        onPick={() => {
+          pick.current = openEyeDropper({
+            part: target.part,
+            onSelect: (hex) => target.setColor(hex, draft.alpha, false),
+          });
+        }}
       />
-      <ColorRow
-        sel={sel}
-        label="Stroke"
-        colorOf={(el) => el.strokeColor}
-        prop="strokeColor"
-        currentItemKey="currentItemStrokeColor"
-        fallbackColor={a?.currentItemStrokeColor ?? "#1e1e1e"}
-        ids={sel.selectedIds}
+
+      <NumericFields
+        hsv={draft.hsv}
+        alpha={draft.alpha}
+        mode={numericMode}
+        onModeChange={setNumericMode}
+        onChange={draft.setHsvAlpha}
+        onHexCommit={(hex, hexAlpha) => target.setColor(hex, hexAlpha, false)}
       />
-      <ColorRow
-        sel={sel}
-        label="Text"
-        colorOf={(el) => el.strokeColor}
-        prop="strokeColor"
-        currentItemKey="currentItemTextColor"
-        fallbackColor={a?.currentItemTextColor ?? "#1e1e1e"}
-        ids={sel.textTargetIds}
-        disabled={!sel.hasText}
+
+      <PaletteSection
+        currentColor={hsvToHex(draft.hsv)}
+        onPick={(hex) => target.setColor(hex, draft.alpha, false)}
       />
     </div>
   );

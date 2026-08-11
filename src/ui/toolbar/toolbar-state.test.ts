@@ -45,4 +45,12 @@ describe("shouldRedock", () => {
     expect(shouldRedock(20)).toBe(false);
     expect(shouldRedock(200)).toBe(false);
   });
+
+  it("redocks on the left edge regardless of rail width", () => {
+    // shouldRedock tests the rail's left edge against the viewport, so the
+    // 48 -> 88 widening must not change the threshold.
+    expect(shouldRedock(9)).toBe(true);
+    expect(shouldRedock(10)).toBe(false);
+    expect(shouldRedock(87)).toBe(false);
+  });
 });

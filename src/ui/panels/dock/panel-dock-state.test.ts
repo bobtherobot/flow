@@ -73,6 +73,22 @@ describe("normalizeDockState", () => {
     // Position (order) and per-panel state carry over to the renamed panel.
     expect(s.panels[0]).toMatchObject({ id: "color", visible: false, order: 0 });
   });
+
+  it("drops a persisted panel id that no longer exists", () => {
+    // A layout saved before the Swatches panel was merged into Color. Unlike
+    // 'style' → 'color', 'swatches' has no rename target — Color already
+    // exists as its own panel, so mapping 'swatches' onto it would produce two
+    // panel entries sharing one id. syncPanelDefs dropping the orphan (rather
+    // than a LEGACY_PANEL_ID_RENAMES entry) is what's under test here.
+    const stored = normalizeDockState({
+      panels: [
+        { id: "color", order: 0, visible: true },
+        { id: "swatches", order: 1, visible: true },
+      ],
+    });
+    const synced = syncPanelDefs(stored, ["color", "stroke"]);
+    expect(synced.panels.map((p) => p.id)).toEqual(["color", "stroke"]);
+  });
 });
 
 describe("dockReducer — main panel", () => {

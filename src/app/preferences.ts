@@ -12,6 +12,7 @@ import {
 } from "../lib/selection-mode";
 import { clampGridSize, isGridSize, DEFAULT_GRID_SIZE } from "../lib/grid";
 import { normalizePalettes, type ColorPalette } from "../lib/color-palettes";
+import { normalizeRecents } from "../lib/recent-colors";
 
 const SLOPPINESS_KEY = "flow.sloppiness";
 const UNITS_KEY = "flow.units";
@@ -252,6 +253,44 @@ export function getDefaultPaletteId(): string | null {
 export function setDefaultPaletteId(value: string): void {
   try {
     localStorage.setItem(DEFAULT_PALETTE_ID_KEY, value);
+  } catch {
+    // Quota / disabled storage: preference simply won't persist this session.
+  }
+}
+
+const RECENT_COLORS_KEY = "flow.recentColors";
+
+/** Read the recent-colors MRU, normalized (empty on miss/parse error). */
+export function getRecentColors(): string[] {
+  return normalizeRecents(readJson(RECENT_COLORS_KEY));
+}
+
+/** Persist the recent-colors MRU. */
+export function setRecentColors(value: string[]): void {
+  writeJson(RECENT_COLORS_KEY, value);
+}
+
+const COLOR_NUMERIC_MODE_KEY = "flow.colorNumericMode";
+
+/** How the color panel's numeric fields are labelled and parsed. */
+export type NumericMode = "hsla" | "rgba" | "hex";
+
+const NUMERIC_MODES: NumericMode[] = ["hsla", "rgba", "hex"];
+
+/** Read the color panel's numeric-field mode (default hsla on miss/corrupt). */
+export function getColorNumericMode(): NumericMode {
+  try {
+    const raw = localStorage.getItem(COLOR_NUMERIC_MODE_KEY);
+    return NUMERIC_MODES.includes(raw as NumericMode) ? (raw as NumericMode) : "hsla";
+  } catch {
+    return "hsla";
+  }
+}
+
+/** Persist the color panel's numeric-field mode. */
+export function setColorNumericMode(value: NumericMode): void {
+  try {
+    localStorage.setItem(COLOR_NUMERIC_MODE_KEY, value);
   } catch {
     // Quota / disabled storage: preference simply won't persist this session.
   }

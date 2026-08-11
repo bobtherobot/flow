@@ -181,18 +181,6 @@ export function addSwatch(paletteId: string, color: string): void {
   });
 }
 
-export function updateSwatch(paletteId: string, index: number, color: string): void {
-  const hex = scrubHex(color);
-  if (!hex) return;
-  commit({
-    ...state,
-    palettes: mapPalette(paletteId, (p) => ({
-      ...p,
-      colors: p.colors.map((c, i) => (i === index ? hex : c)),
-    })),
-  });
-}
-
 export function removeSwatches(paletteId: string, indices: number[]): void {
   const drop = new Set(indices);
   commit({

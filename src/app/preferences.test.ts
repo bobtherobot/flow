@@ -11,6 +11,10 @@ import {
   setColorPalettes,
   getDefaultPaletteId,
   setDefaultPaletteId,
+  getRecentColors,
+  setRecentColors,
+  getColorNumericMode,
+  setColorNumericMode,
 } from "./preferences";
 import { DEFAULT_TOOLBAR_STATE } from "../ui/toolbar/toolbar-state";
 import { DEFAULT_QUICKBAR_STATE } from "../ui/quickbar/quickbar-state";
@@ -229,5 +233,46 @@ describe("color palettes persistence", () => {
     expect(getDefaultPaletteId()).toBeNull();
     setDefaultPaletteId("xyz");
     expect(getDefaultPaletteId()).toBe("xyz");
+  });
+});
+
+describe("recent colors", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to an empty list", () => {
+    expect(getRecentColors()).toEqual([]);
+  });
+
+  it("round-trips a list", () => {
+    setRecentColors(["#111111", "#222222"]);
+    expect(getRecentColors()).toEqual(["#111111", "#222222"]);
+  });
+
+  it("survives a corrupt payload", () => {
+    localStorage.setItem("flow.recentColors", "{not json");
+    expect(getRecentColors()).toEqual([]);
+  });
+
+  it("scrubs junk entries on read", () => {
+    localStorage.setItem("flow.recentColors", JSON.stringify(["#111111", "zzz"]));
+    expect(getRecentColors()).toEqual(["#111111"]);
+  });
+});
+
+describe("color numeric mode", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to hsla", () => {
+    expect(getColorNumericMode()).toBe("hsla");
+  });
+
+  it("round-trips a mode", () => {
+    setColorNumericMode("rgba");
+    expect(getColorNumericMode()).toBe("rgba");
+  });
+
+  it("rejects an unknown stored mode", () => {
+    localStorage.setItem("flow.colorNumericMode", "cmyk");
+    expect(getColorNumericMode()).toBe("hsla");
   });
 });

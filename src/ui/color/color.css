@@ -1,0 +1,522 @@
+/* src/ui/color/color.css — styles for every control in src/ui/color/. */
+
+.flow-clr-slider {
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  touch-action: none;
+  border: 1px solid var(--flow-border);
+}
+
+.flow-clr-slider:focus-visible {
+  outline: 2px solid var(--flow-accent);
+  outline-offset: 2px;
+}
+
+.flow-clr-slider--hue {
+  background: linear-gradient(
+    to right,
+    #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%
+  );
+}
+
+/* Checkerboard beneath a transparent→opaque ramp of the live hue. */
+.flow-clr-slider--alpha {
+  background-image:
+    linear-gradient(to right, transparent, var(--flow-clr-ramp, #000)),
+    conic-gradient(#c8c8c8 0 25%, #fff 0 50%, #c8c8c8 0 75%, #fff 0);
+  background-size: 100% 100%, 10px 10px;
+}
+
+.flow-clr-slider__thumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--flow-border);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* Saturation/value field: a white→transparent wash across, black up from the
+   bottom, over a solid backdrop of the current hue set inline. */
+.flow-clr-satbox {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 4px;
+  cursor: crosshair;
+  touch-action: none;
+  background-image:
+    linear-gradient(to top, #000, transparent),
+    linear-gradient(to right, #fff, transparent);
+  border: 1px solid var(--flow-border);
+}
+
+.flow-clr-satbox:focus-visible {
+  outline: 2px solid var(--flow-accent);
+  outline-offset: 2px;
+}
+
+.flow-clr-satbox__thumb {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 40%);
+  pointer-events: none;
+}
+
+.flow-clr-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.flow-clr-row__tracks {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.flow-clr-preview {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 1px solid var(--flow-border);
+  background-image: conic-gradient(#c8c8c8 0 25%, #fff 0 50%, #c8c8c8 0 75%, #fff 0);
+  background-size: 10px 10px;
+}
+
+.flow-clr-preview__fill {
+  position: absolute;
+  inset: 0;
+}
+
+/* "No color": a red slash over white, matching the quartet's none chip. */
+.flow-clr-preview--none {
+  background-image: linear-gradient(
+    to bottom right,
+    #fff calc(50% - 1px), #e03131 calc(50% - 1px),
+    #e03131 calc(50% + 1px), #fff calc(50% + 1px)
+  );
+  background-size: 100% 100%;
+}
+
+.flow-clr-eyedropper {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--flow-ink);
+  background: none;
+  border: none;
+  border-radius: 4px;
+}
+
+.flow-clr-eyedropper:hover:not(:disabled) {
+  background: var(--flow-hover);
+}
+
+.flow-clr-eyedropper:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.flow-clr-numrow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.flow-clr-num {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+/* Drawn as a compact chevron stack; still a real select underneath. */
+.flow-clr-mode {
+  width: 22px;
+  height: 28px;
+  flex: 0 0 auto;
+  padding: 0;
+  cursor: pointer;
+  color: transparent;
+  background: transparent
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='16' fill='none' stroke='%23868e96' stroke-width='1.5'><path d='M2 6 5 3l3 3M2 10l3 3 3-3'/></svg>")
+    no-repeat center;
+  border: none;
+  appearance: none;
+}
+
+.flow-clr-mode:focus-visible {
+  outline: 2px solid var(--flow-accent);
+  outline-offset: 1px;
+}
+
+/* The options themselves must stay readable when the closed control is not. */
+.flow-clr-mode option {
+  color: var(--flow-ink);
+}
+
+.flow-clr-hex {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 28px;
+  padding: 0 6px;
+  font-family: inherit;
+  border: 1px solid var(--flow-border);
+  border-radius: 4px;
+}
+
+/* Illustrator-style fill/stroke/text part chooser. */
+
+.flow-clr-chooser {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.flow-clr-chooser__stack {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  --flow-clr-part-size: 46px;
+}
+
+.flow-clr-chooser--compact .flow-clr-chooser__stack {
+  width: 52px;
+  height: 52px;
+  --flow-clr-part-size: 32px;
+}
+
+/*
+ * Boxes step down the diagonal by their index among the VISIBLE parts (set
+ * from `--flow-clr-part-offset`, 0..1), so two parts sit at the corners and
+ * three spread evenly between them. Driven by a custom property rather than
+ * per-part `top`/`left`/`right`/`bottom` rules because `stroke` and `text`
+ * are never both visible at once as siblings of a two-part stack, but they
+ * ARE both visible in the three-part (labeled container) case — fixed
+ * per-part offsets there gave them the identical position, so whichever sat
+ * behind was completely covered and unclickable.
+ */
+.flow-clr-part {
+  position: absolute;
+  top: calc(var(--flow-clr-part-offset, 0) * (100% - var(--flow-clr-part-size)));
+  left: calc(var(--flow-clr-part-offset, 0) * (100% - var(--flow-clr-part-size)));
+  width: var(--flow-clr-part-size);
+  height: var(--flow-clr-part-size);
+  padding: 0;
+  cursor: pointer;
+  background: var(--flow-clr-part-color, #fff);
+  border: 2px solid var(--flow-ink);
+}
+
+/*
+ * The stroke box reads as a ring, not a filled square: the swatch color
+ * covers the whole box, then `::after` punches a hole by painting a smaller
+ * centered square in the panel surface color on top of it.
+ *
+ * A brief for this task specified a double inset `box-shadow` for the ring
+ * instead (an outer inset shadow in the swatch color layered over an inner
+ * inset shadow in white). That doesn't work: box-shadow layers paint
+ * front-to-back in listing order, both on top of `background`, and both
+ * insets grow inward *from the edge* — so with this box's background already
+ * filled solid, the result is a color band at the edge, a thin white ring
+ * just inside it, and the untouched solid-color background showing again
+ * for the rest of the interior. That is a bullseye, not a ring: the center
+ * stays filled instead of reading as a hole. Nothing renders this file
+ * (Task 12's component isn't mounted until Task 14), so this was caught by
+ * reasoning through the paint order rather than by looking at it — the
+ * `::after` hole below replaces it.
+ */
+.flow-clr-part--stroke::after {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  background: var(--flow-panel-bg);
+}
+
+.flow-clr-chooser--compact .flow-clr-part--stroke::after {
+  inset: 6px;
+}
+
+.flow-clr-part--active {
+  z-index: 2;
+}
+
+.flow-clr-part--none {
+  background: linear-gradient(
+    to bottom right,
+    #fff calc(50% - 1.5px),
+    #e03131 calc(50% - 1.5px),
+    #e03131 calc(50% + 1.5px),
+    #fff calc(50% + 1.5px)
+  );
+}
+
+.flow-clr-part--mixed {
+  background-image: conic-gradient(#c8c8c8 0 25%, #fff 0 50%, #c8c8c8 0 75%, #fff 0);
+  background-size: 8px 8px;
+}
+
+/* A "none" or "mixed" stroke shows the same full-square treatment as fill
+   and text — the ring reading is only meaningful when a real color is
+   underneath it, so the punched hole is suppressed here. */
+.flow-clr-part--none::after,
+.flow-clr-part--mixed::after {
+  content: none;
+}
+
+.flow-clr-part__glyph {
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--flow-ink);
+  mix-blend-mode: difference;
+}
+
+.flow-clr-chooser__swap {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--flow-ink);
+  background: none;
+  border: none;
+}
+
+.flow-clr-quartet {
+  display: flex;
+  gap: 4px;
+}
+
+.flow-clr-chip {
+  width: var(--flow-clr-chip-size, 22px);
+  height: var(--flow-clr-chip-size, 22px);
+  padding: 0;
+  cursor: pointer;
+  border: 1px solid var(--flow-ink);
+}
+
+.flow-clr-chip--none {
+  background: linear-gradient(
+    to bottom right,
+    #fff calc(50% - 1px),
+    #e03131 calc(50% - 1px),
+    #e03131 calc(50% + 1px),
+    #fff calc(50% + 1px)
+  );
+}
+
+/* Palette section: tile density and control sizing carried forward from the
+   retired Swatches panel (`SwatchGrid`/`SwatchesPanel`, both deleted), under
+   the `flow-clr-*` naming this panel uses throughout. */
+
+.flow-clr-palette {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flow-clr-palette__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flow-clr-palette__select,
+.flow-clr-palette__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.flow-clr-palette__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--flow-ink);
+  background: transparent;
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-sm);
+}
+
+.flow-clr-palette__icon:hover {
+  background: var(--flow-hover);
+}
+
+.flow-clr-palette__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.flow-clr-palette__add,
+.flow-clr-palette__tile {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  cursor: pointer;
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-sm);
+}
+
+.flow-clr-palette__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--flow-ink);
+  background: transparent;
+}
+
+.flow-clr-palette__add:hover {
+  background: var(--flow-hover);
+}
+
+.flow-clr-palette__tile[aria-pressed="true"] {
+  outline: 2px solid var(--flow-accent);
+  outline-offset: 1px;
+}
+
+.flow-clr-palette__confirm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 12px;
+  border-radius: var(--flow-radius-md);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  color: var(--flow-ink);
+}
+
+.flow-clr-palette__confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* The panel assembly (Task 14): part chooser + saturation box on top, then
+   the shared PickerRow/NumericFields/PaletteSection stack. */
+
+.flow-clr-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px;
+}
+
+.flow-clr-panel__top {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.flow-clr-panel__top > .flow-clr-satbox {
+  flex: 1 1 auto;
+}
+
+/* The rail's compact picker (Task 16): saturation box, eyedropper/preview/hue/
+   alpha, then six recents — no numeric fields, no palette section. Anchored as
+   a fixed-position portal beside the rail, so it needs to sit above both the
+   rail (z-index 90) and the menu bar (z-index 100) — matched to
+   `.flow-pnl-config`'s 130 rather than invented fresh. */
+
+.flow-clr-popup {
+  position: fixed;
+  z-index: 130;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 280px;
+  padding: 12px;
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-md);
+  box-shadow: var(--flow-shadow);
+}
+
+.flow-clr-popup__close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--flow-ink);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: 50%;
+  box-shadow: var(--flow-shadow);
+}
+
+.flow-clr-popup__close:hover {
+  background: var(--flow-hover);
+}
+
+.flow-clr-recents {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.flow-clr-recents__slot {
+  aspect-ratio: 1;
+  padding: 0;
+  cursor: pointer;
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-sm);
+}
+
+.flow-clr-recents__slot:disabled {
+  cursor: default;
+}
+
+/* The quartet at its default 22px chip doesn't fit the rail's compact chooser
+   (88px rail − 1px border − 8px padding = 79px usable; 4×22 + 3×4 gaps = 100px).
+   Same technique as `--flow-clr-part-size` (Task 12): a custom property on the
+   chooser, overridden under `--compact`. 16px chips at a 3px gap measure 73px
+   in the running rail (getBoundingClientRect, Chromium) — 6px of headroom
+   against the 79px usable width. */
+.flow-clr-quartet {
+  --flow-clr-chip-size: 22px;
+}
+
+.flow-clr-chooser--compact .flow-clr-quartet {
+  --flow-clr-chip-size: 16px;
+  gap: 3px;
+}

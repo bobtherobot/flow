@@ -1,7 +1,7 @@
 # Color system redesign — design
 
 **Date:** 2026-08-11
-**Status:** approved, ready to plan
+**Status:** shipped 2026-08-11
 
 One Color panel that owns everything about color — an Illustrator-style part
 chooser, a real HSV picker with eyedropper and alpha, numeric entry in
@@ -151,17 +151,42 @@ free; HEX is a plain text field spanning the row.
 The reference screenshot draws the switcher as a small chevron stack. It is
 implemented as a labelled `<select>` styled to look like that — a cycle button
 would be unreachable by keyboard and unnamed to a screen reader. A MIXED
-selection renders the fields empty rather than showing a fabricated value.
+selection shows the resolved first-element values rather than blanking the
+fields, consistent with the part chooser seeding from the first element too
+(§4) — blank numeric fields sitting beside a populated saturation box and
+sliders would be incoherent, not more honest.
 
 ### 6. Write path
 
-`useColorTarget(sel)` → `{ part, setPart, available, color, setColor, swap, quickSet }`.
+`useColorTarget(sel)` → `{ part, setPart, available, color, setColor, adjustColor, swap, quickSet }`.
 
-`setColor` resolves the part through `color-parts`, combines the alpha into
-8-digit hex, and writes through `sel.setProp` / `sel.update`. Slider and
-saturation-field drags pass `transient: true`, so `deferred-commit` batching
-makes one drag one undo entry — the pattern [[scrub-numeric-inputs]] established.
-Recents push on commit only, never mid-drag.
+`setColor` and `adjustColor` both resolve the part through `color-parts`, combine
+the alpha into 8-digit hex, and write through `sel.setProp` / `sel.update` — they
+share one write implementation and differ only in whether the write also joins
+recents. Slider and saturation-field drags pass `transient: true`, so
+`deferred-commit` batching makes one drag one undo entry — the pattern
+[[scrub-numeric-inputs]] established.
+
+Recents record a *whole colour*, never a *channel adjustment* — even a settled,
+non-transient one. A hue slider, an alpha slider, and the saturation box (drag
+**and** arrow-key steps alike) are channel adjustments, and so are the H/S/L,
+R/G/B, and A numeric fields: each moves one component of a color still being
+worked on. None of these call `setColor`; they all route through `adjustColor`,
+which writes identically but never touches recents. Only four paths call
+`setColor` and do record: the Hex field commit (a typed hex names a whole color
+outright), a palette swatch pick, an eyedropper pick, and a click on an existing
+recent. The white/grey/black quartet under the part chooser is the same rule
+applied to `quickSet`: those three colors already have permanent dedicated
+chips one click away, so `quickSet`'s non-`"none"` branch calls `adjustColor`
+directly rather than `setColor`, and caching them would just evict colors the
+user actually chose.
+
+The risk this guards against: without the split, an arrow-key step is
+non-transient (`transient: false`) exactly like a drag release, so it looks
+identical to a deliberate commit from the write path's point of view. Six
+ArrowRight presses on the hue track would replace the entire six-slot recents
+strip with six adjacent hues, and reaching one color by dragging hue then
+saturation would burn two slots for a single choice.
 
 `quickSet` carries the baseline colors, and the stroke rules are the sharp edge:
 
@@ -189,8 +214,9 @@ canvas gutter needs no separate change. The part chooser pins to the bottom via
 Clicking the frontmost box opens the popup in a portal anchored right of the
 rail, dismissed on outside pointerdown or Esc — mirroring `ToolbarConfigMenu`
 and `PanelShell`. A floating rail anchors off its own rect.
-`shouldRedock` (`ToolBar.tsx:79`) is tuned against a 48px rail and needs
-retuning for 88.
+`shouldRedock` (`ToolBar.tsx:79`) is tuned against a 48px rail. **Correction
+(shipped):** it tests the left edge of the rail, not its width, so it needed no
+retuning for 88 — this risk dissolved on inspection.
 
 ### 8. Eyedropper
 
@@ -204,6 +230,10 @@ shows the payload.
 
 Fallback if the export needs more than an index re-export: the browser
 `EyeDropper` API behind a support check, with the button hidden where absent.
+**Correction (shipped):** the fallback was never needed — both symbols
+(`activeEyeDropperAtom`, `editorJotaiStore`) were already exported from their
+own modules, so the fork edit is a two-line additive re-export in
+`packages/excalidraw/index.tsx`.
 
 ### 9. Palette section
 
@@ -226,7 +256,7 @@ Renaming is in-place: double-click the select and it swaps for a text input.
 | `src/ui/panels/SwatchGrid.tsx` | absorbed into `PaletteSection` |
 | `ColorPanel`'s three rows + opacity `NumberInput`s | deleted — alpha lives in the picker |
 | `src/ui/panels/controls/ColorSwatch.tsx` | **kept** — `PreferencesDialog.tsx:207` and `BackgroundControl.tsx:15` use it as the generic small well for non-element colors |
-| Saved dock layouts naming `swatches` | no-op migration in `panel-dock-state` so a stale id doesn't break restore |
+| Saved dock layouts naming `swatches` | **Correction (shipped):** no `panel-dock-state` migration was written or needed — `syncPanelDefs` already drops unknown panel ids on load, so a stale `swatches` entry is silently dropped by existing code |
 | `flow.defaultPaletteId` | reused as the active-palette id; no migration needed |
 
 ## Testing
@@ -246,11 +276,21 @@ survives a reload; the widened rail still docks and floats.
 
 ## Risks
 
-1. **Eyedropper fork export** — the only item not verified end-to-end. Fallback
-   specified above.
-2. **`shouldRedock` at 88px** — needs retuning, easy to miss.
-3. **Stale `swatches` in persisted dock layouts** — covered by the migration.
+1. ~~**Eyedropper fork export** — the only item not verified end-to-end.~~
+   **Dissolved (shipped):** both symbols were already exported from their own
+   modules; the fork edit is a two-line additive re-export, verified
+   end-to-end in Task 18.
+2. ~~**`shouldRedock` at 88px** — needs retuning, easy to miss.~~ **Dissolved
+   (shipped):** `shouldRedock` tests the rail's left edge, not its width, and
+   is width-independent — no retuning was needed.
+3. ~~**Stale `swatches` in persisted dock layouts** — covered by the
+   migration.~~ **Dissolved (shipped):** no migration was written; `syncPanelDefs`
+   already drops unknown panel ids, so this was already covered by existing code.
 4. **`strokeWidth` falsy coercions** — see the [[drawing-defaults]] warning.
+   **Materialized:** the plan's own reference implementation for Task 11 wired
+   the fix/revival coupling in only one direction, breaking the empty-selection
+   tool-defaults path outright until review caught it. Fixed via a shared
+   `needsRevival()` used by all four write paths, `??` not `||`.
 
 ## Out of scope
 

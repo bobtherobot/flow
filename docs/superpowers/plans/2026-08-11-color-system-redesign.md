@@ -21,8 +21,9 @@ Every task's requirements implicitly include this section.
 - **Transparent is spelled `"transparent"`, never `"none"`.** [[drawing-defaults]]: `"none"` crashes curved arrows in the vendor renderer.
 - **Recents are opaque `#rrggbb` lowercase**, max 6, deduped on hue; `"transparent"` never enters the list.
 - **Grey is `#808080`**, white `#ffffff`, black `#000000`.
-- **Conversions return unrounded floats.** Only the numeric fields round, at display time. Rounding inside conversions destroys round-trip fidelity.
+- **Conversions return unrounded H/S/V/L floats.** Only the numeric fields round those, at display time — rounding hue or saturation inside a conversion drifts the color on every frame of a drag. RGB channels are the exception and *are* rounded to integers, because a channel is a byte; `fromHueChroma`'s `Math.round` is correct and not a violation of this rule.
 - **Colors are lowercase `#rrggbb`** everywhere, matching `scrubHex` in `src/lib/color-palettes.ts`.
+- **CSS uses flow's existing design tokens, with no fallback values.** They are defined on `:root` in `src/ui/menubar/menubar.css`: `--flow-ink`, `--flow-ink-muted`, `--flow-ink-disabled`, `--flow-panel-bg`, `--flow-border`, `--flow-accent`, `--flow-hover`, `--flow-active`, `--flow-shadow`, `--flow-radius-sm`, `--flow-radius-md`, `--flow-font`, `--flow-dur-fast`, `--flow-ease`. Existing stylesheets write `var(--flow-border)` bare — match that. Never invent a token name; a `var(--made-up, #fallback)` silently renders the fallback forever and looks almost right.
 - Commands: `npm test -- --run` (unit), `npm run typecheck`, `npm run test:e2e`. Both unit and typecheck must be green before every commit.
 - Memory-file conventions: this project keeps memory repo-local in `.claude/memory/`. Do not write to the global Claude account.
 
@@ -43,11 +44,13 @@ Every task's requirements implicitly include this section.
 | File | Responsibility |
 |---|---|
 | `src/ui/color/useAreaDrag.ts` | Normalized 0–1 pointer drag over an element, with transient/commit semantics |
+| `src/ui/color/slider-keys.ts` | Shared arrow-key delta helper for the sliders |
 | `src/ui/color/HueSlider.tsx` | 0–360 track |
 | `src/ui/color/AlphaSlider.tsx` | 0–100 track over checkerboard |
 | `src/ui/color/SaturationBox.tsx` | 2D S/V field |
 | `src/ui/color/ColorPreview.tsx` | Round well |
 | `src/ui/color/EyeDropperButton.tsx` | Presentational; disabled until Phase 5 supplies `onPick` |
+| `src/ui/color/PickerRow.tsx` | Shared eyedropper + preview + hue/alpha row, used by both surfaces |
 | `src/ui/color/NumericFields.tsx` | HSLA/RGBA/HEX + mode `<select>` |
 | `src/ui/color/useColorDraft.ts` | The HSV draft + commit rules shared by both surfaces |
 | `src/ui/color/useColorTarget.ts` | The write path: `setColor`, `swap`, `quickSet` |
@@ -406,10 +409,16 @@ import {
   availableParts, partSpec, normalizeActivePart, swapFillStroke,
 } from "./color-parts";
 
-/** Minimal element stand-ins — these functions only read type/id/containerId. */
+/** Minimal element stand-ins.
+ *
+ *  Note the container binding: `resolveTextTargetIds` reads `boundElements` on
+ *  the CONTAINER (`selection-style.ts:46`), not `containerId` on the child.
+ *  Real Excalidraw keeps both in sync; a fixture carrying only `containerId`
+ *  would resolve to no text targets and quietly test nothing. */
 const rect = { id: "r1", type: "rectangle", strokeColor: "#111111", backgroundColor: "#eeeeee" };
-const text = { id: "t1", type: "text", strokeColor: "#222222", containerId: null };
+const text = { id: "t1", type: "text", strokeColor: "#222222" };
 const label = { id: "t2", type: "text", strokeColor: "#333333", containerId: "r1" };
+const labeledRect = { ...rect, boundElements: [{ id: "t2", type: "text" }] };
 
 describe("availableParts", () => {
   it("gives a shape fill and stroke", () => {
@@ -421,7 +430,7 @@ describe("availableParts", () => {
   });
 
   it("gives a labeled container all three", () => {
-    expect(availableParts([rect, label], { r1: true })).toEqual(["fill", "stroke", "text"]);
+    expect(availableParts([labeledRect, label], { r1: true })).toEqual(["fill", "stroke", "text"]);
   });
 
   it("falls back to fill and stroke with nothing selected", () => {
@@ -1298,11 +1307,12 @@ git commit -m "feat(color): normalized pointer-drag hook for picker controls"
 ### Task 6: Hue and alpha sliders
 
 **Files:**
-- Create: `src/ui/color/HueSlider.tsx`, `src/ui/color/AlphaSlider.tsx`, `src/ui/color/color.css`
+- Create: `src/ui/color/slider-keys.ts`, `src/ui/color/HueSlider.tsx`, `src/ui/color/AlphaSlider.tsx`, `src/ui/color/color.css`
 - Test: `src/ui/color/sliders.test.tsx`
 
 **Interfaces:**
 - Consumes: `useAreaDrag` (Task 5); `hsvToHex` (Task 1).
+- Produces (shared): `keyDelta(e: React.KeyboardEvent, step: number, coarse: number): number` from `slider-keys.ts`.
 - Produces: `HueSlider({ hue, onChange }: { hue: number; onChange: (hue: number, transient: boolean) => void })` with `hue` 0–360; `AlphaSlider({ alpha, hue, onChange }: { alpha: number; hue: number; onChange: (alpha: number, transient: boolean) => void })` with `alpha` 0–100. `AlphaSlider` takes `hue` only to paint its ramp.
 
 Both expose `role="slider"` with `aria-valuenow`/`aria-valuemin`/`aria-valuemax`
@@ -1337,7 +1347,9 @@ describe("HueSlider", () => {
     render(<HueSlider hue={0} onChange={onChange} />);
     const el = screen.getByRole("slider", { name: /hue/i });
     stubBox(el);
-    fireEvent.pointerDown(el, { clientX: 100, clientY: 6, button: 0 });
+    // clientY deliberately gives a DIFFERENT fraction than clientX (0.25 vs 0.5)
+    // on the 200x12 stub: if the slider ever read pos.y, this must fail.
+    fireEvent.pointerDown(el, { clientX: 100, clientY: 3, button: 0 });
     expect(onChange).toHaveBeenCalledWith(180, true);
   });
 
@@ -1397,13 +1409,29 @@ describe("AlphaSlider", () => {
 Run: `npm test -- --run src/ui/color/sliders.test.tsx`
 Expected: FAIL — unresolved imports for `./HueSlider` and `./AlphaSlider`.
 
-- [ ] **Step 3: Write HueSlider**
+- [ ] **Step 3: Write the shared key helper**
+
+Create `src/ui/color/slider-keys.ts`:
+
+```ts
+/** Arrow-key delta for a slider event, or 0 when the key isn't ours.
+ *  Shared by the hue and alpha tracks — same gesture, different range. */
+export function keyDelta(e: React.KeyboardEvent, step: number, coarse: number): number {
+  const size = e.shiftKey ? coarse : step;
+  if (e.key === "ArrowRight" || e.key === "ArrowUp") return size;
+  if (e.key === "ArrowLeft" || e.key === "ArrowDown") return -size;
+  return 0;
+}
+```
+
+- [ ] **Step 4: Write HueSlider**
 
 Create `src/ui/color/HueSlider.tsx`:
 
 ```tsx
 import "./color.css";
 import { useAreaDrag } from "./useAreaDrag";
+import { keyDelta } from "./slider-keys";
 
 interface HueSliderProps {
   /** 0–360. */
@@ -1413,14 +1441,6 @@ interface HueSliderProps {
 
 const STEP = 1;
 const COARSE_STEP = 10;
-
-/** Arrow-key delta for a slider event, or 0 when the key isn't ours. */
-function keyDelta(e: React.KeyboardEvent, step: number, coarse: number): number {
-  const size = e.shiftKey ? coarse : step;
-  if (e.key === "ArrowRight" || e.key === "ArrowUp") return size;
-  if (e.key === "ArrowLeft" || e.key === "ArrowDown") return -size;
-  return 0;
-}
 
 /** The rainbow track. Horizontal only — the vertical axis is ignored. */
 export function HueSlider({ hue, onChange }: HueSliderProps) {
@@ -1460,15 +1480,15 @@ export function HueSlider({ hue, onChange }: HueSliderProps) {
 }
 ```
 
-- [ ] **Step 4: Write AlphaSlider**
+- [ ] **Step 5: Write AlphaSlider**
 
-Create `src/ui/color/AlphaSlider.tsx`. Copy `keyDelta` rather than importing it
-across files for two call sites — if a third slider appears, lift it then.
+Create `src/ui/color/AlphaSlider.tsx`:
 
 ```tsx
 import "./color.css";
 import { hsvToHex } from "../../lib/color-convert";
 import { useAreaDrag } from "./useAreaDrag";
+import { keyDelta } from "./slider-keys";
 
 interface AlphaSliderProps {
   /** 0–100. */
@@ -1480,13 +1500,6 @@ interface AlphaSliderProps {
 
 const STEP = 1;
 const COARSE_STEP = 10;
-
-function keyDelta(e: React.KeyboardEvent, step: number, coarse: number): number {
-  const size = e.shiftKey ? coarse : step;
-  if (e.key === "ArrowRight" || e.key === "ArrowUp") return size;
-  if (e.key === "ArrowLeft" || e.key === "ArrowDown") return -size;
-  return 0;
-}
 
 /** Opacity track: a transparent→opaque ramp of the current hue laid over a
  *  checkerboard, so the alpha reads at a glance. */
@@ -1528,7 +1541,7 @@ export function AlphaSlider({ alpha, hue, onChange }: AlphaSliderProps) {
 }
 ```
 
-- [ ] **Step 5: Write the stylesheet**
+- [ ] **Step 6: Write the stylesheet**
 
 Create `src/ui/color/color.css`. **Read `src/ui/panels/panels.css` first** and
 reuse its custom properties and border/radius conventions instead of inventing
@@ -1544,11 +1557,11 @@ names.
   border-radius: 7px;
   cursor: pointer;
   touch-action: none;
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
 }
 
 .flow-clr-slider:focus-visible {
-  outline: 2px solid var(--flow-focus, #4263eb);
+  outline: 2px solid var(--flow-accent);
   outline-offset: 2px;
 }
 
@@ -1575,24 +1588,24 @@ names.
   margin-left: -7px;
   border-radius: 50%;
   background: #fff;
-  border: 1px solid var(--flow-border, #b0b0b0);
+  border: 1px solid var(--flow-border);
   box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
   transform: translateY(-50%);
   pointer-events: none;
 }
 ```
 
-- [ ] **Step 6: Run test to verify it passes**
+- [ ] **Step 7: Run test to verify it passes**
 
 Run: `npm test -- --run src/ui/color/sliders.test.tsx`
 Expected: PASS, 8 tests.
 
-- [ ] **Step 7: Typecheck and commit**
+- [ ] **Step 8: Typecheck and commit**
 
 Run: `npm run typecheck`
 
 ```bash
-git add src/ui/color/HueSlider.tsx src/ui/color/AlphaSlider.tsx src/ui/color/color.css src/ui/color/sliders.test.tsx
+git add src/ui/color/slider-keys.ts src/ui/color/HueSlider.tsx src/ui/color/AlphaSlider.tsx src/ui/color/color.css src/ui/color/sliders.test.tsx
 git commit -m "feat(color): hue and alpha sliders"
 ```
 
@@ -1762,11 +1775,11 @@ Append to `src/ui/color/color.css`:
   background-image:
     linear-gradient(to top, #000, transparent),
     linear-gradient(to right, #fff, transparent);
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
 }
 
 .flow-clr-satbox:focus-visible {
-  outline: 2px solid var(--flow-focus, #4263eb);
+  outline: 2px solid var(--flow-accent);
   outline-offset: 2px;
 }
 
@@ -1802,16 +1815,21 @@ git commit -m "feat(color): 2D saturation/value field"
 
 ---
 
-### Task 8: Color preview well and eyedropper button
+### Task 8: Preview well, eyedropper button, and the shared picker row
 
 **Files:**
-- Create: `src/ui/color/ColorPreview.tsx`, `src/ui/color/EyeDropperButton.tsx`
+- Create: `src/ui/color/ColorPreview.tsx`, `src/ui/color/EyeDropperButton.tsx`, `src/ui/color/PickerRow.tsx`
 - Modify: `src/ui/color/color.css` (append)
 - Test: `src/ui/color/preview.test.tsx`
 
 **Interfaces:**
-- Consumes: nothing beyond React.
-- Produces: `ColorPreview({ hex, alpha }: { hex: string; alpha: number })` where `hex` may be `"transparent"`; `EyeDropperButton({ onPick }: { onPick?: () => void })`.
+- Consumes: `HueSlider`, `AlphaSlider` (Task 6); `hsvToHex`, `Hsv` (Task 1).
+- Produces: `ColorPreview({ hex, alpha }: { hex: string; alpha: number })` where `hex` may be `"transparent"`; `EyeDropperButton({ onPick }: { onPick?: () => void })`; and `PickerRow({ hsv, alpha, isNone, onHue, onAlpha, onPick }: { hsv: Hsv; alpha: number; isNone: boolean; onHue: (h: number, transient: boolean) => void; onAlpha: (a: number, transient: boolean) => void; onPick?: () => void })`.
+
+`PickerRow` is the eyedropper + preview + stacked-tracks strip that the panel
+and the rail popup both show identically. The two surfaces still own their own
+overall layout — they differ in where the saturation box sits — but this row is
+byte-for-byte the same in both, so it is a component rather than a copy.
 
 `EyeDropperButton` is presentational on purpose. `onPick` is optional and the
 button renders **disabled** without it, so Phase 2 can ship a complete-looking
@@ -1857,7 +1875,36 @@ describe("EyeDropperButton", () => {
     expect(onPick).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("PickerRow", () => {
+  const hsv = { h: 200, s: 50, v: 80 };
+
+  it("renders the eyedropper, preview and both tracks", () => {
+    render(<PickerRow hsv={hsv} alpha={100} isNone={false} onHue={vi.fn()} onAlpha={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /pick a color/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/current color/i)).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: /hue/i })).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: /opacity/i })).toBeInTheDocument();
+  });
+
+  it("shows the none preview when isNone", () => {
+    render(<PickerRow hsv={hsv} alpha={0} isNone onHue={vi.fn()} onAlpha={vi.fn()} />);
+    expect(screen.getByLabelText(/no color/i)).toBeInTheDocument();
+  });
+
+  it("forwards hue and alpha changes", () => {
+    const onHue = vi.fn();
+    const onAlpha = vi.fn();
+    render(<PickerRow hsv={hsv} alpha={100} isNone={false} onHue={onHue} onAlpha={onAlpha} />);
+    fireEvent.keyDown(screen.getByRole("slider", { name: /hue/i }), { key: "ArrowRight" });
+    expect(onHue).toHaveBeenCalledWith(201, false);
+    fireEvent.keyDown(screen.getByRole("slider", { name: /opacity/i }), { key: "ArrowLeft" });
+    expect(onAlpha).toHaveBeenCalledWith(99, false);
+  });
+});
 ```
+
+Add `PickerRow` to the imports at the top of that test file.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1944,11 +1991,69 @@ export function EyeDropperButton({ onPick }: EyeDropperButtonProps) {
 }
 ```
 
-- [ ] **Step 5: Append the styles**
+- [ ] **Step 5: Write PickerRow**
+
+Create `src/ui/color/PickerRow.tsx`:
+
+```tsx
+import "./color.css";
+import { hsvToHex, type Hsv } from "../../lib/color-convert";
+import { HueSlider } from "./HueSlider";
+import { AlphaSlider } from "./AlphaSlider";
+import { ColorPreview } from "./ColorPreview";
+import { EyeDropperButton } from "./EyeDropperButton";
+
+interface PickerRowProps {
+  hsv: Hsv;
+  /** 0–100. */
+  alpha: number;
+  /** True when the target color is "transparent". */
+  isNone: boolean;
+  onHue: (hue: number, transient: boolean) => void;
+  onAlpha: (alpha: number, transient: boolean) => void;
+  /** Absent until Phase 5 wires the eyedropper. */
+  onPick?: () => void;
+}
+
+/**
+ * Eyedropper, preview well and the two stacked tracks — the strip the Color
+ * panel and the rail popup show identically. Their *outer* layouts differ (the
+ * panel puts the saturation box beside the part chooser, the popup puts it full
+ * width on top), which is why only this row is shared and not the whole picker.
+ */
+export function PickerRow({ hsv, alpha, isNone, onHue, onAlpha, onPick }: PickerRowProps) {
+  return (
+    <div className="flow-clr-row">
+      <EyeDropperButton onPick={onPick} />
+      <ColorPreview hex={isNone ? "transparent" : hsvToHex(hsv)} alpha={alpha} />
+      <div className="flow-clr-row__tracks">
+        <HueSlider hue={hsv.h} onChange={onHue} />
+        <AlphaSlider alpha={alpha} hue={hsv.h} onChange={onAlpha} />
+      </div>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 6: Append the styles**
 
 Append to `src/ui/color/color.css`:
 
 ```css
+.flow-clr-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.flow-clr-row__tracks {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
 .flow-clr-preview {
   position: relative;
   width: 44px;
@@ -1956,7 +2061,7 @@ Append to `src/ui/color/color.css`:
   flex: 0 0 auto;
   overflow: hidden;
   border-radius: 50%;
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
   background-image: conic-gradient(#c8c8c8 0 25%, #fff 0 50%, #c8c8c8 0 75%, #fff 0);
   background-size: 10px 10px;
 }
@@ -1983,14 +2088,14 @@ Append to `src/ui/color/color.css`:
   height: 28px;
   padding: 0;
   cursor: pointer;
-  color: var(--flow-text, #1e1e1e);
+  color: var(--flow-ink);
   background: none;
   border: none;
   border-radius: 4px;
 }
 
 .flow-clr-eyedropper:hover:not(:disabled) {
-  background: var(--flow-hover, #f1f3f5);
+  background: var(--flow-hover);
 }
 
 .flow-clr-eyedropper:disabled {
@@ -1999,18 +2104,18 @@ Append to `src/ui/color/color.css`:
 }
 ```
 
-- [ ] **Step 6: Run test to verify it passes**
+- [ ] **Step 7: Run test to verify it passes**
 
 Run: `npm test -- --run src/ui/color/preview.test.tsx`
-Expected: PASS, 5 tests.
+Expected: PASS, 8 tests.
 
-- [ ] **Step 7: Typecheck and commit**
+- [ ] **Step 8: Typecheck and commit**
 
 Run: `npm run typecheck`
 
 ```bash
-git add src/ui/color/ColorPreview.tsx src/ui/color/EyeDropperButton.tsx src/ui/color/color.css src/ui/color/preview.test.tsx
-git commit -m "feat(color): preview well and eyedropper button"
+git add src/ui/color/ColorPreview.tsx src/ui/color/EyeDropperButton.tsx src/ui/color/PickerRow.tsx src/ui/color/color.css src/ui/color/preview.test.tsx
+git commit -m "feat(color): preview well, eyedropper button and shared picker row"
 ```
 
 ---
@@ -2040,6 +2145,7 @@ Create `src/ui/color/NumericFields.test.tsx`:
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { NumericFields } from "./NumericFields";
+import { hsvToHsl, hsvToRgb } from "../../lib/color-convert";
 
 const hsv = { h: 200, s: 25, v: 91 };
 
@@ -2056,7 +2162,8 @@ describe("NumericFields", () => {
   it("shows rounded HSLA by default", () => {
     setup();
     expect(screen.getByLabelText("Hue")).toHaveValue(200);
-    expect(screen.getByLabelText("Saturation")).toHaveValue(72);
+    // 56, not 25: the fields show HSL, the draft carries HSV. Different spaces.
+    expect(screen.getByLabelText("Saturation")).toHaveValue(56);
     expect(screen.getByLabelText("Lightness")).toHaveValue(80);
     expect(screen.getByLabelText("Alpha")).toHaveValue(1);
   });
@@ -2089,6 +2196,45 @@ describe("NumericFields", () => {
       expect.objectContaining({ hsv: expect.objectContaining({ h: 300 }) }),
       false,
     );
+  });
+
+  // These three prove the FIELDS ARE WIRED TO THE RIGHT CHANNEL. Without them a
+  // transposition of s/l or g/b passes the whole suite, because the display
+  // assertions read from the same correct object regardless of which key the
+  // edit path writes. Values chosen to round-trip exactly through HSV; the
+  // untouched channel is asserted too, which is what catches a swap.
+  it("routes a typed saturation to saturation, leaving lightness alone", () => {
+    const { onChange } = setup();
+    const field = screen.getByLabelText("Saturation");
+    fireEvent.change(field, { target: { value: "40" } });
+    fireEvent.blur(field);
+    const back = hsvToHsl(onChange.mock.calls[onChange.mock.calls.length - 1][0].hsv);
+    expect(Math.round(back.s)).toBe(40);
+    expect(Math.round(back.l)).toBe(80);
+  });
+
+  it("routes a typed lightness to lightness, leaving saturation alone", () => {
+    const { onChange } = setup();
+    const field = screen.getByLabelText("Lightness");
+    fireEvent.change(field, { target: { value: "40" } });
+    fireEvent.blur(field);
+    const back = hsvToHsl(onChange.mock.calls[onChange.mock.calls.length - 1][0].hsv);
+    expect(Math.round(back.l)).toBe(40);
+    expect(Math.round(back.s)).toBe(56);
+  });
+
+  it("routes a typed green channel to green, leaving red and blue alone", () => {
+    const onChange = vi.fn();
+    render(
+      <NumericFields hsv={hsv} alpha={100} mode="rgba" onChange={onChange} onModeChange={vi.fn()} />,
+    );
+    const field = screen.getByLabelText("Green");
+    fireEvent.change(field, { target: { value: "100" } });
+    fireEvent.blur(field);
+    const back = hsvToRgb(onChange.mock.calls[onChange.mock.calls.length - 1][0].hsv);
+    expect(Math.round(back.g)).toBe(100);
+    expect(Math.round(back.r)).toBe(174);
+    expect(Math.round(back.b)).toBe(232);
   });
 
   it("converts a typed alpha from 0-1 back to 0-100", () => {
@@ -2140,10 +2286,12 @@ describe("NumericFields", () => {
 });
 ```
 
-The expected values above come from `#aed5e8`. Before writing the
-implementation, **verify them** in a node one-liner using the Task 1 module
-rather than trusting this plan's arithmetic; if any differ, fix the test's
-numbers, not the conversion module.
+The expected values above come from `#aed5e8` and have now been **verified
+against the real Task 1 module**: `hsvToHex({h:200,s:25,v:91})` is `#aed5e8`,
+its RGB is `174, 213, 232`, and its HSL rounds to `200, 56, 80`. Note the
+saturation: HSV `s: 25` displays as HSL `s: 56` — different color spaces, and
+an easy thing to "correct" in the wrong direction. If a test disagrees with the
+module, fix the test, never the conversion.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -2358,13 +2506,13 @@ Append to `src/ui/color/color.css`:
 }
 
 .flow-clr-mode:focus-visible {
-  outline: 2px solid var(--flow-focus, #4263eb);
+  outline: 2px solid var(--flow-accent);
   outline-offset: 1px;
 }
 
 /* The options themselves must stay readable when the closed control is not. */
 .flow-clr-mode option {
-  color: var(--flow-text, #1e1e1e);
+  color: var(--flow-ink);
 }
 
 .flow-clr-hex {
@@ -2373,7 +2521,7 @@ Append to `src/ui/color/color.css`:
   height: 28px;
   padding: 0 6px;
   font-family: inherit;
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
   border-radius: 4px;
 }
 ```
@@ -2498,6 +2646,18 @@ describe("useColorDraft", () => {
     expect(onCommit).toHaveBeenLastCalledWith("#ff00ff", 40, false);
   });
 
+  it("keeps the hue when only the alpha changes from outside at an achromatic hex", () => {
+    // The rail popup (or an undo) changing opacity while the draft sits at black
+    // must not discard the hue — re-seeding from "#000000" would lose it.
+    const onCommit = vi.fn();
+    const { rerender } = render(<Harness hex="#0000ff" alpha={100} onCommit={onCommit} />);
+    fireEvent.click(screen.getByText("to black"));
+    rerender(<Harness hex="#000000" alpha={100} onCommit={onCommit} />);
+    rerender(<Harness hex="#000000" alpha={40} onCommit={onCommit} />);
+    fireEvent.click(screen.getByText("to bright"));
+    expect(onCommit).toHaveBeenLastCalledWith("#0000ff", 40, false);
+  });
+
   it("leaves the none state as soon as a control moves", () => {
     const onCommit = vi.fn();
     render(<Harness hex="transparent" alpha={0} onCommit={onCommit} />);
@@ -2533,19 +2693,29 @@ const NEUTRAL: Hsv = { h: 0, s: 0, v: 0 };
 interface Draft {
   hsv: Hsv;
   alpha: number;
-  /** The (hex, alpha) pair this draft was seeded from OR last emitted. */
-  fromHex: string;
-  fromAlpha: number;
+  /** The (hex, alpha) prop pair we last OBSERVED — updated only on a render
+   *  that actually sees a new prop pair. Drives "did the props change at all". */
+  seenHex: string;
+  seenAlpha: number;
+  /** The (hex, alpha) pair we last EMITTED, or null before the first emit.
+   *  Used only to recognize an incoming prop change as our own echo.
+   *
+   *  These are two fields, not one, because `onCommit` updates this draft's
+   *  state before the parent can feed the new hex back as a prop: React
+   *  re-renders with the SAME, STILL-STALE props right after. One field doing
+   *  both jobs would see its own fresh emitted value disagree with the stale
+   *  prop, misread that as an outside change, and re-seed from the stale hex —
+   *  destroying the hue it just set, before the real echo ever arrives. */
+  emittedHex: string | null;
+  emittedAlpha: number | null;
 }
 
-function seed(hex: string, alpha: number): Draft {
+function seedHsv(hex: string, alpha: number): { hsv: Hsv; alpha: number } {
   return {
     hsv: hexToHsv(hex) ?? NEUTRAL,
     // "transparent" carries alpha 0, but a picker parked at zero opacity is a
     // dead control — the first move should produce a visible color.
     alpha: hex === "transparent" ? 100 : alpha,
-    fromHex: hex,
-    fromAlpha: alpha,
   };
 }
 
@@ -2565,21 +2735,48 @@ function seed(hex: string, alpha: number): Draft {
  * popup. That single rule is what makes two surfaces safe to bind to one value.
  */
 export function useColorDraft({ hex, alpha, onCommit }: UseColorDraftOptions) {
-  const [draft, setDraft] = useState<Draft>(() => seed(hex, alpha));
+  const [draft, setDraft] = useState<Draft>(() => ({
+    ...seedHsv(hex, alpha),
+    seenHex: hex,
+    seenAlpha: alpha,
+    emittedHex: null,
+    emittedAlpha: null,
+  }));
 
   // Adjusting state during render (React's documented pattern) rather than in
   // an effect: an effect would paint one frame of the stale color first.
   let current = draft;
-  if (draft.fromHex !== hex || draft.fromAlpha !== alpha) {
-    current = seed(hex, alpha);
+  if (draft.seenHex !== hex || draft.seenAlpha !== alpha) {
+    const isEcho = hex === draft.emittedHex && alpha === draft.emittedAlpha;
+    // An alpha-only change must not re-seed: the color itself did not move, so
+    // discarding the HSV would kill the hue at an achromatic hex — the exact
+    // failure this hook exists to prevent. Reachable whenever the other surface
+    // (or an undo) changes opacity while the draft sits at #000000.
+    const alphaOnly = hex === draft.seenHex;
+    current =
+      isEcho || alphaOnly
+        ? {
+            ...draft,
+            alpha: hex === "transparent" ? 100 : alpha,
+            seenHex: hex,
+            seenAlpha: alpha,
+          }
+        : {
+            ...seedHsv(hex, alpha),
+            seenHex: hex,
+            seenAlpha: alpha,
+            emittedHex: null,
+            emittedAlpha: null,
+          };
     setDraft(current);
   }
 
   const emit = (hsv: Hsv, nextAlpha: number, transient: boolean) => {
     const nextHex = hsvToHex(hsv);
     // Record what we produced so the echo back through props is not treated as
-    // an outside change — this is what preserves the hue.
-    setDraft({ hsv, alpha: nextAlpha, fromHex: nextHex, fromAlpha: nextAlpha });
+    // an outside change — this is what preserves the hue. `seenHex`/`seenAlpha`
+    // are deliberately NOT touched here; see the Draft doc comment.
+    setDraft({ ...current, hsv, alpha: nextAlpha, emittedHex: nextHex, emittedAlpha: nextAlpha });
     onCommit(nextHex, nextAlpha, transient);
   };
 
@@ -2697,6 +2894,9 @@ function Harness({ sel }: { sel: SelectionStyle }) {
       <output data-testid="hex">{t.hex}</output>
       <output data-testid="alpha">{String(t.alpha)}</output>
       <output data-testid="available">{t.available.join(",")}</output>
+      <output data-testid="mixed">{String(t.isMixed)}</output>
+      <output data-testid="partFill">{t.partColor("fill")}</output>
+      <output data-testid="partStroke">{t.partColor("stroke")}</output>
       <button onClick={() => t.setPart("stroke")}>use stroke</button>
       <button onClick={() => t.setColor("#00ff00", 50, false)}>set green</button>
       <button onClick={() => t.setColor("#00ff00", 50, true)}>set green transient</button>
@@ -2732,6 +2932,27 @@ describe("reading", () => {
     expect(screen.getByTestId("hex")).toHaveTextContent("transparent");
   });
 
+  it("reports a single-valued selection as not mixed", () => {
+    render(<Harness sel={fakeSel()} />);
+    expect(screen.getByTestId("mixed")).toHaveTextContent("false");
+  });
+
+  it("exposes each part's own color for the chooser boxes", () => {
+    render(<Harness sel={fakeSel()} />);
+    expect(screen.getByTestId("partFill")).toHaveTextContent("#eeeeee");
+    expect(screen.getByTestId("partStroke")).toHaveTextContent("#111111");
+  });
+
+  it("flags a mixed selection", () => {
+    const sel = fakeSel({
+      elements: [rect, { ...rect, id: "r2", backgroundColor: "#123456" }] as never,
+      selectedIds: { r1: true, r2: true },
+      selectedCount: 2,
+    });
+    render(<Harness sel={sel} />);
+    expect(screen.getByTestId("mixed")).toHaveTextContent("true");
+  });
+
   it("resolves a mixed selection to a concrete color", () => {
     const sel = fakeSel({
       elements: [rect, { ...rect, id: "r2", backgroundColor: "#123456" }] as never,
@@ -2765,7 +2986,21 @@ describe("writing", () => {
     const sel = fakeSel();
     render(<Harness sel={sel} />);
     fireEvent.click(screen.getByText("set green"));
-    expect(sel.update).toHaveBeenCalled();
+    // Asserting the VALUE, not just that update ran: with a bare
+    // `toHaveBeenCalled()` the alpha could be dropped entirely and this passes.
+    const [ids, updater, currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(ids).toEqual({ r1: true });
+    expect(updater(rect)).toEqual({ backgroundColor: "#00ff0080" });
+    expect(currentItems).toEqual({ currentItemBackgroundColor: "#00ff0080" });
+  });
+
+  it("forwards the transient flag so a drag is one undo entry", () => {
+    const sel = fakeSel();
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("set green transient"));
+    expect((sel.update as ReturnType<typeof vi.fn>).mock.calls[0][3]).toBe(true);
+    fireEvent.click(screen.getByText("set green"));
+    expect((sel.update as ReturnType<typeof vi.fn>).mock.calls[1][3]).toBe(false);
   });
 
   it("records a recent on commit but not mid-drag", () => {
@@ -2832,6 +3067,44 @@ describe("quick colors", () => {
     expect(updater(rect)).toEqual({ strokeColor: "#808080" });
   });
 
+  it("revives the stroke-width DEFAULT, not just the element", () => {
+    // With an empty selection the element updater never runs, so the default is
+    // the only path — and a default stuck at 0 draws every later shape invisible.
+    const sel = fakeSel({
+      selectedIds: {},
+      hasSelection: false,
+      selectedCount: 0,
+      appState: {
+        currentItemBackgroundColor: "transparent",
+        currentItemStrokeColor: "transparent",
+        currentItemTextColor: "#1e1e1e",
+        currentItemStrokeWidth: 0,
+      },
+    });
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("use stroke"));
+    fireEvent.click(screen.getByText("grey"));
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(currentItems).toEqual({
+      currentItemStrokeColor: "#808080",
+      currentItemStrokeWidth: 1,
+    });
+  });
+
+  it("revives the stroke width when a swap moves a real color onto it", () => {
+    const zeroed = { ...rect, strokeColor: "transparent", strokeWidth: 0, backgroundColor: "#ff0000" };
+    const sel = fakeSel({ elements: [zeroed] as never });
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("swap"));
+    const [, updater] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Without the revival the shape vanishes: no fill, and a real stroke at width 0.
+    expect(updater(zeroed)).toEqual({
+      backgroundColor: "transparent",
+      strokeColor: "#ff0000",
+      strokeWidth: 1,
+    });
+  });
+
   it("does nothing for none on the text part", () => {
     const text = { id: "t1", type: "text", strokeColor: "#222222", backgroundColor: "transparent", containerId: null };
     const sel = fakeSel({ elements: [text] as never, selectedIds: { t1: true }, textTargetIds: { t1: true }, hasText: true });
@@ -2871,6 +3144,22 @@ const QUICK_HEX: Record<Exclude<QuickColor, "none">, string> = {
 
 /** Width a stroke is revived at when a color is applied over "none". */
 const REVIVED_STROKE_WIDTH = 1;
+
+/**
+ * Whether applying `color` to a stroke of `width` has to restore a width too.
+ *
+ * A stroke whose width is 0 is invisible, so handing it a real color without a
+ * width makes the click appear to do nothing. Every path that can put a color
+ * on a stroke goes through here — `setColor`, `swap`, and both of their
+ * `currentItem*` counterparts — because wiring it in only some of them is how
+ * you get a default that stays at 0 forever.
+ *
+ * `??` not `||`: a width of 0 is real data. Coercing it has already cost this
+ * project three fork edits (see [[drawing-defaults]]).
+ */
+function needsRevival(color: string, width: number | undefined): boolean {
+  return color !== "transparent" && (width ?? REVIVED_STROKE_WIDTH) === 0;
+}
 
 export interface ColorTarget {
   part: ColorPart;
@@ -2946,20 +3235,28 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
    */
   const setColor: ColorTarget["setColor"] = (nextHex, nextAlpha, transient) => {
     const value = combineColorAlpha(nextHex, nextAlpha);
-    const revive = part === "stroke" && nextHex !== "transparent";
+    const isStroke = part === "stroke";
+
+    // The default needs reviving on its own terms: with an empty selection the
+    // element updater never runs, so this is the ONLY path, and a default left
+    // at 0 makes every shape drawn afterwards invisible.
+    const defaultWidth = a?.currentItemStrokeWidth as number | undefined;
+    const reviveDefault = isStroke && needsRevival(nextHex, defaultWidth);
 
     sel.update(
       spec.ids,
       (el) => {
         const record = el as unknown as Record<string, unknown>;
-        const width = (record.strokeWidth as number | undefined) ?? REVIVED_STROKE_WIDTH;
-        const needsWidth = revive && width === 0;
+        const needsWidth =
+          isStroke && needsRevival(nextHex, record.strokeWidth as number | undefined);
         if (record[spec.prop] === value && !needsWidth) return null;
         return needsWidth
           ? { [spec.prop]: value, strokeWidth: REVIVED_STROKE_WIDTH }
           : { [spec.prop]: value };
       },
-      { [spec.currentItemKey]: value },
+      reviveDefault
+        ? { [spec.currentItemKey]: value, currentItemStrokeWidth: REVIVED_STROKE_WIDTH }
+        : { [spec.currentItemKey]: value },
       transient,
     );
 
@@ -2968,10 +3265,36 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
   };
 
   const swap: ColorTarget["swap"] = () => {
-    sel.update(sel.selectedIds, (el) => swapFillStroke(el as never), {
-      currentItemBackgroundColor: fallbackFor("stroke"),
-      currentItemStrokeColor: fallbackFor("fill"),
-    });
+    // The color arriving on the stroke came from the fill, so the same revival
+    // rule applies — without it, swapping a fill onto a zeroed stroke makes the
+    // shape disappear with nothing in the panel to explain why.
+    const nextStrokeDefault = fallbackFor("fill");
+    const reviveDefault = needsRevival(
+      nextStrokeDefault,
+      a?.currentItemStrokeWidth as number | undefined,
+    );
+
+    sel.update(
+      sel.selectedIds,
+      (el) => {
+        const patch = swapFillStroke(el as never);
+        if (!patch) return null;
+        const record = el as unknown as Record<string, unknown>;
+        return needsRevival(patch.strokeColor as string, record.strokeWidth as number | undefined)
+          ? { ...patch, strokeWidth: REVIVED_STROKE_WIDTH }
+          : patch;
+      },
+      reviveDefault
+        ? {
+            currentItemBackgroundColor: fallbackFor("stroke"),
+            currentItemStrokeColor: nextStrokeDefault,
+            currentItemStrokeWidth: REVIVED_STROKE_WIDTH,
+          }
+        : {
+            currentItemBackgroundColor: fallbackFor("stroke"),
+            currentItemStrokeColor: nextStrokeDefault,
+          },
+    );
   };
 
   const quickSet: ColorTarget["quickSet"] = (kind) => {
@@ -3206,7 +3529,9 @@ const QUICK: { kind: QuickColor; label: string; hex: string }[] = [
  * control in the picker is editing, and clicking a back box brings it forward.
  *
  * Radios rather than buttons: this is a single choice among a small set, which
- * is what a radiogroup means, and it gets arrow-key navigation for free.
+ * is what a radiogroup means semantically. A custom radiogroup does NOT get
+ * keyboard navigation for free the way native grouped inputs do, so the roving
+ * tabindex and arrow handling below are required, not decorative.
  */
 export function PartChooser({ target, compact = false }: PartChooserProps) {
   const { part, available, setPart, isMixed, partColor, swap, quickSet } = target;
@@ -3298,41 +3623,44 @@ Append to `src/ui/color/color.css`:
 }
 
 .flow-clr-chooser__stack {
+  --flow-clr-part-size: 46px;
   position: relative;
   width: 74px;
   height: 74px;
 }
 
 .flow-clr-chooser--compact .flow-clr-chooser__stack {
+  --flow-clr-part-size: 32px;
   width: 52px;
   height: 52px;
 }
 
 .flow-clr-part {
   position: absolute;
-  width: 46px;
-  height: 46px;
+  width: var(--flow-clr-part-size);
+  height: var(--flow-clr-part-size);
   padding: 0;
   cursor: pointer;
   background: var(--flow-clr-part-color, #fff);
-  border: 2px solid var(--flow-text, #1e1e1e);
+  border: 2px solid var(--flow-ink);
 }
 
-.flow-clr-chooser--compact .flow-clr-part {
-  width: 32px;
-  height: 32px;
+/* Boxes step down the diagonal by their index among the VISIBLE parts, so two
+   parts sit at the corners and three spread evenly between them. Driven by a
+   custom property rather than per-part rules because `stroke` and `text` are
+   never both at the same offset — an earlier version gave them identical
+   `right/bottom`, which made whichever was behind completely unclickable. */
+.flow-clr-part {
+  top: calc(var(--flow-clr-part-offset) * (100% - var(--flow-clr-part-size)));
+  left: calc(var(--flow-clr-part-offset) * (100% - var(--flow-clr-part-size)));
 }
-
-.flow-clr-part--fill { top: 0; left: 0; }
-.flow-clr-part--stroke { right: 0; bottom: 0; }
-.flow-clr-part--text { right: 0; bottom: 0; }
 
 /* The stroke box is a ring: a thick border around a hole. */
 .flow-clr-part--stroke {
   background:
     linear-gradient(var(--flow-clr-part-color, #fff) 0 0) padding-box,
     linear-gradient(var(--flow-clr-part-color, #fff) 0 0) border-box;
-  border: 2px solid var(--flow-text, #1e1e1e);
+  border: 2px solid var(--flow-ink);
   box-shadow: inset 0 0 0 8px var(--flow-clr-part-color, #fff), inset 0 0 0 10px #fff;
 }
 
@@ -3355,7 +3683,7 @@ Append to `src/ui/color/color.css`:
   font-weight: 700;
   font-size: 20px;
   line-height: 1;
-  color: var(--flow-text, #1e1e1e);
+  color: var(--flow-ink);
   mix-blend-mode: difference;
 }
 
@@ -3370,7 +3698,7 @@ Append to `src/ui/color/color.css`:
   height: 22px;
   padding: 0;
   cursor: pointer;
-  color: var(--flow-text, #1e1e1e);
+  color: var(--flow-ink);
   background: none;
   border: none;
 }
@@ -3385,7 +3713,7 @@ Append to `src/ui/color/color.css`:
   height: 22px;
   padding: 0;
   cursor: pointer;
-  border: 1px solid var(--flow-text, #1e1e1e);
+  border: 1px solid var(--flow-ink);
 }
 
 .flow-clr-chip--none {
@@ -3534,6 +3862,45 @@ describe("PaletteSection", () => {
       .toBe("Mine");
   });
 
+  it("abandons a rename on Escape", () => {
+    // Unmounting a focused input can fire blur on the way out; without an
+    // explicit abandon flag that blur commits the edit Escape just cancelled.
+    setup();
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    const input = screen.getByLabelText("Palette name");
+    fireEvent.change(input, { target: { value: "Discarded" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect((screen.getByLabelText("Palette") as HTMLSelectElement).selectedOptions[0].textContent)
+      .toBe("Pastel");
+  });
+
+  it("leaves rename mode when the palette is switched", () => {
+    setup();
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    expect(screen.getByLabelText("Palette name")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText("Palette name"), { key: "Escape" });
+    const select = screen.getByLabelText("Palette") as HTMLSelectElement;
+    const vibrant = [...select.options].find((o) => o.textContent === "Vibrant")!;
+    fireEvent.change(select, { target: { value: vibrant.value } });
+    expect(screen.queryByLabelText("Palette name")).not.toBeInTheDocument();
+  });
+
+  it("still commits a rename after an earlier Escape", () => {
+    // The abandon flag must not survive the session it was set in: Escape
+    // unmounts without a blur in jsdom, so a flag cleared only in onBlur
+    // strands and eats the next real rename.
+    setup();
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    fireEvent.keyDown(screen.getByLabelText("Palette name"), { key: "Escape" });
+
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    const input = screen.getByLabelText("Palette name");
+    fireEvent.change(input, { target: { value: "Kept" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect((screen.getByLabelText("Palette") as HTMLSelectElement).selectedOptions[0].textContent)
+      .toBe("Kept");
+  });
+
   it("has no set-as-default control", () => {
     setup();
     expect(screen.queryByRole("button", { name: /default/i })).not.toBeInTheDocument();
@@ -3583,14 +3950,20 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   const [confirming, setConfirming] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const dragFrom = useRef<number | null>(null);
+  /** Set by Escape so the input's blur-on-unmount does not commit the edit. */
+  const abandonRename = useRef(false);
 
   // Resolve defensively: the id may point at a just-deleted palette.
   const current = palettes.find((p) => p.id === defaultPaletteId) ?? palettes[0];
 
   const choosePalette = (id: string) => {
     setDefaultPalette(id);
+    // Every piece of transient state tied to "which palette is current" resets
+    // together — leaving `renaming` set would edit the new palette's name in an
+    // input seeded from the old one's.
     setSelected([]);
     setConfirming(false);
+    setRenaming(false);
   };
 
   const onTrash = () => {
@@ -3665,17 +4038,32 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
       <div className="flow-clr-palette__row">
         {renaming ? (
           <input
+            // Keyed so switching palettes rebuilds the field from the new name
+            // instead of carrying the old one's text across.
+            key={current.id}
             className="flow-clr-palette__name"
             aria-label="Palette name"
             autoFocus
             defaultValue={current.name}
             onBlur={(e) => {
+              // Escape sets this first. Unmounting a focused input can fire a
+              // blur on the way out, which would commit the very edit Escape
+              // was meant to discard — so abandonment is an explicit flag, not
+              // an assumption about event ordering.
+              if (abandonRename.current) {
+                abandonRename.current = false;
+                setRenaming(false);
+                return;
+              }
               renamePalette(current.id, e.target.value);
               setRenaming(false);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-              if (e.key === "Escape") setRenaming(false);
+              if (e.key === "Escape") {
+                abandonRename.current = true;
+                setRenaming(false);
+              }
             }}
           />
         ) : (
@@ -3685,7 +4073,14 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
             value={current.id}
             title="Double-click to rename"
             onChange={(e) => choosePalette(e.target.value)}
-            onDoubleClick={() => setRenaming(true)}
+            onDoubleClick={() => {
+              // Clear the abandon flag on ENTRY, not only in onBlur's abandon
+              // branch: Escape unmounts the input without necessarily firing a
+              // blur, so a flag cleared only there strands at `true` and
+              // silently swallows the NEXT genuine rename.
+              abandonRename.current = false;
+              setRenaming(true);
+            }}
           >
             {palettes.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
@@ -3758,7 +4153,7 @@ it has today:
   aspect-ratio: 1;
   padding: 0;
   cursor: pointer;
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
   border-radius: 3px;
 }
 
@@ -3769,7 +4164,7 @@ it has today:
 }
 
 .flow-clr-palette__tile[aria-pressed="true"] {
-  outline: 2px solid var(--flow-focus, #4263eb);
+  outline: 2px solid var(--flow-accent);
   outline-offset: 1px;
 }
 
@@ -3793,14 +4188,14 @@ it has today:
   padding: 0;
   cursor: pointer;
   background: none;
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
   border-radius: 4px;
 }
 
 .flow-clr-palette__confirm {
   padding: 8px;
-  background: var(--flow-surface, #fff);
-  border: 1px solid var(--flow-border, #d0d0d0);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
   border-radius: 4px;
 }
 
@@ -3924,12 +4319,51 @@ describe("ColorPanel", () => {
     expect(sel.update).toHaveBeenCalled();
   });
 
-  it("writes when a hue is dragged", () => {
+  // Wiring IS the deliverable of this task, so these assert the value written,
+  // not merely that a write happened. `toHaveBeenCalled()` alone cannot tell
+  // correct wiring from a swapped onHue/onAlpha, a wrong alpha on a palette
+  // pick, or a numeric field routed through two setters instead of the
+  // combined one.
+  const chromatic = () =>
+    fakeSel({ elements: [{ ...rect, backgroundColor: "#2091c2" }] as never });
+
+  it("routes the hue slider to hue, not alpha", () => {
+    const sel = chromatic();
+    render(<ColorPanel sel={sel} />);
+    fireEvent.keyDown(screen.getByRole("slider", { name: /hue/i }), { key: "ArrowRight" });
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Alpha untouched, so still a 6-digit hex. Swapped wiring would have moved
+    // alpha to 99% and produced #2091c2fc instead.
+    expect(currentItems.currentItemBackgroundColor).toBe("#208fc2");
+  });
+
+  it("routes the alpha slider to alpha, not hue", () => {
+    const sel = chromatic();
+    render(<ColorPanel sel={sel} />);
+    fireEvent.keyDown(screen.getByRole("slider", { name: /opacity/i }), { key: "ArrowLeft" });
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // 99% alpha, rgb half untouched.
+    expect(currentItems.currentItemBackgroundColor).toBe("#2091c2fc");
+  });
+
+  it("sends a numeric-field edit through the combined setter", () => {
+    const sel = chromatic();
+    render(<ColorPanel sel={sel} />);
+    const field = screen.getByLabelText("Lightness", { selector: "input" });
+    fireEvent.change(field, { target: { value: "20" } });
+    fireEvent.blur(field);
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Two separate setters would revert the first; the lightness must land.
+    expect(Math.round(hexToHsl(currentItems.currentItemBackgroundColor as string)!.l)).toBe(20);
+  });
+
+  it("applies a palette swatch at full alpha", () => {
     const sel = fakeSel();
     render(<ColorPanel sel={sel} />);
-    const hue = screen.getByRole("slider", { name: /hue/i });
-    fireEvent.keyDown(hue, { key: "ArrowRight" });
-    expect(sel.update).toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole("button", { name: /^swatch /i })[0]);
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // A wrong alpha here writes an invisible color; 6 digits proves alpha 100.
+    expect(currentItems.currentItemBackgroundColor).toMatch(/^#[0-9a-f]{6}$/);
   });
 });
 ```
@@ -3950,10 +4384,7 @@ Replace `src/ui/panels/ColorPanel.tsx` entirely:
 import "../color/color.css";
 import { PartChooser } from "../color/PartChooser";
 import { SaturationBox } from "../color/SaturationBox";
-import { HueSlider } from "../color/HueSlider";
-import { AlphaSlider } from "../color/AlphaSlider";
-import { ColorPreview } from "../color/ColorPreview";
-import { EyeDropperButton } from "../color/EyeDropperButton";
+import { PickerRow } from "../color/PickerRow";
 import { NumericFields } from "../color/NumericFields";
 import { PaletteSection } from "../color/PaletteSection";
 import { useColorTarget } from "../color/useColorTarget";
@@ -3985,14 +4416,13 @@ export function ColorPanel({ sel }: { sel: SelectionStyle }) {
         <SaturationBox hsv={draft.hsv} onChange={draft.setSv} />
       </div>
 
-      <div className="flow-clr-panel__mid">
-        <EyeDropperButton />
-        <ColorPreview hex={draft.isNone ? "transparent" : hsvToHex(draft.hsv)} alpha={draft.alpha} />
-        <div className="flow-clr-panel__tracks">
-          <HueSlider hue={draft.hsv.h} onChange={draft.setHue} />
-          <AlphaSlider alpha={draft.alpha} hue={draft.hsv.h} onChange={draft.setAlpha} />
-        </div>
-      </div>
+      <PickerRow
+        hsv={draft.hsv}
+        alpha={draft.alpha}
+        isNone={draft.isNone}
+        onHue={draft.setHue}
+        onAlpha={draft.setAlpha}
+      />
 
       <NumericFields
         hsv={draft.hsv}
@@ -4032,21 +4462,10 @@ Append to `src/ui/color/color.css`:
 .flow-clr-panel__top > .flow-clr-satbox {
   flex: 1 1 auto;
 }
-
-.flow-clr-panel__mid {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.flow-clr-panel__tracks {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
 ```
+
+The row's own styles (`.flow-clr-row`) already landed with `PickerRow` in
+Task 8 — do not redefine them here.
 
 - [ ] **Step 5: Drop the Swatches panel**
 
@@ -4200,8 +4619,33 @@ In `src/ui/toolbar/toolbar.css`, replace the `.flow-toolbar__tools` rule:
   gap: 2px;
   padding: 4px;
   overflow-y: auto;
+  /* `.flow-toolbar` is `align-items: center`, so without this the grid hugs
+     its content and centres itself — the `1fr` tracks then size to max-content
+     instead of splitting the rail, and anything wider than the buttons (the
+     quartet in Task 16's control) overflows. */
+  align-self: stretch;
+  /* Lets the tools scroll instead of squashing, so Task 16's control can pin
+     to the bottom with `margin-top: auto`. */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 ```
+
+Also give the rail itself a border-box, so `RAIL_WIDTH` is the **outer** width:
+
+```css
+.flow-toolbar {
+  /* The docked rail carries a 1px right border. Under the default content-box
+     the box would be RAIL_WIDTH + 1 while `--flow-toolbar-reserved` reserves
+     exactly RAIL_WIDTH, so the rail (z-index 90) paints its border over the
+     canvas's leftmost pixel. Border-box makes the two agree. */
+  box-sizing: border-box;
+}
+```
+
+This last rule fixes a pre-existing off-by-one — the rail was 49px against a
+48px gutter before the widening too — but the brief's own acceptance check
+below says "no overlap", so it belongs here.
 
 Read the surrounding `.flow-toolbar__btn` rule and confirm the buttons still
 size correctly in a grid cell; if they were relying on `flex-direction: column`
@@ -4216,9 +4660,22 @@ touching.
 
 - [ ] **Step 6: Verify in the running app**
 
-Run: `npm run dev`. The rail is two columns; the canvas insets correctly with no
-overlap and no gap; tearing it off and dragging back to the left edge still
-redocks; hiding it via the hamburger reclaims the gutter.
+Run: `npm run dev` and check all four, reporting evidence for each — not a
+summary judgement:
+
+1. The rail shows tools in two columns.
+2. **Measure the rail's outer right edge and the canvas's left edge and assert
+   they are equal.** Reading `--flow-toolbar-reserved` alone does not test this:
+   it tells you what was reserved, not what the rail occupies. The two disagreed
+   by 1px before `box-sizing: border-box` was added.
+3. Tear the rail off by dragging its top bar, drag it back to the left edge, and
+   confirm it redocks.
+4. Hide it via the hamburger and confirm the gutter is reclaimed (the canvas's
+   left edge returns to 0).
+
+Also measure the two tool columns' x positions. If the buttons are ~38px apart
+rather than filling half the rail each, `align-self: stretch` did not take and
+the `1fr` tracks are still sizing to content.
 
 - [ ] **Step 7: Commit**
 
@@ -4339,6 +4796,28 @@ describe("RailColorControl", () => {
     expect(sel.update).toHaveBeenCalled();
   });
 
+  it("closes on a second press of the active box", () => {
+    // fireEvent.click alone never fires pointerdown, so this interleaving is
+    // invisible to a click-only test: the popup's outside-press handler closes
+    // on pointerdown and the click then reopens, making the close branch dead.
+    render(<RailColorControl sel={fakeSel()} />);
+    const box = screen.getByRole("radio", { name: /fill/i });
+    fireEvent.click(box);
+    expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
+    fireEvent.pointerDown(box);
+    fireEvent.click(box);
+    expect(screen.queryByRole("dialog", { name: /color picker/i })).not.toBeInTheDocument();
+  });
+
+  it("a stray arrow key on a quartet chip does not swallow the next open", () => {
+    // The chips sit outside the radiogroup, so an arrow there has no setPart to
+    // consume the flag; if it latched, the next click would be eaten.
+    render(<RailColorControl sel={fakeSel()} />);
+    fireEvent.keyDown(screen.getByRole("button", { name: /^white$/i }), { key: "ArrowRight" });
+    fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
+    expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
+  });
+
   it("closes on Escape", () => {
     render(<RailColorControl sel={fakeSel()} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
@@ -4382,14 +4861,10 @@ import { createPortal } from "react-dom";
 import "../color/color.css";
 import "./toolbar.css";
 import { SaturationBox } from "../color/SaturationBox";
-import { HueSlider } from "../color/HueSlider";
-import { AlphaSlider } from "../color/AlphaSlider";
-import { ColorPreview } from "../color/ColorPreview";
-import { EyeDropperButton } from "../color/EyeDropperButton";
+import { PickerRow } from "../color/PickerRow";
 import { useColorDraft } from "../color/useColorDraft";
 import { useColorUiState } from "../../lib/color-store";
 import { RECENT_LIMIT } from "../../lib/recent-colors";
-import { hsvToHex } from "../../lib/color-convert";
 import type { ColorTarget } from "../color/useColorTarget";
 
 interface ColorPopupProps {
@@ -4417,6 +4892,12 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
   // Dismissal mirrors ToolbarConfigMenu: outside press or Escape.
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
+      // The trigger box lives OUTSIDE this portal, so a press on it would
+      // close here on pointerdown and the click that follows would reopen —
+      // the toggle's close branch becomes unreachable, and the remount
+      // re-seeds useColorDraft, discarding an in-progress hue. Same guard
+      // ToolBar uses for its hamburger.
+      if ((e.target as HTMLElement).closest(".flow-toolbar__color")) return;
       if (!ref.current?.contains(e.target as Node)) onClose();
     };
     const onKey = (e: KeyboardEvent) => {
@@ -4452,14 +4933,13 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
 
       <SaturationBox hsv={draft.hsv} onChange={draft.setSv} />
 
-      <div className="flow-clr-panel__mid">
-        <EyeDropperButton />
-        <ColorPreview hex={draft.isNone ? "transparent" : hsvToHex(draft.hsv)} alpha={draft.alpha} />
-        <div className="flow-clr-panel__tracks">
-          <HueSlider hue={draft.hsv.h} onChange={draft.setHue} />
-          <AlphaSlider alpha={draft.alpha} hue={draft.hsv.h} onChange={draft.setAlpha} />
-        </div>
-      </div>
+      <PickerRow
+        hsv={draft.hsv}
+        alpha={draft.alpha}
+        isNone={draft.isNone}
+        onHue={draft.setHue}
+        onAlpha={draft.setAlpha}
+      />
 
       <div className="flow-clr-recents">
         {slots.map((hex, i) => (
@@ -4519,10 +4999,25 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
     };
   };
 
+  // Arrow-key navigation also calls setPart, and on a single-part selection it
+  // re-selects the part already active — indistinguishable from a click unless
+  // we mark it. The flag is set only for keys inside the radiogroup: the
+  // quartet chips sit outside it and are focusable, so an arrow pressed on a
+  // chip would otherwise latch the flag with no setPart to consume it, and
+  // silently swallow the next click on the active box.
+  const arrowNav = useRef(false);
+  const onKeyDownCapture = (e: React.KeyboardEvent) => {
+    if (!e.key.startsWith("Arrow")) return;
+    if (!(e.target as HTMLElement).closest('[role="radiogroup"]')) return;
+    arrowNav.current = true;
+  };
+
   const chooserTarget = {
     ...target,
     setPart: (part: typeof target.part) => {
-      if (part === target.part) {
+      const viaArrow = arrowNav.current;
+      arrowNav.current = false;
+      if (part === target.part && !viaArrow) {
         setOpen((o) => !o);
         return;
       }
@@ -4531,7 +5026,7 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
   };
 
   return (
-    <div className="flow-toolbar__color" ref={wrapRef}>
+    <div className="flow-toolbar__color" ref={wrapRef} onKeyDownCapture={onKeyDownCapture}>
       <PartChooser target={chooserTarget} compact />
       {open && (
         <ColorPopup target={target} anchor={anchor()} onClose={() => setOpen(false)} />
@@ -4565,7 +5060,7 @@ Append to `src/ui/toolbar/toolbar.css`:
   justify-content: center;
   margin-top: auto;
   padding: 8px 4px;
-  border-top: 1px solid var(--flow-border, #e0e0e0);
+  border-top: 1px solid var(--flow-border);
 }
 ```
 
@@ -4580,8 +5075,8 @@ And to `src/ui/color/color.css`:
   gap: 10px;
   width: 280px;
   padding: 12px;
-  background: var(--flow-surface, #fff);
-  border: 1px solid var(--flow-border, #d0d0d0);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
 }
@@ -4595,8 +5090,8 @@ And to `src/ui/color/color.css`:
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  background: var(--flow-surface, #fff);
-  border: 1px solid var(--flow-border, #d0d0d0);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
   border-radius: 50%;
   box-shadow: 0 2px 6px rgb(0 0 0 / 18%);
 }
@@ -4611,8 +5106,8 @@ And to `src/ui/color/color.css`:
   aspect-ratio: 1;
   padding: 0;
   cursor: pointer;
-  background: var(--flow-surface, #fff);
-  border: 1px solid var(--flow-border, #d0d0d0);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
   border-radius: 4px;
 }
 
@@ -4659,9 +5154,28 @@ git commit -m "feat(toolbar): rail color control with compact picker popup"
 - Consumes: the shipped UI from Tasks 14 and 16.
 - Produces: nothing importable.
 
-Read `e2e/color-panel.spec.ts` and `e2e/align-panel.spec.ts` first for the
-house helpers (`drawRect`, the `.flow-pnl` wait). Reuse them rather than
-inventing new ones.
+Read `e2e/color-panel.spec.ts`, `e2e/align-panel.spec.ts` and
+`e2e/toolbar.spec.ts` first for the house helpers (`drawRect`, the `.flow-pnl`
+wait) and for how the existing suite drives the rail. Reuse them rather than
+inventing new ones — in particular, `toolbar.spec.ts` may already have a
+tear-off helper, and the hide affordance's real accessible name should be taken
+from `ToolbarConfigMenu.tsx` rather than guessed.
+
+**Two carry-forwards that change what this spec must assert:**
+
+1. **The undo test must count steps, not infer from one restore.** The app was
+   observed collapsing consecutive same-property writes into one undo entry —
+   traced not to the vendor (`store.ts` advances the snapshot per committed
+   write; `history.ts` pushes one entry per delta) but to flow's own
+   `src/lib/deferred-commit.ts:20-32`, whose module-global `pending` flag can
+   strand `true` and let a later write skip the filter. So "one Ctrl+Z restored
+   the pre-drag state" is equally consistent with *the drag made one entry* and
+   *the drag's entry absorbed a leaked deferral*. Assert undo **step counts**
+   across a sequence of distinct edits instead.
+2. **Cover the rename Escape-abandon here.** jsdom does not fire blur on
+   unmount, so `PaletteSection`'s abandon guard has no unit test that can fail.
+   Playwright runs real Chromium and can: double-click the palette select, type
+   a new name, press Escape, and assert the name is unchanged.
 
 - [ ] **Step 1: Write the spec**
 
@@ -4804,6 +5318,62 @@ test("selecting text collapses the chooser to the text part", async ({ page }) =
   const radios = page.locator(panel).getByRole("radio");
   await expect(radios).toHaveCount(1);
   await expect(radios.first()).toHaveAccessibleName(/Text/);
+});
+
+// --- rail geometry, transferred from Task 15 ---
+//
+// Task 15 widened the rail 48 -> 88px. Two of its four required running-app
+// checks were never performed as browser interactions (unit-level assertions
+// on `shouldRedock` were substituted twice), so they land here instead, where
+// Playwright makes them durable and re-runnable rather than a one-shot
+// measurement. These exercise PRE-EXISTING rail behavior at the new width.
+
+test("the rail's outer edge meets the canvas with no overlap or gap", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  const rail = (await page.locator(".flow-toolbar").boundingBox())!;
+  const canvasLeft = await page.evaluate(
+    () => getComputedStyle(document.documentElement).getPropertyValue("--flow-toolbar-reserved"),
+  );
+  // The rail carries a 1px border; without box-sizing: border-box its outer
+  // box was 89 against an 88px reserved gutter, and it painted over the
+  // canvas's leftmost pixel.
+  expect(Math.round(rail.x + rail.width)).toBe(parseInt(canvasLeft, 10));
+});
+
+test("the rail tears off and redocks at the new width", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-toolbar");
+  const grip = page.locator(".flow-toolbar__topbar");
+
+  const start = (await grip.boundingBox())!;
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 320, start.y + 160, { steps: 10 });
+  await page.mouse.up();
+  await expect(page.locator(".flow-toolbar--floating")).toBeVisible();
+
+  const floated = (await grip.boundingBox())!;
+  await page.mouse.move(floated.x + floated.width / 2, floated.y + floated.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(4, 120, { steps: 10 });
+  await page.mouse.up();
+  await expect(page.locator(".flow-toolbar--docked")).toBeVisible();
+});
+
+test("hiding the rail reclaims the canvas gutter", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-toolbar");
+  const reserved = () =>
+    page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--flow-toolbar-reserved").trim(),
+    );
+
+  expect(await reserved()).toBe("88px");
+  await page.getByRole("button", { name: "Toolbar options" }).click();
+  await page.getByRole("menuitem", { name: /hide/i }).click();
+  await expect(page.locator(".flow-toolbar")).toHaveCount(0);
+  expect(await reserved()).toBe("0px");
 });
 
 test("adding the current color to a palette persists", async ({ page }) => {
@@ -5048,21 +5618,21 @@ export function cancelEyeDropper(): void {
 
 - [ ] **Step 7: Pass `onPick` at both call sites**
 
-In `src/ui/panels/ColorPanel.tsx`, import `openEyeDropper` and replace
-`<EyeDropperButton />` with:
+In `src/ui/panels/ColorPanel.tsx`, import `openEyeDropper` and add the `onPick`
+prop to the existing `<PickerRow …>`:
 
 ```tsx
-        <EyeDropperButton
-          onPick={() =>
-            openEyeDropper({
-              part: target.part,
-              onSelect: (hex) => target.setColor(hex, draft.alpha, false),
-            })
-          }
-        />
+        onPick={() =>
+          openEyeDropper({
+            part: target.part,
+            onSelect: (hex) => target.setColor(hex, draft.alpha, false),
+          })
+        }
 ```
 
-Do the same in `src/ui/toolbar/ColorPopup.tsx`.
+Do the same on the `<PickerRow …>` in `src/ui/toolbar/ColorPopup.tsx`.
+`PickerRow` already forwards `onPick` to `EyeDropperButton`, so no other file
+changes — which is the payoff for having extracted the row in Task 8.
 
 - [ ] **Step 8: Run tests**
 
@@ -5081,10 +5651,18 @@ mid-pick and confirm the overlay dismisses with nothing written.
 
 The vendor submodule commits separately.
 
+Confirm the submodule is on `flow-next` first (`git -C vendor/excalidraw branch
+--show-current`) — that is the live fork branch. Also fix `.gitmodules`, which
+still names the stale `flow` branch:
+
+```bash
+git config -f .gitmodules submodule.vendor/excalidraw.branch flow-next
+```
+
 ```bash
 git -C vendor/excalidraw add packages/excalidraw/index.tsx
 git -C vendor/excalidraw commit -m "flow: export activeEyeDropperAtom and editorJotaiStore"
-git add vendor/excalidraw src/lib/eyedropper.ts src/lib/eyedropper.test.ts \
+git add .gitmodules vendor/excalidraw src/lib/eyedropper.ts src/lib/eyedropper.test.ts \
         src/excalidraw-fork.d.ts src/ui/panels/ColorPanel.tsx src/ui/toolbar/ColorPopup.tsx
 git commit -m "feat(color): wire the vendor eyedropper into both pickers"
 ```

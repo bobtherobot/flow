@@ -1,57 +1,311 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+
+// The eyedropper bridge (src/lib/eyedropper.ts) imports the real vendor
+// package; stub the two exports it touches with a minimal real store (`get`
+// reflects whatever `set` last wrote) so the unmount-cancellation test below
+// can exercise the real identity check in `cancelEyeDropper`, not just spy on
+// calls. `vi.hoisted` avoids vitest's "cannot access before initialization"
+// hoisting trap (see src/lib/eyedropper.test.ts).
+const store = vi.hoisted(() => {
+  let value: unknown = null;
+  return {
+    get: vi.fn((_atom?: unknown) => value),
+    set: vi.fn((_atom: unknown, v: unknown) => {
+      value = v;
+    }),
+    reset: () => {
+      value = null;
+    },
+  };
+});
+vi.mock("@excalidraw/excalidraw", () => ({
+  activeEyeDropperAtom: { __atom: true },
+  editorJotaiStore: { get: store.get, set: store.set },
+}));
+
 import { ColorPanel } from "./ColorPanel";
+import { reloadColorStore } from "../../lib/color-store";
+import { reloadPaletteStore } from "../../lib/palette-store";
+import { hexToHsl } from "../../lib/color-convert";
 import type { SelectionStyle } from "./useSelectionStyle";
 
-/** Minimal SelectionStyle stub — empty scene, tool-default colors. */
-function makeSel(overrides: Partial<SelectionStyle> = {}): SelectionStyle {
+// jsdom/Node's native `localStorage` global does not implement a usable
+// Storage in this project's vitest setup (see src/lib/palette-store.test.ts,
+// src/lib/color-store.test.ts, src/app/preferences.test.ts and
+// src/ui/color/PaletteSection.test.tsx, which all use this same in-memory
+// mock for the identical reason). Without this stub, `localStorage.clear()`
+// throws "not a function" — an environment gap, not a behavior change.
+const mockStorage: Record<string, string> = {};
+
+const mockLocalStorage = {
+  getItem: (key: string) => mockStorage[key] ?? null,
+  setItem: (key: string, value: string) => {
+    mockStorage[key] = String(value);
+  },
+  removeItem: (key: string) => {
+    delete mockStorage[key];
+  },
+  clear: () => {
+    for (const key in mockStorage) {
+      delete mockStorage[key];
+    }
+  },
+  key: (index: number) => {
+    const keys = Object.keys(mockStorage);
+    return keys[index] ?? null;
+  },
+  get length() {
+    return Object.keys(mockStorage).length;
+  },
+};
+
+vi.stubGlobal("localStorage", mockLocalStorage);
+
+const rect = {
+  id: "r1", type: "rectangle",
+  strokeColor: "#111111", backgroundColor: "#eeeeee", strokeWidth: 2,
+};
+
+function fakeSel(over: Partial<SelectionStyle> = {}): SelectionStyle {
   return {
-    elements: [],
+    elements: [rect],
     appState: {
       currentItemBackgroundColor: "transparent",
       currentItemStrokeColor: "#1e1e1e",
       currentItemTextColor: "#1e1e1e",
-    } as unknown as SelectionStyle["appState"],
-    selectedIds: {},
+    },
+    selectedIds: { r1: true },
     textTargetIds: {},
-    hasSelection: false,
-    selectedCount: 0,
+    hasSelection: true,
+    selectedCount: 1,
     hasText: false,
     hasLinear: false,
     setProp: vi.fn(),
     update: vi.fn(),
     executeAction: vi.fn(),
-    ...overrides,
-  };
+    ...over,
+  } as unknown as SelectionStyle;
 }
 
+// A labeled container: a rectangle carrying `boundElements` pointing at its
+// bound text, the way real Excalidraw represents a shape with a caption
+// (never `containerId` alone). Every other fixture in this plan has used bare
+// text, where `selectedIds` and `textTargetIds` happen to be the same map —
+// this one deliberately selects the container but targets the child, so a
+// write that accidentally lands on the container id would be caught.
+const container = {
+  id: "c1", type: "rectangle",
+  strokeColor: "#111111", backgroundColor: "#eeeeee", strokeWidth: 2,
+  boundElements: [{ id: "t1", type: "text" }],
+};
+const boundText = {
+  id: "t1", type: "text", strokeColor: "#222222",
+};
+
+function fakeSelWithLabeledContainer(): SelectionStyle {
+  return {
+    elements: [container, boundText],
+    appState: {
+      currentItemBackgroundColor: "transparent",
+      currentItemStrokeColor: "#1e1e1e",
+      currentItemTextColor: "#1e1e1e",
+    },
+    selectedIds: { c1: true },
+    textTargetIds: { t1: true },
+    hasSelection: true,
+    selectedCount: 1,
+    hasText: true,
+    hasLinear: false,
+    setProp: vi.fn(),
+    update: vi.fn(),
+    executeAction: vi.fn(),
+  } as unknown as SelectionStyle;
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  reloadColorStore();
+  reloadPaletteStore();
+  store.get.mockClear();
+  store.set.mockClear();
+  store.reset();
+});
+
 describe("ColorPanel", () => {
-  it("renders the three per-element color rows", () => {
-    render(<ColorPanel sel={makeSel()} />);
-    for (const label of ["Fill", "Stroke", "Text"]) {
-      expect(screen.getByRole("button", { name: `${label} color` })).toBeInTheDocument();
-      expect(screen.getByLabelText(`${label} opacity`)).toBeInTheDocument();
-    }
+  it("renders every section", () => {
+    render(<ColorPanel sel={fakeSel()} />);
+    expect(screen.getByRole("radiogroup", { name: /color target/i })).toBeInTheDocument();
+    expect(screen.getByRole("application", { name: /saturation/i })).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: /hue/i })).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: /opacity/i })).toBeInTheDocument();
+    // "Hue" alone is ambiguous: the hue slider (role="slider") and the HSLA
+    // numeric field both carry aria-label="Hue". The slider is already
+    // asserted above by role; this checks the numeric field specifically.
+    expect(screen.getByLabelText("Hue", { selector: "input" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Palette")).toBeInTheDocument();
   });
 
-  it("writes an opacity change to the selection", () => {
-    const sel = makeSel();
+  it("no longer renders the old fill/stroke/text rows", () => {
+    render(<ColorPanel sel={fakeSel()} />);
+    expect(screen.queryByLabelText("Fill opacity")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Stroke color")).not.toBeInTheDocument();
+  });
+
+  it("seeds the picker from the selection's fill", () => {
+    render(<ColorPanel sel={fakeSel()} />);
+    // #eeeeee is achromatic and nearly white.
+    expect(screen.getByLabelText("Lightness")).toHaveValue(93);
+  });
+
+  it("follows the active part to the stroke color", () => {
+    render(<ColorPanel sel={fakeSel()} />);
+    fireEvent.click(screen.getByRole("radio", { name: /stroke/i }));
+    expect(screen.getByLabelText("Lightness")).toHaveValue(7);
+  });
+
+  // Wiring IS the deliverable of this task, so these assert the value written,
+  // not merely that a write happened. `toHaveBeenCalled()` alone cannot tell
+  // correct wiring from a swapped onHue/onAlpha, a wrong alpha on a palette
+  // pick, or a numeric field routed through two setters instead of the
+  // combined one.
+  const chromatic = () =>
+    fakeSel({ elements: [{ ...rect, backgroundColor: "#2091c2" }] as never });
+
+  it("routes the hue slider to hue, not alpha", () => {
+    const sel = chromatic();
     render(<ColorPanel sel={sel} />);
-
-    const opacity = screen.getByLabelText("Stroke opacity");
-    fireEvent.change(opacity, { target: { value: "50" } });
-    fireEvent.blur(opacity);
-
-    expect(sel.setProp).toHaveBeenCalledWith(
-      expect.objectContaining({ prop: "strokeColor", value: "#1e1e1e80" }),
-    );
+    fireEvent.keyDown(screen.getByRole("slider", { name: /hue/i }), { key: "ArrowRight" });
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Alpha untouched, so still a 6-digit hex. Swapped wiring would have moved
+    // alpha to 99% and produced #2091c2fc instead.
+    expect(currentItems.currentItemBackgroundColor).toBe("#208fc2");
   });
 
-  // The laser trail is a global preference, not an element property — it moved
-  // to File ▸ Preferences. See PreferencesDialog.test.tsx.
-  it("no longer renders a Laser row", () => {
-    render(<ColorPanel sel={makeSel()} />);
-    expect(screen.queryByRole("button", { name: "Laser color" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Laser opacity")).not.toBeInTheDocument();
+  it("routes the alpha slider to alpha, not hue", () => {
+    const sel = chromatic();
+    render(<ColorPanel sel={sel} />);
+    fireEvent.keyDown(screen.getByRole("slider", { name: /opacity/i }), { key: "ArrowLeft" });
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // 99% alpha, rgb half untouched.
+    expect(currentItems.currentItemBackgroundColor).toBe("#2091c2fc");
+  });
+
+  it("sends a numeric-field edit through the combined setter", () => {
+    const sel = chromatic();
+    render(<ColorPanel sel={sel} />);
+    const field = screen.getByLabelText("Lightness", { selector: "input" });
+    fireEvent.change(field, { target: { value: "20" } });
+    fireEvent.blur(field);
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Two separate setters would revert the first; the lightness must land.
+    expect(Math.round(hexToHsl(currentItems.currentItemBackgroundColor as string)!.l)).toBe(20);
+  });
+
+  it("applies a palette swatch at full alpha", () => {
+    const sel = fakeSel();
+    render(<ColorPanel sel={sel} />);
+    fireEvent.click(screen.getAllByRole("button", { name: /^swatch /i })[0]);
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // A wrong alpha here writes an invisible color; 6 digits proves alpha 100.
+    expect(currentItems.currentItemBackgroundColor).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  describe("recents", () => {
+    // These discriminate "adjusting a channel" from "picking a whole colour"
+    // (see useColorTarget.adjustColor vs. setColor). Before that split, every
+    // one of these controls routed through useColorDraft's onCommit, which
+    // was wired to setColor — so a hue arrow-press, an alpha arrow-press, or
+    // a numeric-field edit each recorded a recent on every keypress, and six
+    // ArrowRight presses on the hue track would replace the whole six-slot
+    // strip with six adjacent hues. Reverting the wiring in ColorPanel/
+    // ColorPopup back to `onCommit: target.setColor` makes these first two
+    // fail (confirmed by hand before writing this comment).
+    it("does not record a recent when the hue slider is nudged with arrow keys", () => {
+      const sel = chromatic();
+      render(<ColorPanel sel={sel} />);
+      fireEvent.keyDown(screen.getByRole("slider", { name: /hue/i }), { key: "ArrowRight" });
+      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([]);
+    });
+
+    it("does not record a recent when the alpha slider is nudged with arrow keys", () => {
+      const sel = chromatic();
+      render(<ColorPanel sel={sel} />);
+      fireEvent.keyDown(screen.getByRole("slider", { name: /opacity/i }), { key: "ArrowLeft" });
+      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([]);
+    });
+
+    it("does not record a recent when a numeric field is edited", () => {
+      const sel = chromatic();
+      render(<ColorPanel sel={sel} />);
+      const field = screen.getByLabelText("Lightness", { selector: "input" });
+      fireEvent.change(field, { target: { value: "20" } });
+      fireEvent.blur(field);
+      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([]);
+    });
+
+    it("records a recent when the Hex field is committed", () => {
+      const sel = chromatic();
+      render(<ColorPanel sel={sel} />);
+      fireEvent.change(screen.getByLabelText(/color format/i), { target: { value: "hex" } });
+      const field = screen.getByLabelText("Hex");
+      fireEvent.change(field, { target: { value: "#123456" } });
+      fireEvent.keyDown(field, { key: "Enter" });
+      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual(["#123456"]);
+    });
+
+    it("records a recent when a palette swatch is picked", () => {
+      const sel = fakeSel();
+      render(<ColorPanel sel={sel} />);
+      const swatch = screen.getAllByRole("button", { name: /^swatch /i })[0];
+      const swatchHex = swatch.getAttribute("aria-label")!.replace(/^swatch /i, "");
+      fireEvent.click(swatch);
+      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([swatchHex]);
+    });
+
+    it("records a recent when an eyedropper pick resolves", () => {
+      const sel = fakeSel();
+      render(<ColorPanel sel={sel} />);
+      fireEvent.click(screen.getByRole("button", { name: /pick a color from the canvas/i }));
+      const payload = store.set.mock.calls[0][1] as { onSelect: (color: string) => void };
+      act(() => payload.onSelect("#654321"));
+      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual(["#654321"]);
+    });
+  });
+
+  it("targets the bound text element's id, not the container's, when the text part is active on a labeled container", () => {
+    const sel = fakeSelWithLabeledContainer();
+    render(<ColorPanel sel={sel} />);
+    fireEvent.click(screen.getByRole("radio", { name: /^text/i }));
+    const hue = screen.getByRole("slider", { name: /hue/i });
+    fireEvent.keyDown(hue, { key: "ArrowRight" });
+    expect(sel.update).toHaveBeenCalled();
+    const ids = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(ids).toEqual({ t1: true });
+  });
+
+  it("does not touch the atom on unmount if it never opened a pick", () => {
+    // Rendering (and unmounting without ever picking) must not cancel
+    // anything — a panel that never opened a pick has no business writing to
+    // this shared atom at all.
+    const { unmount } = render(<ColorPanel sel={fakeSel()} />);
+    unmount();
+    expect(store.set).not.toHaveBeenCalled();
+  });
+
+  it("cancels its own in-flight eyedropper pick if the panel unmounts", () => {
+    // The accordion can collapse this panel (or switch to another) mid-pick.
+    // The overlay lives outside this subtree (LayerUI mounts it globally), so
+    // without this cleanup it would survive with `onSelect` closing over a
+    // `target`/`draft` that no longer exists.
+    const { unmount } = render(<ColorPanel sel={fakeSel()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /pick a color from the canvas/i }));
+    expect(store.set).toHaveBeenCalledTimes(1); // opening the pick
+
+    unmount();
+
+    expect(store.set).toHaveBeenCalledTimes(2);
+    expect(store.set).toHaveBeenLastCalledWith({ __atom: true }, null);
   });
 });

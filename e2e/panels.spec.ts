@@ -10,12 +10,11 @@ test("dockable accordion replaces the Excalidraw island", async ({ page }) => {
   const panel = page.locator(".flow-pnl");
   await expect(panel).toBeVisible();
 
-  // Transform / Color / Color Swatches / Stroke / Text / Align / Search / Layers sub-panels, in order.
+  // Transform / Color / Stroke / Text / Align / Search / Layers sub-panels, in order.
   const titles = page.locator(".flow-pnl-sub__title");
   await expect(titles).toHaveText([
     "Transform",
     "Color",
-    "Color Swatches",
     "Stroke",
     "Text",
     "Align",
@@ -77,7 +76,6 @@ test("reordering a docked sub-panel persists after drop and reload", async ({ pa
   await expect(titles).toHaveText([
     "Transform",
     "Color",
-    "Color Swatches",
     "Stroke",
     "Text",
     "Align",
@@ -107,7 +105,6 @@ test("reordering a docked sub-panel persists after drop and reload", async ({ pa
     "Stroke",
     "Transform",
     "Color",
-    "Color Swatches",
     "Text",
     "Align",
     "Search",
