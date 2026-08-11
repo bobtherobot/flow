@@ -5111,9 +5111,28 @@ git commit -m "feat(toolbar): rail color control with compact picker popup"
 - Consumes: the shipped UI from Tasks 14 and 16.
 - Produces: nothing importable.
 
-Read `e2e/color-panel.spec.ts` and `e2e/align-panel.spec.ts` first for the
-house helpers (`drawRect`, the `.flow-pnl` wait). Reuse them rather than
-inventing new ones.
+Read `e2e/color-panel.spec.ts`, `e2e/align-panel.spec.ts` and
+`e2e/toolbar.spec.ts` first for the house helpers (`drawRect`, the `.flow-pnl`
+wait) and for how the existing suite drives the rail. Reuse them rather than
+inventing new ones — in particular, `toolbar.spec.ts` may already have a
+tear-off helper, and the hide affordance's real accessible name should be taken
+from `ToolbarConfigMenu.tsx` rather than guessed.
+
+**Two carry-forwards that change what this spec must assert:**
+
+1. **The undo test must count steps, not infer from one restore.** The app was
+   observed collapsing consecutive same-property writes into one undo entry —
+   traced not to the vendor (`store.ts` advances the snapshot per committed
+   write; `history.ts` pushes one entry per delta) but to flow's own
+   `src/lib/deferred-commit.ts:20-32`, whose module-global `pending` flag can
+   strand `true` and let a later write skip the filter. So "one Ctrl+Z restored
+   the pre-drag state" is equally consistent with *the drag made one entry* and
+   *the drag's entry absorbed a leaked deferral*. Assert undo **step counts**
+   across a sequence of distinct edits instead.
+2. **Cover the rename Escape-abandon here.** jsdom does not fire blur on
+   unmount, so `PaletteSection`'s abandon guard has no unit test that can fail.
+   Playwright runs real Chromium and can: double-click the palette select, type
+   a new name, press Escape, and assert the name is unchanged.
 
 - [ ] **Step 1: Write the spec**
 
@@ -5256,6 +5275,62 @@ test("selecting text collapses the chooser to the text part", async ({ page }) =
   const radios = page.locator(panel).getByRole("radio");
   await expect(radios).toHaveCount(1);
   await expect(radios.first()).toHaveAccessibleName(/Text/);
+});
+
+// --- rail geometry, transferred from Task 15 ---
+//
+// Task 15 widened the rail 48 -> 88px. Two of its four required running-app
+// checks were never performed as browser interactions (unit-level assertions
+// on `shouldRedock` were substituted twice), so they land here instead, where
+// Playwright makes them durable and re-runnable rather than a one-shot
+// measurement. These exercise PRE-EXISTING rail behavior at the new width.
+
+test("the rail's outer edge meets the canvas with no overlap or gap", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  const rail = (await page.locator(".flow-toolbar").boundingBox())!;
+  const canvasLeft = await page.evaluate(
+    () => getComputedStyle(document.documentElement).getPropertyValue("--flow-toolbar-reserved"),
+  );
+  // The rail carries a 1px border; without box-sizing: border-box its outer
+  // box was 89 against an 88px reserved gutter, and it painted over the
+  // canvas's leftmost pixel.
+  expect(Math.round(rail.x + rail.width)).toBe(parseInt(canvasLeft, 10));
+});
+
+test("the rail tears off and redocks at the new width", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-toolbar");
+  const grip = page.locator(".flow-toolbar__topbar");
+
+  const start = (await grip.boundingBox())!;
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 320, start.y + 160, { steps: 10 });
+  await page.mouse.up();
+  await expect(page.locator(".flow-toolbar--floating")).toBeVisible();
+
+  const floated = (await grip.boundingBox())!;
+  await page.mouse.move(floated.x + floated.width / 2, floated.y + floated.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(4, 120, { steps: 10 });
+  await page.mouse.up();
+  await expect(page.locator(".flow-toolbar--docked")).toBeVisible();
+});
+
+test("hiding the rail reclaims the canvas gutter", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-toolbar");
+  const reserved = () =>
+    page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--flow-toolbar-reserved").trim(),
+    );
+
+  expect(await reserved()).toBe("88px");
+  await page.getByRole("button", { name: "Toolbar options" }).click();
+  await page.getByRole("menuitem", { name: /hide/i }).click();
+  await expect(page.locator(".flow-toolbar")).toHaveCount(0);
+  expect(await reserved()).toBe("0px");
 });
 
 test("adding the current color to a palette persists", async ({ page }) => {
