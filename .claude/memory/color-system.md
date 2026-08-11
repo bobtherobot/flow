@@ -183,17 +183,21 @@ eyedropper export needed a rebuild. Replaced with `scripts/build-excalidraw.mjs`
 declarations, tolerating a non-zero `tsc` exit only after confirming
 `dist/types/excalidraw/index.d.ts` actually exists (mirrors the historical
 upstream failure mode where tsc printed pre-existing errors but still wrote
-every declaration file). `.github/workflows/ci.yml` now calls this same script
-instead of carrying its own copy of the sequence — the three-places-drift
-problem (this script's header comment, CI's old bespoke steps, and a memory
-file) is now one source of truth.
+every declaration file; as of the 2026-08 upgrade it exits 0 clean, and the
+tolerance is only a guard against that reappearing on a future upstream sync).
 
-The stale claim that `ci.yml`'s comment said gen:types/tsc were "expected to
-exit non-zero" was corrected in the same fix round: both `ci.yml` and
-`build-excalidraw.mjs` now say the vendor package typechecks clean as of the
-2026-08 upstream-master upgrade, and tolerate non-zero only as a guard against
-that reappearing on some future upstream sync — verify against the files
-directly if this is ever suspected of drifting again.
+**flow has no CI — builds are local, deliberately.** A GitHub Actions workflow
+briefly existed and was deleted on 2026-08-11. Its one genuinely valuable job
+moved into `build-excalidraw.mjs` as stage 4: verifying that flow's fork edits
+survived into the **built declarations**, so a submodule rebase that silently
+drops one is caught at vendor-build time rather than surfacing later as a
+baffling typecheck or e2e failure. That is strictly better than where it was —
+CI only ever checked one of the two load-bearing edits, and only after a push.
+
+The guard is a `FORK_EDITS` table at the bottom of the script
+(`commitDeferredChanges` in `App.d.ts`, `activeEyeDropperAtom` in `index.d.ts`).
+**Add a row whenever a new fork edit becomes load-bearing** — it is the only
+automated thing standing between a rebase and a silently missing customization.
 
 ## The rail is 88px, and `box-sizing: border-box` is load-bearing
 
