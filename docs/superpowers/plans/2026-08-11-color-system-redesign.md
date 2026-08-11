@@ -4619,8 +4619,33 @@ In `src/ui/toolbar/toolbar.css`, replace the `.flow-toolbar__tools` rule:
   gap: 2px;
   padding: 4px;
   overflow-y: auto;
+  /* `.flow-toolbar` is `align-items: center`, so without this the grid hugs
+     its content and centres itself — the `1fr` tracks then size to max-content
+     instead of splitting the rail, and anything wider than the buttons (the
+     quartet in Task 16's control) overflows. */
+  align-self: stretch;
+  /* Lets the tools scroll instead of squashing, so Task 16's control can pin
+     to the bottom with `margin-top: auto`. */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 ```
+
+Also give the rail itself a border-box, so `RAIL_WIDTH` is the **outer** width:
+
+```css
+.flow-toolbar {
+  /* The docked rail carries a 1px right border. Under the default content-box
+     the box would be RAIL_WIDTH + 1 while `--flow-toolbar-reserved` reserves
+     exactly RAIL_WIDTH, so the rail (z-index 90) paints its border over the
+     canvas's leftmost pixel. Border-box makes the two agree. */
+  box-sizing: border-box;
+}
+```
+
+This last rule fixes a pre-existing off-by-one — the rail was 49px against a
+48px gutter before the widening too — but the brief's own acceptance check
+below says "no overlap", so it belongs here.
 
 Read the surrounding `.flow-toolbar__btn` rule and confirm the buttons still
 size correctly in a grid cell; if they were relying on `flex-direction: column`
@@ -4635,9 +4660,22 @@ touching.
 
 - [ ] **Step 6: Verify in the running app**
 
-Run: `npm run dev`. The rail is two columns; the canvas insets correctly with no
-overlap and no gap; tearing it off and dragging back to the left edge still
-redocks; hiding it via the hamburger reclaims the gutter.
+Run: `npm run dev` and check all four, reporting evidence for each — not a
+summary judgement:
+
+1. The rail shows tools in two columns.
+2. **Measure the rail's outer right edge and the canvas's left edge and assert
+   they are equal.** Reading `--flow-toolbar-reserved` alone does not test this:
+   it tells you what was reserved, not what the rail occupies. The two disagreed
+   by 1px before `box-sizing: border-box` was added.
+3. Tear the rail off by dragging its top bar, drag it back to the left edge, and
+   confirm it redocks.
+4. Hide it via the hamburger and confirm the gutter is reclaimed (the canvas's
+   left edge returns to 0).
+
+Also measure the two tool columns' x positions. If the buttons are ~38px apart
+rather than filling half the rail each, `align-self: stretch` did not take and
+the `1fr` tracks are still sizing to content.
 
 - [ ] **Step 7: Commit**
 
