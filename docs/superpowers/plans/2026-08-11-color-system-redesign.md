@@ -21,7 +21,7 @@ Every task's requirements implicitly include this section.
 - **Transparent is spelled `"transparent"`, never `"none"`.** [[drawing-defaults]]: `"none"` crashes curved arrows in the vendor renderer.
 - **Recents are opaque `#rrggbb` lowercase**, max 6, deduped on hue; `"transparent"` never enters the list.
 - **Grey is `#808080`**, white `#ffffff`, black `#000000`.
-- **Conversions return unrounded floats.** Only the numeric fields round, at display time. Rounding inside conversions destroys round-trip fidelity.
+- **Conversions return unrounded H/S/V/L floats.** Only the numeric fields round those, at display time — rounding hue or saturation inside a conversion drifts the color on every frame of a drag. RGB channels are the exception and *are* rounded to integers, because a channel is a byte; `fromHueChroma`'s `Math.round` is correct and not a violation of this rule.
 - **Colors are lowercase `#rrggbb`** everywhere, matching `scrubHex` in `src/lib/color-palettes.ts`.
 - Commands: `npm test -- --run` (unit), `npm run typecheck`, `npm run test:e2e`. Both unit and typecheck must be green before every commit.
 - Memory-file conventions: this project keeps memory repo-local in `.claude/memory/`. Do not write to the global Claude account.
@@ -43,11 +43,13 @@ Every task's requirements implicitly include this section.
 | File | Responsibility |
 |---|---|
 | `src/ui/color/useAreaDrag.ts` | Normalized 0–1 pointer drag over an element, with transient/commit semantics |
+| `src/ui/color/slider-keys.ts` | Shared arrow-key delta helper for the sliders |
 | `src/ui/color/HueSlider.tsx` | 0–360 track |
 | `src/ui/color/AlphaSlider.tsx` | 0–100 track over checkerboard |
 | `src/ui/color/SaturationBox.tsx` | 2D S/V field |
 | `src/ui/color/ColorPreview.tsx` | Round well |
 | `src/ui/color/EyeDropperButton.tsx` | Presentational; disabled until Phase 5 supplies `onPick` |
+| `src/ui/color/PickerRow.tsx` | Shared eyedropper + preview + hue/alpha row, used by both surfaces |
 | `src/ui/color/NumericFields.tsx` | HSLA/RGBA/HEX + mode `<select>` |
 | `src/ui/color/useColorDraft.ts` | The HSV draft + commit rules shared by both surfaces |
 | `src/ui/color/useColorTarget.ts` | The write path: `setColor`, `swap`, `quickSet` |
@@ -1298,11 +1300,12 @@ git commit -m "feat(color): normalized pointer-drag hook for picker controls"
 ### Task 6: Hue and alpha sliders
 
 **Files:**
-- Create: `src/ui/color/HueSlider.tsx`, `src/ui/color/AlphaSlider.tsx`, `src/ui/color/color.css`
+- Create: `src/ui/color/slider-keys.ts`, `src/ui/color/HueSlider.tsx`, `src/ui/color/AlphaSlider.tsx`, `src/ui/color/color.css`
 - Test: `src/ui/color/sliders.test.tsx`
 
 **Interfaces:**
 - Consumes: `useAreaDrag` (Task 5); `hsvToHex` (Task 1).
+- Produces (shared): `keyDelta(e: React.KeyboardEvent, step: number, coarse: number): number` from `slider-keys.ts`.
 - Produces: `HueSlider({ hue, onChange }: { hue: number; onChange: (hue: number, transient: boolean) => void })` with `hue` 0–360; `AlphaSlider({ alpha, hue, onChange }: { alpha: number; hue: number; onChange: (alpha: number, transient: boolean) => void })` with `alpha` 0–100. `AlphaSlider` takes `hue` only to paint its ramp.
 
 Both expose `role="slider"` with `aria-valuenow`/`aria-valuemin`/`aria-valuemax`
@@ -1397,13 +1400,29 @@ describe("AlphaSlider", () => {
 Run: `npm test -- --run src/ui/color/sliders.test.tsx`
 Expected: FAIL — unresolved imports for `./HueSlider` and `./AlphaSlider`.
 
-- [ ] **Step 3: Write HueSlider**
+- [ ] **Step 3: Write the shared key helper**
+
+Create `src/ui/color/slider-keys.ts`:
+
+```ts
+/** Arrow-key delta for a slider event, or 0 when the key isn't ours.
+ *  Shared by the hue and alpha tracks — same gesture, different range. */
+export function keyDelta(e: React.KeyboardEvent, step: number, coarse: number): number {
+  const size = e.shiftKey ? coarse : step;
+  if (e.key === "ArrowRight" || e.key === "ArrowUp") return size;
+  if (e.key === "ArrowLeft" || e.key === "ArrowDown") return -size;
+  return 0;
+}
+```
+
+- [ ] **Step 4: Write HueSlider**
 
 Create `src/ui/color/HueSlider.tsx`:
 
 ```tsx
 import "./color.css";
 import { useAreaDrag } from "./useAreaDrag";
+import { keyDelta } from "./slider-keys";
 
 interface HueSliderProps {
   /** 0–360. */
@@ -1413,14 +1432,6 @@ interface HueSliderProps {
 
 const STEP = 1;
 const COARSE_STEP = 10;
-
-/** Arrow-key delta for a slider event, or 0 when the key isn't ours. */
-function keyDelta(e: React.KeyboardEvent, step: number, coarse: number): number {
-  const size = e.shiftKey ? coarse : step;
-  if (e.key === "ArrowRight" || e.key === "ArrowUp") return size;
-  if (e.key === "ArrowLeft" || e.key === "ArrowDown") return -size;
-  return 0;
-}
 
 /** The rainbow track. Horizontal only — the vertical axis is ignored. */
 export function HueSlider({ hue, onChange }: HueSliderProps) {
@@ -1460,15 +1471,15 @@ export function HueSlider({ hue, onChange }: HueSliderProps) {
 }
 ```
 
-- [ ] **Step 4: Write AlphaSlider**
+- [ ] **Step 5: Write AlphaSlider**
 
-Create `src/ui/color/AlphaSlider.tsx`. Copy `keyDelta` rather than importing it
-across files for two call sites — if a third slider appears, lift it then.
+Create `src/ui/color/AlphaSlider.tsx`:
 
 ```tsx
 import "./color.css";
 import { hsvToHex } from "../../lib/color-convert";
 import { useAreaDrag } from "./useAreaDrag";
+import { keyDelta } from "./slider-keys";
 
 interface AlphaSliderProps {
   /** 0–100. */
@@ -1480,13 +1491,6 @@ interface AlphaSliderProps {
 
 const STEP = 1;
 const COARSE_STEP = 10;
-
-function keyDelta(e: React.KeyboardEvent, step: number, coarse: number): number {
-  const size = e.shiftKey ? coarse : step;
-  if (e.key === "ArrowRight" || e.key === "ArrowUp") return size;
-  if (e.key === "ArrowLeft" || e.key === "ArrowDown") return -size;
-  return 0;
-}
 
 /** Opacity track: a transparent→opaque ramp of the current hue laid over a
  *  checkerboard, so the alpha reads at a glance. */
@@ -1528,7 +1532,7 @@ export function AlphaSlider({ alpha, hue, onChange }: AlphaSliderProps) {
 }
 ```
 
-- [ ] **Step 5: Write the stylesheet**
+- [ ] **Step 6: Write the stylesheet**
 
 Create `src/ui/color/color.css`. **Read `src/ui/panels/panels.css` first** and
 reuse its custom properties and border/radius conventions instead of inventing
@@ -1582,17 +1586,17 @@ names.
 }
 ```
 
-- [ ] **Step 6: Run test to verify it passes**
+- [ ] **Step 7: Run test to verify it passes**
 
 Run: `npm test -- --run src/ui/color/sliders.test.tsx`
 Expected: PASS, 8 tests.
 
-- [ ] **Step 7: Typecheck and commit**
+- [ ] **Step 8: Typecheck and commit**
 
 Run: `npm run typecheck`
 
 ```bash
-git add src/ui/color/HueSlider.tsx src/ui/color/AlphaSlider.tsx src/ui/color/color.css src/ui/color/sliders.test.tsx
+git add src/ui/color/slider-keys.ts src/ui/color/HueSlider.tsx src/ui/color/AlphaSlider.tsx src/ui/color/color.css src/ui/color/sliders.test.tsx
 git commit -m "feat(color): hue and alpha sliders"
 ```
 
@@ -1802,16 +1806,21 @@ git commit -m "feat(color): 2D saturation/value field"
 
 ---
 
-### Task 8: Color preview well and eyedropper button
+### Task 8: Preview well, eyedropper button, and the shared picker row
 
 **Files:**
-- Create: `src/ui/color/ColorPreview.tsx`, `src/ui/color/EyeDropperButton.tsx`
+- Create: `src/ui/color/ColorPreview.tsx`, `src/ui/color/EyeDropperButton.tsx`, `src/ui/color/PickerRow.tsx`
 - Modify: `src/ui/color/color.css` (append)
 - Test: `src/ui/color/preview.test.tsx`
 
 **Interfaces:**
-- Consumes: nothing beyond React.
-- Produces: `ColorPreview({ hex, alpha }: { hex: string; alpha: number })` where `hex` may be `"transparent"`; `EyeDropperButton({ onPick }: { onPick?: () => void })`.
+- Consumes: `HueSlider`, `AlphaSlider` (Task 6); `hsvToHex`, `Hsv` (Task 1).
+- Produces: `ColorPreview({ hex, alpha }: { hex: string; alpha: number })` where `hex` may be `"transparent"`; `EyeDropperButton({ onPick }: { onPick?: () => void })`; and `PickerRow({ hsv, alpha, isNone, onHue, onAlpha, onPick }: { hsv: Hsv; alpha: number; isNone: boolean; onHue: (h: number, transient: boolean) => void; onAlpha: (a: number, transient: boolean) => void; onPick?: () => void })`.
+
+`PickerRow` is the eyedropper + preview + stacked-tracks strip that the panel
+and the rail popup both show identically. The two surfaces still own their own
+overall layout — they differ in where the saturation box sits — but this row is
+byte-for-byte the same in both, so it is a component rather than a copy.
 
 `EyeDropperButton` is presentational on purpose. `onPick` is optional and the
 button renders **disabled** without it, so Phase 2 can ship a complete-looking
@@ -1857,7 +1866,36 @@ describe("EyeDropperButton", () => {
     expect(onPick).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("PickerRow", () => {
+  const hsv = { h: 200, s: 50, v: 80 };
+
+  it("renders the eyedropper, preview and both tracks", () => {
+    render(<PickerRow hsv={hsv} alpha={100} isNone={false} onHue={vi.fn()} onAlpha={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /pick a color/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/current color/i)).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: /hue/i })).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: /opacity/i })).toBeInTheDocument();
+  });
+
+  it("shows the none preview when isNone", () => {
+    render(<PickerRow hsv={hsv} alpha={0} isNone onHue={vi.fn()} onAlpha={vi.fn()} />);
+    expect(screen.getByLabelText(/no color/i)).toBeInTheDocument();
+  });
+
+  it("forwards hue and alpha changes", () => {
+    const onHue = vi.fn();
+    const onAlpha = vi.fn();
+    render(<PickerRow hsv={hsv} alpha={100} isNone={false} onHue={onHue} onAlpha={onAlpha} />);
+    fireEvent.keyDown(screen.getByRole("slider", { name: /hue/i }), { key: "ArrowRight" });
+    expect(onHue).toHaveBeenCalledWith(201, false);
+    fireEvent.keyDown(screen.getByRole("slider", { name: /opacity/i }), { key: "ArrowLeft" });
+    expect(onAlpha).toHaveBeenCalledWith(99, false);
+  });
+});
 ```
+
+Add `PickerRow` to the imports at the top of that test file.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1944,11 +1982,69 @@ export function EyeDropperButton({ onPick }: EyeDropperButtonProps) {
 }
 ```
 
-- [ ] **Step 5: Append the styles**
+- [ ] **Step 5: Write PickerRow**
+
+Create `src/ui/color/PickerRow.tsx`:
+
+```tsx
+import "./color.css";
+import { hsvToHex, type Hsv } from "../../lib/color-convert";
+import { HueSlider } from "./HueSlider";
+import { AlphaSlider } from "./AlphaSlider";
+import { ColorPreview } from "./ColorPreview";
+import { EyeDropperButton } from "./EyeDropperButton";
+
+interface PickerRowProps {
+  hsv: Hsv;
+  /** 0–100. */
+  alpha: number;
+  /** True when the target color is "transparent". */
+  isNone: boolean;
+  onHue: (hue: number, transient: boolean) => void;
+  onAlpha: (alpha: number, transient: boolean) => void;
+  /** Absent until Phase 5 wires the eyedropper. */
+  onPick?: () => void;
+}
+
+/**
+ * Eyedropper, preview well and the two stacked tracks — the strip the Color
+ * panel and the rail popup show identically. Their *outer* layouts differ (the
+ * panel puts the saturation box beside the part chooser, the popup puts it full
+ * width on top), which is why only this row is shared and not the whole picker.
+ */
+export function PickerRow({ hsv, alpha, isNone, onHue, onAlpha, onPick }: PickerRowProps) {
+  return (
+    <div className="flow-clr-row">
+      <EyeDropperButton onPick={onPick} />
+      <ColorPreview hex={isNone ? "transparent" : hsvToHex(hsv)} alpha={alpha} />
+      <div className="flow-clr-row__tracks">
+        <HueSlider hue={hsv.h} onChange={onHue} />
+        <AlphaSlider alpha={alpha} hue={hsv.h} onChange={onAlpha} />
+      </div>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 6: Append the styles**
 
 Append to `src/ui/color/color.css`:
 
 ```css
+.flow-clr-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.flow-clr-row__tracks {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
 .flow-clr-preview {
   position: relative;
   width: 44px;
@@ -1999,18 +2095,18 @@ Append to `src/ui/color/color.css`:
 }
 ```
 
-- [ ] **Step 6: Run test to verify it passes**
+- [ ] **Step 7: Run test to verify it passes**
 
 Run: `npm test -- --run src/ui/color/preview.test.tsx`
-Expected: PASS, 5 tests.
+Expected: PASS, 8 tests.
 
-- [ ] **Step 7: Typecheck and commit**
+- [ ] **Step 8: Typecheck and commit**
 
 Run: `npm run typecheck`
 
 ```bash
-git add src/ui/color/ColorPreview.tsx src/ui/color/EyeDropperButton.tsx src/ui/color/color.css src/ui/color/preview.test.tsx
-git commit -m "feat(color): preview well and eyedropper button"
+git add src/ui/color/ColorPreview.tsx src/ui/color/EyeDropperButton.tsx src/ui/color/PickerRow.tsx src/ui/color/color.css src/ui/color/preview.test.tsx
+git commit -m "feat(color): preview well, eyedropper button and shared picker row"
 ```
 
 ---
@@ -3950,10 +4046,7 @@ Replace `src/ui/panels/ColorPanel.tsx` entirely:
 import "../color/color.css";
 import { PartChooser } from "../color/PartChooser";
 import { SaturationBox } from "../color/SaturationBox";
-import { HueSlider } from "../color/HueSlider";
-import { AlphaSlider } from "../color/AlphaSlider";
-import { ColorPreview } from "../color/ColorPreview";
-import { EyeDropperButton } from "../color/EyeDropperButton";
+import { PickerRow } from "../color/PickerRow";
 import { NumericFields } from "../color/NumericFields";
 import { PaletteSection } from "../color/PaletteSection";
 import { useColorTarget } from "../color/useColorTarget";
@@ -3985,14 +4078,13 @@ export function ColorPanel({ sel }: { sel: SelectionStyle }) {
         <SaturationBox hsv={draft.hsv} onChange={draft.setSv} />
       </div>
 
-      <div className="flow-clr-panel__mid">
-        <EyeDropperButton />
-        <ColorPreview hex={draft.isNone ? "transparent" : hsvToHex(draft.hsv)} alpha={draft.alpha} />
-        <div className="flow-clr-panel__tracks">
-          <HueSlider hue={draft.hsv.h} onChange={draft.setHue} />
-          <AlphaSlider alpha={draft.alpha} hue={draft.hsv.h} onChange={draft.setAlpha} />
-        </div>
-      </div>
+      <PickerRow
+        hsv={draft.hsv}
+        alpha={draft.alpha}
+        isNone={draft.isNone}
+        onHue={draft.setHue}
+        onAlpha={draft.setAlpha}
+      />
 
       <NumericFields
         hsv={draft.hsv}
@@ -4032,21 +4124,10 @@ Append to `src/ui/color/color.css`:
 .flow-clr-panel__top > .flow-clr-satbox {
   flex: 1 1 auto;
 }
-
-.flow-clr-panel__mid {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.flow-clr-panel__tracks {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
 ```
+
+The row's own styles (`.flow-clr-row`) already landed with `PickerRow` in
+Task 8 — do not redefine them here.
 
 - [ ] **Step 5: Drop the Swatches panel**
 
@@ -4382,14 +4463,10 @@ import { createPortal } from "react-dom";
 import "../color/color.css";
 import "./toolbar.css";
 import { SaturationBox } from "../color/SaturationBox";
-import { HueSlider } from "../color/HueSlider";
-import { AlphaSlider } from "../color/AlphaSlider";
-import { ColorPreview } from "../color/ColorPreview";
-import { EyeDropperButton } from "../color/EyeDropperButton";
+import { PickerRow } from "../color/PickerRow";
 import { useColorDraft } from "../color/useColorDraft";
 import { useColorUiState } from "../../lib/color-store";
 import { RECENT_LIMIT } from "../../lib/recent-colors";
-import { hsvToHex } from "../../lib/color-convert";
 import type { ColorTarget } from "../color/useColorTarget";
 
 interface ColorPopupProps {
@@ -4452,14 +4529,13 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
 
       <SaturationBox hsv={draft.hsv} onChange={draft.setSv} />
 
-      <div className="flow-clr-panel__mid">
-        <EyeDropperButton />
-        <ColorPreview hex={draft.isNone ? "transparent" : hsvToHex(draft.hsv)} alpha={draft.alpha} />
-        <div className="flow-clr-panel__tracks">
-          <HueSlider hue={draft.hsv.h} onChange={draft.setHue} />
-          <AlphaSlider alpha={draft.alpha} hue={draft.hsv.h} onChange={draft.setAlpha} />
-        </div>
-      </div>
+      <PickerRow
+        hsv={draft.hsv}
+        alpha={draft.alpha}
+        isNone={draft.isNone}
+        onHue={draft.setHue}
+        onAlpha={draft.setAlpha}
+      />
 
       <div className="flow-clr-recents">
         {slots.map((hex, i) => (
@@ -5048,21 +5124,21 @@ export function cancelEyeDropper(): void {
 
 - [ ] **Step 7: Pass `onPick` at both call sites**
 
-In `src/ui/panels/ColorPanel.tsx`, import `openEyeDropper` and replace
-`<EyeDropperButton />` with:
+In `src/ui/panels/ColorPanel.tsx`, import `openEyeDropper` and add the `onPick`
+prop to the existing `<PickerRow …>`:
 
 ```tsx
-        <EyeDropperButton
-          onPick={() =>
-            openEyeDropper({
-              part: target.part,
-              onSelect: (hex) => target.setColor(hex, draft.alpha, false),
-            })
-          }
-        />
+        onPick={() =>
+          openEyeDropper({
+            part: target.part,
+            onSelect: (hex) => target.setColor(hex, draft.alpha, false),
+          })
+        }
 ```
 
-Do the same in `src/ui/toolbar/ColorPopup.tsx`.
+Do the same on the `<PickerRow …>` in `src/ui/toolbar/ColorPopup.tsx`.
+`PickerRow` already forwards `onPick` to `EyeDropperButton`, so no other file
+changes — which is the payoff for having extracted the row in Task 8.
 
 - [ ] **Step 8: Run tests**
 
@@ -5081,10 +5157,18 @@ mid-pick and confirm the overlay dismisses with nothing written.
 
 The vendor submodule commits separately.
 
+Confirm the submodule is on `flow-next` first (`git -C vendor/excalidraw branch
+--show-current`) — that is the live fork branch. Also fix `.gitmodules`, which
+still names the stale `flow` branch:
+
+```bash
+git config -f .gitmodules submodule.vendor/excalidraw.branch flow-next
+```
+
 ```bash
 git -C vendor/excalidraw add packages/excalidraw/index.tsx
 git -C vendor/excalidraw commit -m "flow: export activeEyeDropperAtom and editorJotaiStore"
-git add vendor/excalidraw src/lib/eyedropper.ts src/lib/eyedropper.test.ts \
+git add .gitmodules vendor/excalidraw src/lib/eyedropper.ts src/lib/eyedropper.test.ts \
         src/excalidraw-fork.d.ts src/ui/panels/ColorPanel.tsx src/ui/toolbar/ColorPopup.tsx
 git commit -m "feat(color): wire the vendor eyedropper into both pickers"
 ```
