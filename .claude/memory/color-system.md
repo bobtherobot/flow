@@ -66,8 +66,11 @@ of the four write paths, which broke the empty-selection (tool-defaults) path
 outright — set stroke to none, then draw a new shape, and the stroke stayed at
 width 0 with no way to fix it from the panel; a different path could make an
 existing shape's outline vanish entirely (real color, real width 0). Fixed by
-extracting `needsRevival` and calling it from all four: single-selection write,
-multi-selection write, swap, and the empty-selection tool-defaults write.
+extracting `needsRevival` and calling it from all four write paths:
+single-selection write, multi-selection write, swap, and the empty-selection
+tool-defaults write — the first two share one per-element code site called for
+both single and multi selections, so "four" is a count of write paths, not of
+distinct call sites in the source.
 
 **The comparison is `??`, never `||`.** `strokeWidth: 0` is a legitimate,
 meaningful value in this codebase (the whole 0–10px slider exists because 0 is
@@ -122,9 +125,18 @@ object it was given** — reference equality, not structural. The common case
 natural no-op. A cross-surface test that mounts both real components against
 one shared store is what caught this; per-surface isolated tests could not.
 
-`cancelEyeDropper` still has **no production caller** as of this branch — the
-only unmount paths that would need it (selection change, rail hidden) don't
-call it. Narrow, deferred, and known.
+`cancelEyeDropper(handle)` is called from an unmount `useEffect` on **both**
+surfaces — `ColorPanel.tsx:39` and `ColorPopup.tsx:49`, each
+`useEffect(() => () => cancelEyeDropper(pick.current), [])`. It is
+ownership-scoped by handle identity precisely because the atom is global and
+both surfaces share it: an unconditional cancel would let one surface's
+unmount kill a pick the *other* surface had started (the Color accordion
+collapsing mid-pick from the rail popup, or the rail hiding mid-pick from the
+panel). This was not true after Task 18's first review round — at that point
+`cancelEyeDropper` had no caller at all, which is a real earlier state
+recorded in `.superpowers/sdd/2026-08-11-color-system-redesign/progress.md`,
+but the fix round that added the identity guard added these two call sites in
+the same pass. Don't cite the no-caller state as current.
 
 ## `deferred-commit.ts` has a module-global flag that can strand — not ours, but real
 
