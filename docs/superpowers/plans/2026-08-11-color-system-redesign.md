@@ -4796,6 +4796,28 @@ describe("RailColorControl", () => {
     expect(sel.update).toHaveBeenCalled();
   });
 
+  it("closes on a second press of the active box", () => {
+    // fireEvent.click alone never fires pointerdown, so this interleaving is
+    // invisible to a click-only test: the popup's outside-press handler closes
+    // on pointerdown and the click then reopens, making the close branch dead.
+    render(<RailColorControl sel={fakeSel()} />);
+    const box = screen.getByRole("radio", { name: /fill/i });
+    fireEvent.click(box);
+    expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
+    fireEvent.pointerDown(box);
+    fireEvent.click(box);
+    expect(screen.queryByRole("dialog", { name: /color picker/i })).not.toBeInTheDocument();
+  });
+
+  it("a stray arrow key on a quartet chip does not swallow the next open", () => {
+    // The chips sit outside the radiogroup, so an arrow there has no setPart to
+    // consume the flag; if it latched, the next click would be eaten.
+    render(<RailColorControl sel={fakeSel()} />);
+    fireEvent.keyDown(screen.getByRole("button", { name: /^white$/i }), { key: "ArrowRight" });
+    fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
+    expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
+  });
+
   it("closes on Escape", () => {
     render(<RailColorControl sel={fakeSel()} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
@@ -4870,6 +4892,12 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
   // Dismissal mirrors ToolbarConfigMenu: outside press or Escape.
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
+      // The trigger box lives OUTSIDE this portal, so a press on it would
+      // close here on pointerdown and the click that follows would reopen —
+      // the toggle's close branch becomes unreachable, and the remount
+      // re-seeds useColorDraft, discarding an in-progress hue. Same guard
+      // ToolBar uses for its hamburger.
+      if ((e.target as HTMLElement).closest(".flow-toolbar__color")) return;
       if (!ref.current?.contains(e.target as Node)) onClose();
     };
     const onKey = (e: KeyboardEvent) => {
@@ -4971,10 +4999,25 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
     };
   };
 
+  // Arrow-key navigation also calls setPart, and on a single-part selection it
+  // re-selects the part already active — indistinguishable from a click unless
+  // we mark it. The flag is set only for keys inside the radiogroup: the
+  // quartet chips sit outside it and are focusable, so an arrow pressed on a
+  // chip would otherwise latch the flag with no setPart to consume it, and
+  // silently swallow the next click on the active box.
+  const arrowNav = useRef(false);
+  const onKeyDownCapture = (e: React.KeyboardEvent) => {
+    if (!e.key.startsWith("Arrow")) return;
+    if (!(e.target as HTMLElement).closest('[role="radiogroup"]')) return;
+    arrowNav.current = true;
+  };
+
   const chooserTarget = {
     ...target,
     setPart: (part: typeof target.part) => {
-      if (part === target.part) {
+      const viaArrow = arrowNav.current;
+      arrowNav.current = false;
+      if (part === target.part && !viaArrow) {
         setOpen((o) => !o);
         return;
       }
@@ -4983,7 +5026,7 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
   };
 
   return (
-    <div className="flow-toolbar__color" ref={wrapRef}>
+    <div className="flow-toolbar__color" ref={wrapRef} onKeyDownCapture={onKeyDownCapture}>
       <PartChooser target={chooserTarget} compact />
       {open && (
         <ColorPopup target={target} anchor={anchor()} onClose={() => setOpen(false)} />
