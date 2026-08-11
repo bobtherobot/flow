@@ -23,6 +23,7 @@ Every task's requirements implicitly include this section.
 - **Grey is `#808080`**, white `#ffffff`, black `#000000`.
 - **Conversions return unrounded H/S/V/L floats.** Only the numeric fields round those, at display time — rounding hue or saturation inside a conversion drifts the color on every frame of a drag. RGB channels are the exception and *are* rounded to integers, because a channel is a byte; `fromHueChroma`'s `Math.round` is correct and not a violation of this rule.
 - **Colors are lowercase `#rrggbb`** everywhere, matching `scrubHex` in `src/lib/color-palettes.ts`.
+- **CSS uses flow's existing design tokens, with no fallback values.** They are defined on `:root` in `src/ui/menubar/menubar.css`: `--flow-ink`, `--flow-ink-muted`, `--flow-ink-disabled`, `--flow-panel-bg`, `--flow-border`, `--flow-accent`, `--flow-hover`, `--flow-active`, `--flow-shadow`, `--flow-radius-sm`, `--flow-radius-md`, `--flow-font`, `--flow-dur-fast`, `--flow-ease`. Existing stylesheets write `var(--flow-border)` bare — match that. Never invent a token name; a `var(--made-up, #fallback)` silently renders the fallback forever and looks almost right.
 - Commands: `npm test -- --run` (unit), `npm run typecheck`, `npm run test:e2e`. Both unit and typecheck must be green before every commit.
 - Memory-file conventions: this project keeps memory repo-local in `.claude/memory/`. Do not write to the global Claude account.
 
@@ -1554,11 +1555,11 @@ names.
   border-radius: 7px;
   cursor: pointer;
   touch-action: none;
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
 }
 
 .flow-clr-slider:focus-visible {
-  outline: 2px solid var(--flow-focus, #4263eb);
+  outline: 2px solid var(--flow-accent);
   outline-offset: 2px;
 }
 
@@ -1585,7 +1586,7 @@ names.
   margin-left: -7px;
   border-radius: 50%;
   background: #fff;
-  border: 1px solid var(--flow-border, #b0b0b0);
+  border: 1px solid var(--flow-border);
   box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
   transform: translateY(-50%);
   pointer-events: none;
@@ -1772,11 +1773,11 @@ Append to `src/ui/color/color.css`:
   background-image:
     linear-gradient(to top, #000, transparent),
     linear-gradient(to right, #fff, transparent);
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
 }
 
 .flow-clr-satbox:focus-visible {
-  outline: 2px solid var(--flow-focus, #4263eb);
+  outline: 2px solid var(--flow-accent);
   outline-offset: 2px;
 }
 
@@ -2058,7 +2059,7 @@ Append to `src/ui/color/color.css`:
   flex: 0 0 auto;
   overflow: hidden;
   border-radius: 50%;
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
   background-image: conic-gradient(#c8c8c8 0 25%, #fff 0 50%, #c8c8c8 0 75%, #fff 0);
   background-size: 10px 10px;
 }
@@ -2085,14 +2086,14 @@ Append to `src/ui/color/color.css`:
   height: 28px;
   padding: 0;
   cursor: pointer;
-  color: var(--flow-text, #1e1e1e);
+  color: var(--flow-ink);
   background: none;
   border: none;
   border-radius: 4px;
 }
 
 .flow-clr-eyedropper:hover:not(:disabled) {
-  background: var(--flow-hover, #f1f3f5);
+  background: var(--flow-hover);
 }
 
 .flow-clr-eyedropper:disabled {
@@ -2460,13 +2461,13 @@ Append to `src/ui/color/color.css`:
 }
 
 .flow-clr-mode:focus-visible {
-  outline: 2px solid var(--flow-focus, #4263eb);
+  outline: 2px solid var(--flow-accent);
   outline-offset: 1px;
 }
 
 /* The options themselves must stay readable when the closed control is not. */
 .flow-clr-mode option {
-  color: var(--flow-text, #1e1e1e);
+  color: var(--flow-ink);
 }
 
 .flow-clr-hex {
@@ -2475,7 +2476,7 @@ Append to `src/ui/color/color.css`:
   height: 28px;
   padding: 0 6px;
   font-family: inherit;
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
   border-radius: 4px;
 }
 ```
@@ -3417,7 +3418,7 @@ Append to `src/ui/color/color.css`:
   padding: 0;
   cursor: pointer;
   background: var(--flow-clr-part-color, #fff);
-  border: 2px solid var(--flow-text, #1e1e1e);
+  border: 2px solid var(--flow-ink);
 }
 
 .flow-clr-chooser--compact .flow-clr-part {
@@ -3434,7 +3435,7 @@ Append to `src/ui/color/color.css`:
   background:
     linear-gradient(var(--flow-clr-part-color, #fff) 0 0) padding-box,
     linear-gradient(var(--flow-clr-part-color, #fff) 0 0) border-box;
-  border: 2px solid var(--flow-text, #1e1e1e);
+  border: 2px solid var(--flow-ink);
   box-shadow: inset 0 0 0 8px var(--flow-clr-part-color, #fff), inset 0 0 0 10px #fff;
 }
 
@@ -3457,7 +3458,7 @@ Append to `src/ui/color/color.css`:
   font-weight: 700;
   font-size: 20px;
   line-height: 1;
-  color: var(--flow-text, #1e1e1e);
+  color: var(--flow-ink);
   mix-blend-mode: difference;
 }
 
@@ -3472,7 +3473,7 @@ Append to `src/ui/color/color.css`:
   height: 22px;
   padding: 0;
   cursor: pointer;
-  color: var(--flow-text, #1e1e1e);
+  color: var(--flow-ink);
   background: none;
   border: none;
 }
@@ -3487,7 +3488,7 @@ Append to `src/ui/color/color.css`:
   height: 22px;
   padding: 0;
   cursor: pointer;
-  border: 1px solid var(--flow-text, #1e1e1e);
+  border: 1px solid var(--flow-ink);
 }
 
 .flow-clr-chip--none {
@@ -3860,7 +3861,7 @@ it has today:
   aspect-ratio: 1;
   padding: 0;
   cursor: pointer;
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
   border-radius: 3px;
 }
 
@@ -3871,7 +3872,7 @@ it has today:
 }
 
 .flow-clr-palette__tile[aria-pressed="true"] {
-  outline: 2px solid var(--flow-focus, #4263eb);
+  outline: 2px solid var(--flow-accent);
   outline-offset: 1px;
 }
 
@@ -3895,14 +3896,14 @@ it has today:
   padding: 0;
   cursor: pointer;
   background: none;
-  border: 1px solid var(--flow-border, #d0d0d0);
+  border: 1px solid var(--flow-border);
   border-radius: 4px;
 }
 
 .flow-clr-palette__confirm {
   padding: 8px;
-  background: var(--flow-surface, #fff);
-  border: 1px solid var(--flow-border, #d0d0d0);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
   border-radius: 4px;
 }
 
@@ -4647,7 +4648,7 @@ Append to `src/ui/toolbar/toolbar.css`:
   justify-content: center;
   margin-top: auto;
   padding: 8px 4px;
-  border-top: 1px solid var(--flow-border, #e0e0e0);
+  border-top: 1px solid var(--flow-border);
 }
 ```
 
@@ -4662,8 +4663,8 @@ And to `src/ui/color/color.css`:
   gap: 10px;
   width: 280px;
   padding: 12px;
-  background: var(--flow-surface, #fff);
-  border: 1px solid var(--flow-border, #d0d0d0);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
 }
@@ -4677,8 +4678,8 @@ And to `src/ui/color/color.css`:
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  background: var(--flow-surface, #fff);
-  border: 1px solid var(--flow-border, #d0d0d0);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
   border-radius: 50%;
   box-shadow: 0 2px 6px rgb(0 0 0 / 18%);
 }
@@ -4693,8 +4694,8 @@ And to `src/ui/color/color.css`:
   aspect-ratio: 1;
   padding: 0;
   cursor: pointer;
-  background: var(--flow-surface, #fff);
-  border: 1px solid var(--flow-border, #d0d0d0);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
   border-radius: 4px;
 }
 
