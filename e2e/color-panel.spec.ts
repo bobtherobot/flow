@@ -90,44 +90,75 @@ test("a hue slider drag is a single undo step", async ({ page }) => {
  * Carry-forward from the plan: flow's own `deferred-commit.ts` keeps a
  * module-global `pending` flag that can strand `true` and let a later,
  * unrelated write skip the uncommitted-element filter — which merges it into
- * the previous undo entry instead of recording its own. A single
- * drag-then-undo (the test above) cannot tell "one gesture, one entry" apart
- * from "a leaked flag ate one of two entries" — both look like one restore.
- * This asserts step counts across a sequence of ordinary, non-transient
- * edits instead: three distinct color picks must take three distinct
- * undos to unwind, each landing on the exact intermediate color, not a
- * neighbour.
+ * the previous undo entry instead of recording its own. `markDeferred` /
+ * `consumeDeferred` only run during a drag gesture, so a sequence of three
+ * discrete clicks can never touch that path — it proves ordinary edits don't
+ * collapse, but says nothing about whether a drag's flag gets cleared rather
+ * than leaking into whatever commits next. A single drag-then-undo (the test
+ * above) doesn't close that either: "one gesture, one entry" and "a leaked
+ * flag ate the next edit's entry" both look identical from one restore.
+ *
+ * The drag is deliberately one of the three edits: markDeferred/consumeDeferred
+ * only run during a gesture, so a sequence of discrete clicks cannot detect a
+ * leaked `pending` flag swallowing the following commit.
  */
-test("a sequence of distinct edits produces the same number of undo steps", async ({ page }) => {
+test("a drag followed by two distinct edits produces three distinct undo steps", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
-  const lightness = page.locator(panel).getByLabel("Lightness");
-  const fillRadio = page.locator(panel).getByRole("radio", { name: /^Fill/ });
-  await expect(fillRadio).toHaveAttribute("aria-label", "Fill, none");
+  // Setup, not one of the three counted edits: seed real saturation so the
+  // hue drag below is observable at all (see the note on the single-drag
+  // test above — a hue-only change on an achromatic color is invisible).
+  const satBox = (await page.locator(panel).getByRole("application").boundingBox())!;
+  await page.mouse.click(satBox.x + satBox.width * 0.8, satBox.y + satBox.height * 0.3);
 
+  const hueField = page.locator(panel).getByRole("spinbutton", { name: "Hue" });
+  const lightness = page.locator(panel).getByLabel("Lightness");
+  await expect(hueField).toHaveValue("0");
+  const seededL = await lightness.inputValue();
+
+  // Edit 1: a genuine pointer drag (down, several moves, up) — not a click
+  // and not an arrow-key step, both of which commit immediately and never
+  // call markDeferred. This is the only one of the three edits that passes
+  // through the deferred-commit path at all.
+  const hue = page.locator(panel).getByRole("slider", { name: "Hue" });
+  const box = (await hue.boundingBox())!;
+  await page.mouse.move(box.x + 10, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect(hueField).not.toHaveValue("0");
+  const draggedHue = await hueField.inputValue();
+
+  // Edit 2: a discrete, non-transient commit.
   await page.locator(panel).getByRole("button", { name: "White" }).click();
   await expect(lightness).toHaveValue("100");
 
+  // Edit 3: another discrete, non-transient commit.
   await page.locator(panel).getByRole("button", { name: "Grey" }).click();
   await expect(lightness).toHaveValue("50");
 
-  await page.locator(panel).getByRole("button", { name: "Black" }).click();
-  await expect(lightness).toHaveValue("0");
-  // Black (#000000) and the original transparent fill both read Lightness 0,
-  // so the aria-label's ", none" suffix is what tells "reverted all the way"
-  // apart from "stopped one edit short" in the final assertion below.
-  await expect(fillRadio).toHaveAttribute("aria-label", "Fill");
-
+  // Undo 1 of 3: back to the state after edit 2 (White), not further.
   await page.keyboard.press("Control+z");
-  await expect(lightness).toHaveValue("50"); // back to Grey, not further
+  await expect(lightness).toHaveValue("100");
 
+  // Undo 2 of 3: back to the state after edit 1 (the drag) — the critical
+  // check. If the drag's `pending` flag had leaked into edit 2's commit,
+  // edit 2 would have absorbed edit 1's entry (commitDeferredChanges: true
+  // skips the uncommitted-element filter for it too), and this single undo
+  // would overshoot straight past the dragged hue to the pre-drag seeded
+  // state instead of landing on it.
   await page.keyboard.press("Control+z");
-  await expect(lightness).toHaveValue("100"); // back to White, not further
+  await expect(lightness).toHaveValue(seededL);
+  await expect(hueField).toHaveValue(draggedHue);
 
+  // Undo 3 of 3: back to the pre-drag seeded state, exactly — not the
+  // original transparent fill from before the setup step.
   await page.keyboard.press("Control+z");
-  await expect(fillRadio).toHaveAttribute("aria-label", "Fill, none"); // back to the original, exactly
+  await expect(hueField).toHaveValue("0");
+  await expect(lightness).toHaveValue(seededL);
 });
 
 test("none on stroke zeroes the width and a color revives it", async ({ page }) => {
