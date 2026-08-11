@@ -3885,6 +3885,22 @@ describe("PaletteSection", () => {
     expect(screen.queryByLabelText("Palette name")).not.toBeInTheDocument();
   });
 
+  it("still commits a rename after an earlier Escape", () => {
+    // The abandon flag must not survive the session it was set in: Escape
+    // unmounts without a blur in jsdom, so a flag cleared only in onBlur
+    // strands and eats the next real rename.
+    setup();
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    fireEvent.keyDown(screen.getByLabelText("Palette name"), { key: "Escape" });
+
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    const input = screen.getByLabelText("Palette name");
+    fireEvent.change(input, { target: { value: "Kept" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect((screen.getByLabelText("Palette") as HTMLSelectElement).selectedOptions[0].textContent)
+      .toBe("Kept");
+  });
+
   it("has no set-as-default control", () => {
     setup();
     expect(screen.queryByRole("button", { name: /default/i })).not.toBeInTheDocument();
@@ -4057,7 +4073,14 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
             value={current.id}
             title="Double-click to rename"
             onChange={(e) => choosePalette(e.target.value)}
-            onDoubleClick={() => setRenaming(true)}
+            onDoubleClick={() => {
+              // Clear the abandon flag on ENTRY, not only in onBlur's abandon
+              // branch: Escape unmounts the input without necessarily firing a
+              // blur, so a flag cleared only there strands at `true` and
+              // silently swallows the NEXT genuine rename.
+              abandonRename.current = false;
+              setRenaming(true);
+            }}
           >
             {palettes.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
