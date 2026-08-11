@@ -2161,7 +2161,8 @@ describe("NumericFields", () => {
   it("shows rounded HSLA by default", () => {
     setup();
     expect(screen.getByLabelText("Hue")).toHaveValue(200);
-    expect(screen.getByLabelText("Saturation")).toHaveValue(72);
+    // 56, not 25: the fields show HSL, the draft carries HSV. Different spaces.
+    expect(screen.getByLabelText("Saturation")).toHaveValue(56);
     expect(screen.getByLabelText("Lightness")).toHaveValue(80);
     expect(screen.getByLabelText("Alpha")).toHaveValue(1);
   });
@@ -2245,10 +2246,12 @@ describe("NumericFields", () => {
 });
 ```
 
-The expected values above come from `#aed5e8`. Before writing the
-implementation, **verify them** in a node one-liner using the Task 1 module
-rather than trusting this plan's arithmetic; if any differ, fix the test's
-numbers, not the conversion module.
+The expected values above come from `#aed5e8` and have now been **verified
+against the real Task 1 module**: `hsvToHex({h:200,s:25,v:91})` is `#aed5e8`,
+its RGB is `174, 213, 232`, and its HSL rounds to `200, 56, 80`. Note the
+saturation: HSV `s: 25` displays as HSL `s: 56` — different color spaces, and
+an easy thing to "correct" in the wrong direction. If a test disagrees with the
+module, fix the test, never the conversion.
 
 - [ ] **Step 2: Run test to verify it fails**
 
