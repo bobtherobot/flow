@@ -4319,12 +4319,51 @@ describe("ColorPanel", () => {
     expect(sel.update).toHaveBeenCalled();
   });
 
-  it("writes when a hue is dragged", () => {
+  // Wiring IS the deliverable of this task, so these assert the value written,
+  // not merely that a write happened. `toHaveBeenCalled()` alone cannot tell
+  // correct wiring from a swapped onHue/onAlpha, a wrong alpha on a palette
+  // pick, or a numeric field routed through two setters instead of the
+  // combined one.
+  const chromatic = () =>
+    fakeSel({ elements: [{ ...rect, backgroundColor: "#2091c2" }] as never });
+
+  it("routes the hue slider to hue, not alpha", () => {
+    const sel = chromatic();
+    render(<ColorPanel sel={sel} />);
+    fireEvent.keyDown(screen.getByRole("slider", { name: /hue/i }), { key: "ArrowRight" });
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Alpha untouched, so still a 6-digit hex. Swapped wiring would have moved
+    // alpha to 99% and produced #2091c2fc instead.
+    expect(currentItems.currentItemBackgroundColor).toBe("#208fc2");
+  });
+
+  it("routes the alpha slider to alpha, not hue", () => {
+    const sel = chromatic();
+    render(<ColorPanel sel={sel} />);
+    fireEvent.keyDown(screen.getByRole("slider", { name: /opacity/i }), { key: "ArrowLeft" });
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // 99% alpha, rgb half untouched.
+    expect(currentItems.currentItemBackgroundColor).toBe("#2091c2fc");
+  });
+
+  it("sends a numeric-field edit through the combined setter", () => {
+    const sel = chromatic();
+    render(<ColorPanel sel={sel} />);
+    const field = screen.getByLabelText("Lightness", { selector: "input" });
+    fireEvent.change(field, { target: { value: "20" } });
+    fireEvent.blur(field);
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Two separate setters would revert the first; the lightness must land.
+    expect(Math.round(hexToHsl(currentItems.currentItemBackgroundColor as string)!.l)).toBe(20);
+  });
+
+  it("applies a palette swatch at full alpha", () => {
     const sel = fakeSel();
     render(<ColorPanel sel={sel} />);
-    const hue = screen.getByRole("slider", { name: /hue/i });
-    fireEvent.keyDown(hue, { key: "ArrowRight" });
-    expect(sel.update).toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole("button", { name: /^swatch /i })[0]);
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // A wrong alpha here writes an invisible color; 6 digits proves alpha 100.
+    expect(currentItems.currentItemBackgroundColor).toMatch(/^#[0-9a-f]{6}$/);
   });
 });
 ```
