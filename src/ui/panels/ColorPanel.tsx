@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import "../color/color.css";
 import { PartChooser } from "../color/PartChooser";
 import { SaturationBox } from "../color/SaturationBox";
@@ -8,7 +9,7 @@ import { useColorTarget } from "../color/useColorTarget";
 import { useColorDraft } from "../color/useColorDraft";
 import { useColorUiState, setNumericMode } from "../../lib/color-store";
 import { hsvToHex } from "../../lib/color-convert";
-import { openEyeDropper } from "../../lib/eyedropper";
+import { openEyeDropper, cancelEyeDropper } from "../../lib/eyedropper";
 import type { SelectionStyle } from "./useSelectionStyle";
 
 /**
@@ -26,6 +27,14 @@ export function ColorPanel({ sel }: { sel: SelectionStyle }) {
     alpha: target.alpha,
     onCommit: target.setColor,
   });
+
+  // The accordion can collapse this panel (or swap it for another) while a
+  // pick is in flight. The overlay lives outside this component's subtree
+  // (LayerUI mounts it globally), so it would otherwise survive the unmount
+  // with `onSelect` closing over a `target`/`draft` that no longer exists.
+  // Cancelling here is unconditionally correct: if this component is gone,
+  // whatever it was about to write is stale by definition.
+  useEffect(() => cancelEyeDropper, []);
 
   return (
     <div className="flow-clr-panel">

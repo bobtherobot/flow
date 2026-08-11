@@ -1,5 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+
+// The eyedropper bridge (src/lib/eyedropper.ts) imports the real vendor
+// package; stub the two exports it touches so the unmount-cancellation test
+// below can assert on the atom write without a live LayerUI/EyeDropper
+// overlay. `vi.hoisted` avoids vitest's "cannot access before initialization"
+// hoisting trap (see src/lib/eyedropper.test.ts).
+const { set } = vi.hoisted(() => ({ set: vi.fn() }));
+vi.mock("@excalidraw/excalidraw", () => ({
+  activeEyeDropperAtom: { __atom: true },
+  editorJotaiStore: { set },
+}));
+
 import { RailColorControl } from "./RailColorControl";
 import { reloadColorStore, recordRecent } from "../../lib/color-store";
 import type { SelectionStyle } from "../panels/useSelectionStyle";
@@ -64,6 +76,7 @@ function fakeSel(over: Partial<SelectionStyle> = {}): SelectionStyle {
 beforeEach(() => {
   localStorage.clear();
   reloadColorStore();
+  set.mockClear();
 });
 
 describe("RailColorControl", () => {
@@ -203,5 +216,23 @@ describe("RailColorControl", () => {
     fireEvent.keyDown(screen.getByRole("button", { name: /^white$/i }), { key: "ArrowRight" });
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
     expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
+  });
+
+  it("cancels an in-flight eyedropper pick if the popup unmounts programmatically", () => {
+    // Not the popup's own Escape/outside-click path — those cancel through the
+    // vendor's own handlers. This is the case those don't cover: something
+    // else (View ▸ Show Toolbar hiding the whole rail, a selection change that
+    // tears down the tree) unmounts the popup out from under a pending pick.
+    const { unmount } = render(<RailColorControl sel={fakeSel()} />);
+    fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
+    expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
+
+    // Merely opening the popup must not itself cancel anything.
+    expect(set).not.toHaveBeenCalled();
+
+    unmount();
+
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(set).toHaveBeenCalledWith({ __atom: true }, null);
   });
 });

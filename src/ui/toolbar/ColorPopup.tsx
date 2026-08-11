@@ -7,7 +7,7 @@ import { PickerRow } from "../color/PickerRow";
 import { useColorDraft } from "../color/useColorDraft";
 import { useColorUiState } from "../../lib/color-store";
 import { RECENT_LIMIT } from "../../lib/recent-colors";
-import { openEyeDropper } from "../../lib/eyedropper";
+import { openEyeDropper, cancelEyeDropper } from "../../lib/eyedropper";
 import { clampMenuPosition, type MenuPoint } from "../panels/dock/menu-position";
 import type { ColorTarget } from "../color/useColorTarget";
 
@@ -34,6 +34,16 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
     alpha: target.alpha,
     onCommit: target.setColor,
   });
+
+  // This popup can be unmounted out from under an in-flight pick — not just
+  // via its own Escape/outside-click handlers, but programmatically (e.g.
+  // View ▸ Show Toolbar hiding the whole rail: `ToolBar` returns `null` when
+  // `!state.visible`, which unmounts this component along with it). The
+  // overlay itself lives outside this subtree (LayerUI mounts it globally),
+  // so without this it would survive with `onSelect` closing over a `target`
+  // that no longer exists. Cancelling on unmount is unconditionally correct:
+  // if this component is gone, its pending pick is stale by definition.
+  useEffect(() => cancelEyeDropper, []);
 
   // Pull the popup fully on-screen before paint, same as ToolbarConfigMenu —
   // the naive anchor (top of the rail control, right of the rail) can overflow

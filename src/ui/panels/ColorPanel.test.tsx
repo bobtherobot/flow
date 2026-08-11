@@ -1,5 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+
+// The eyedropper bridge (src/lib/eyedropper.ts) imports the real vendor
+// package; stub the two exports it touches so the unmount-cancellation test
+// below can assert on the atom write directly. `vi.hoisted` avoids vitest's
+// "cannot access before initialization" hoisting trap (see
+// src/lib/eyedropper.test.ts).
+const { set } = vi.hoisted(() => ({ set: vi.fn() }));
+vi.mock("@excalidraw/excalidraw", () => ({
+  activeEyeDropperAtom: { __atom: true },
+  editorJotaiStore: { set },
+}));
+
 import { ColorPanel } from "./ColorPanel";
 import { reloadColorStore } from "../../lib/color-store";
 import { reloadPaletteStore } from "../../lib/palette-store";
@@ -103,6 +115,7 @@ beforeEach(() => {
   localStorage.clear();
   reloadColorStore();
   reloadPaletteStore();
+  set.mockClear();
 });
 
 describe("ColorPanel", () => {
@@ -193,5 +206,21 @@ describe("ColorPanel", () => {
     expect(sel.update).toHaveBeenCalled();
     const ids = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(ids).toEqual({ t1: true });
+  });
+
+  it("cancels an in-flight eyedropper pick if the panel unmounts", () => {
+    // The accordion can collapse this panel (or switch to another) mid-pick.
+    // The overlay lives outside this subtree (LayerUI mounts it globally), so
+    // without this cleanup it would survive with `onSelect` closing over a
+    // `target`/`draft` that no longer exists.
+    const { unmount } = render(<ColorPanel sel={fakeSel()} />);
+
+    // Rendering alone must not cancel anything — only tearing down should.
+    expect(set).not.toHaveBeenCalled();
+
+    unmount();
+
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(set).toHaveBeenCalledWith({ __atom: true }, null);
   });
 });
