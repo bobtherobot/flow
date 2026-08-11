@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import "../color/color.css";
 import { PartChooser } from "../color/PartChooser";
 import { SaturationBox } from "../color/SaturationBox";
@@ -9,7 +9,7 @@ import { useColorTarget } from "../color/useColorTarget";
 import { useColorDraft } from "../color/useColorDraft";
 import { useColorUiState, setNumericMode } from "../../lib/color-store";
 import { hsvToHex } from "../../lib/color-convert";
-import { openEyeDropper, cancelEyeDropper } from "../../lib/eyedropper";
+import { openEyeDropper, cancelEyeDropper, type EyeDropperHandle } from "../../lib/eyedropper";
 import type { SelectionStyle } from "./useSelectionStyle";
 
 /**
@@ -32,9 +32,11 @@ export function ColorPanel({ sel }: { sel: SelectionStyle }) {
   // pick is in flight. The overlay lives outside this component's subtree
   // (LayerUI mounts it globally), so it would otherwise survive the unmount
   // with `onSelect` closing over a `target`/`draft` that no longer exists.
-  // Cancelling here is unconditionally correct: if this component is gone,
-  // whatever it was about to write is stale by definition.
-  useEffect(() => cancelEyeDropper, []);
+  // `cancelEyeDropper` only clears the atom if it's still this panel's own
+  // handle — the rail popup shares the same global atom and can have its own
+  // pick in flight when this panel happens to unmount.
+  const pick = useRef<EyeDropperHandle | null>(null);
+  useEffect(() => () => cancelEyeDropper(pick.current), []);
 
   return (
     <div className="flow-clr-panel">
@@ -49,12 +51,12 @@ export function ColorPanel({ sel }: { sel: SelectionStyle }) {
         isNone={draft.isNone}
         onHue={draft.setHue}
         onAlpha={draft.setAlpha}
-        onPick={() =>
-          openEyeDropper({
+        onPick={() => {
+          pick.current = openEyeDropper({
             part: target.part,
             onSelect: (hex) => target.setColor(hex, draft.alpha, false),
-          })
-        }
+          });
+        }}
       />
 
       <NumericFields

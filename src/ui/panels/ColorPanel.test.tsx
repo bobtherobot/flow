@@ -2,14 +2,26 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 
 // The eyedropper bridge (src/lib/eyedropper.ts) imports the real vendor
-// package; stub the two exports it touches so the unmount-cancellation test
-// below can assert on the atom write directly. `vi.hoisted` avoids vitest's
-// "cannot access before initialization" hoisting trap (see
-// src/lib/eyedropper.test.ts).
-const { set } = vi.hoisted(() => ({ set: vi.fn() }));
+// package; stub the two exports it touches with a minimal real store (`get`
+// reflects whatever `set` last wrote) so the unmount-cancellation test below
+// can exercise the real identity check in `cancelEyeDropper`, not just spy on
+// calls. `vi.hoisted` avoids vitest's "cannot access before initialization"
+// hoisting trap (see src/lib/eyedropper.test.ts).
+const store = vi.hoisted(() => {
+  let value: unknown = null;
+  return {
+    get: vi.fn((_atom?: unknown) => value),
+    set: vi.fn((_atom: unknown, v: unknown) => {
+      value = v;
+    }),
+    reset: () => {
+      value = null;
+    },
+  };
+});
 vi.mock("@excalidraw/excalidraw", () => ({
   activeEyeDropperAtom: { __atom: true },
-  editorJotaiStore: { set },
+  editorJotaiStore: { get: store.get, set: store.set },
 }));
 
 import { ColorPanel } from "./ColorPanel";
@@ -115,7 +127,9 @@ beforeEach(() => {
   localStorage.clear();
   reloadColorStore();
   reloadPaletteStore();
-  set.mockClear();
+  store.get.mockClear();
+  store.set.mockClear();
+  store.reset();
 });
 
 describe("ColorPanel", () => {
@@ -208,19 +222,28 @@ describe("ColorPanel", () => {
     expect(ids).toEqual({ t1: true });
   });
 
-  it("cancels an in-flight eyedropper pick if the panel unmounts", () => {
+  it("does not touch the atom on unmount if it never opened a pick", () => {
+    // Rendering (and unmounting without ever picking) must not cancel
+    // anything — a panel that never opened a pick has no business writing to
+    // this shared atom at all.
+    const { unmount } = render(<ColorPanel sel={fakeSel()} />);
+    unmount();
+    expect(store.set).not.toHaveBeenCalled();
+  });
+
+  it("cancels its own in-flight eyedropper pick if the panel unmounts", () => {
     // The accordion can collapse this panel (or switch to another) mid-pick.
     // The overlay lives outside this subtree (LayerUI mounts it globally), so
     // without this cleanup it would survive with `onSelect` closing over a
     // `target`/`draft` that no longer exists.
     const { unmount } = render(<ColorPanel sel={fakeSel()} />);
 
-    // Rendering alone must not cancel anything — only tearing down should.
-    expect(set).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /pick a color from the canvas/i }));
+    expect(store.set).toHaveBeenCalledTimes(1); // opening the pick
 
     unmount();
 
-    expect(set).toHaveBeenCalledTimes(1);
-    expect(set).toHaveBeenCalledWith({ __atom: true }, null);
+    expect(store.set).toHaveBeenCalledTimes(2);
+    expect(store.set).toHaveBeenLastCalledWith({ __atom: true }, null);
   });
 });

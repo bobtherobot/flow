@@ -7,7 +7,7 @@ import { PickerRow } from "../color/PickerRow";
 import { useColorDraft } from "../color/useColorDraft";
 import { useColorUiState } from "../../lib/color-store";
 import { RECENT_LIMIT } from "../../lib/recent-colors";
-import { openEyeDropper, cancelEyeDropper } from "../../lib/eyedropper";
+import { openEyeDropper, cancelEyeDropper, type EyeDropperHandle } from "../../lib/eyedropper";
 import { clampMenuPosition, type MenuPoint } from "../panels/dock/menu-position";
 import type { ColorTarget } from "../color/useColorTarget";
 
@@ -41,9 +41,12 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
   // `!state.visible`, which unmounts this component along with it). The
   // overlay itself lives outside this subtree (LayerUI mounts it globally),
   // so without this it would survive with `onSelect` closing over a `target`
-  // that no longer exists. Cancelling on unmount is unconditionally correct:
-  // if this component is gone, its pending pick is stale by definition.
-  useEffect(() => cancelEyeDropper, []);
+  // that no longer exists. `cancelEyeDropper` only clears the atom if it's
+  // still this popup's own handle — the docked Color panel shares the same
+  // global atom and can have its own pick in flight when this popup happens
+  // to unmount.
+  const pick = useRef<EyeDropperHandle | null>(null);
+  useEffect(() => () => cancelEyeDropper(pick.current), []);
 
   // Pull the popup fully on-screen before paint, same as ToolbarConfigMenu —
   // the naive anchor (top of the rail control, right of the rail) can overflow
@@ -114,12 +117,12 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
         isNone={draft.isNone}
         onHue={draft.setHue}
         onAlpha={draft.setAlpha}
-        onPick={() =>
-          openEyeDropper({
+        onPick={() => {
+          pick.current = openEyeDropper({
             part: target.part,
             onSelect: (hex) => target.setColor(hex, draft.alpha, false),
-          })
-        }
+          });
+        }}
       />
 
       <div className="flow-clr-recents">

@@ -1,15 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 
 // The eyedropper bridge (src/lib/eyedropper.ts) imports the real vendor
-// package; stub the two exports it touches so the unmount-cancellation test
-// below can assert on the atom write without a live LayerUI/EyeDropper
-// overlay. `vi.hoisted` avoids vitest's "cannot access before initialization"
+// package; stub the two exports it touches with a minimal real store (`get`
+// reflects whatever `set` last wrote) so the unmount-cancellation tests below
+// can exercise the real identity check in `cancelEyeDropper`, not just spy on
+// calls. `vi.hoisted` avoids vitest's "cannot access before initialization"
 // hoisting trap (see src/lib/eyedropper.test.ts).
-const { set } = vi.hoisted(() => ({ set: vi.fn() }));
+const store = vi.hoisted(() => {
+  let value: unknown = null;
+  return {
+    get: vi.fn((_atom?: unknown) => value),
+    set: vi.fn((_atom: unknown, v: unknown) => {
+      value = v;
+    }),
+    reset: () => {
+      value = null;
+    },
+  };
+});
 vi.mock("@excalidraw/excalidraw", () => ({
   activeEyeDropperAtom: { __atom: true },
-  editorJotaiStore: { set },
+  editorJotaiStore: { get: store.get, set: store.set },
 }));
 
 import { RailColorControl } from "./RailColorControl";
@@ -76,7 +88,9 @@ function fakeSel(over: Partial<SelectionStyle> = {}): SelectionStyle {
 beforeEach(() => {
   localStorage.clear();
   reloadColorStore();
-  set.mockClear();
+  store.get.mockClear();
+  store.set.mockClear();
+  store.reset();
 });
 
 describe("RailColorControl", () => {
@@ -218,21 +232,37 @@ describe("RailColorControl", () => {
     expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
   });
 
-  it("cancels an in-flight eyedropper pick if the popup unmounts programmatically", () => {
+  it("does not touch the atom on unmount if it never opened a pick", () => {
+    // Opening the popup itself does not open a pick — only its eyedropper
+    // button does. Unmounting without ever clicking it must not touch the
+    // shared atom at all.
+    const { unmount } = render(<RailColorControl sel={fakeSel()} />);
+    fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
+    expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
+    expect(store.set).not.toHaveBeenCalled();
+
+    unmount();
+
+    expect(store.set).not.toHaveBeenCalled();
+  });
+
+  it("cancels its own in-flight eyedropper pick if the popup unmounts programmatically", () => {
     // Not the popup's own Escape/outside-click path — those cancel through the
     // vendor's own handlers. This is the case those don't cover: something
     // else (View ▸ Show Toolbar hiding the whole rail, a selection change that
     // tears down the tree) unmounts the popup out from under a pending pick.
     const { unmount } = render(<RailColorControl sel={fakeSel()} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
-    expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: /color picker/i });
 
-    // Merely opening the popup must not itself cancel anything.
-    expect(set).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: /pick a color from the canvas/i }),
+    );
+    expect(store.set).toHaveBeenCalledTimes(1); // opening the pick
 
     unmount();
 
-    expect(set).toHaveBeenCalledTimes(1);
-    expect(set).toHaveBeenCalledWith({ __atom: true }, null);
+    expect(store.set).toHaveBeenCalledTimes(2);
+    expect(store.set).toHaveBeenLastCalledWith({ __atom: true }, null);
   });
 });
