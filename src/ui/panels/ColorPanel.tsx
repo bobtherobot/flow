@@ -8,6 +8,7 @@ import { useColorTarget } from "../color/useColorTarget";
 import { useColorDraft } from "../color/useColorDraft";
 import { useColorUiState, setNumericMode } from "../../lib/color-store";
 import { hsvToHex } from "../../lib/color-convert";
+import { openEyeDropper } from "../../lib/eyedropper";
 import type { SelectionStyle } from "./useSelectionStyle";
 
 /**
@@ -39,6 +40,12 @@ export function ColorPanel({ sel }: { sel: SelectionStyle }) {
         isNone={draft.isNone}
         onHue={draft.setHue}
         onAlpha={draft.setAlpha}
+        onPick={() =>
+          openEyeDropper({
+            part: target.part,
+            onSelect: (hex) => target.setColor(hex, draft.alpha, false),
+          })
+        }
       />
 
       <NumericFields

@@ -7,6 +7,7 @@ import { PickerRow } from "../color/PickerRow";
 import { useColorDraft } from "../color/useColorDraft";
 import { useColorUiState } from "../../lib/color-store";
 import { RECENT_LIMIT } from "../../lib/recent-colors";
+import { openEyeDropper } from "../../lib/eyedropper";
 import { clampMenuPosition, type MenuPoint } from "../panels/dock/menu-position";
 import type { ColorTarget } from "../color/useColorTarget";
 
@@ -103,6 +104,12 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
         isNone={draft.isNone}
         onHue={draft.setHue}
         onAlpha={draft.setAlpha}
+        onPick={() =>
+          openEyeDropper({
+            part: target.part,
+            onSelect: (hex) => target.setColor(hex, draft.alpha, false),
+          })
+        }
       />
 
       <div className="flow-clr-recents">
