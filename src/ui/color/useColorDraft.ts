@@ -81,9 +81,26 @@ export function useColorDraft({ hex, alpha, onCommit }: UseColorDraftOptions) {
   let current = draft;
   if (draft.seenHex !== hex || draft.seenAlpha !== alpha) {
     const isEcho = hex === draft.emittedHex && alpha === draft.emittedAlpha;
-    current = isEcho
-      ? { ...draft, seenHex: hex, seenAlpha: alpha }
-      : { ...seedHsv(hex, alpha), seenHex: hex, seenAlpha: alpha, emittedHex: null, emittedAlpha: null };
+    // An alpha-only change must not re-seed: the color itself did not move, so
+    // discarding the HSV would kill the hue at an achromatic hex — the exact
+    // failure this hook exists to prevent. Reachable whenever the other surface
+    // (or an undo) changes opacity while the draft sits at #000000.
+    const alphaOnly = hex === draft.seenHex;
+    current =
+      isEcho || alphaOnly
+        ? {
+            ...draft,
+            alpha: hex === "transparent" ? 100 : alpha,
+            seenHex: hex,
+            seenAlpha: alpha,
+          }
+        : {
+            ...seedHsv(hex, alpha),
+            seenHex: hex,
+            seenAlpha: alpha,
+            emittedHex: null,
+            emittedAlpha: null,
+          };
     setDraft(current);
   }
 

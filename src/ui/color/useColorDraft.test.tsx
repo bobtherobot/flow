@@ -71,6 +71,18 @@ describe("useColorDraft", () => {
     expect(onCommit).toHaveBeenLastCalledWith("#ff00ff", 40, false);
   });
 
+  it("keeps the hue when only the alpha changes from outside at an achromatic hex", () => {
+    // The rail popup (or an undo) changing opacity while the draft sits at black
+    // must not discard the hue — re-seeding from "#000000" would lose it.
+    const onCommit = vi.fn();
+    const { rerender } = render(<Harness hex="#0000ff" alpha={100} onCommit={onCommit} />);
+    fireEvent.click(screen.getByText("to black"));
+    rerender(<Harness hex="#000000" alpha={100} onCommit={onCommit} />);
+    rerender(<Harness hex="#000000" alpha={40} onCommit={onCommit} />);
+    fireEvent.click(screen.getByText("to bright"));
+    expect(onCommit).toHaveBeenLastCalledWith("#0000ff", 40, false);
+  });
+
   it("leaves the none state as soon as a control moves", () => {
     const onCommit = vi.fn();
     render(<Harness hex="transparent" alpha={0} onCommit={onCommit} />);
