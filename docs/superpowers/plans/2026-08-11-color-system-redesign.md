@@ -2208,7 +2208,7 @@ describe("NumericFields", () => {
     const field = screen.getByLabelText("Saturation");
     fireEvent.change(field, { target: { value: "40" } });
     fireEvent.blur(field);
-    const back = hsvToHsl(onChange.mock.calls.at(-1)![0].hsv);
+    const back = hsvToHsl(onChange.mock.calls[onChange.mock.calls.length - 1][0].hsv);
     expect(Math.round(back.s)).toBe(40);
     expect(Math.round(back.l)).toBe(80);
   });
@@ -2218,7 +2218,7 @@ describe("NumericFields", () => {
     const field = screen.getByLabelText("Lightness");
     fireEvent.change(field, { target: { value: "40" } });
     fireEvent.blur(field);
-    const back = hsvToHsl(onChange.mock.calls.at(-1)![0].hsv);
+    const back = hsvToHsl(onChange.mock.calls[onChange.mock.calls.length - 1][0].hsv);
     expect(Math.round(back.l)).toBe(40);
     expect(Math.round(back.s)).toBe(56);
   });
@@ -2231,7 +2231,7 @@ describe("NumericFields", () => {
     const field = screen.getByLabelText("Green");
     fireEvent.change(field, { target: { value: "100" } });
     fireEvent.blur(field);
-    const back = hsvToRgb(onChange.mock.calls.at(-1)![0].hsv);
+    const back = hsvToRgb(onChange.mock.calls[onChange.mock.calls.length - 1][0].hsv);
     expect(Math.round(back.g)).toBe(100);
     expect(Math.round(back.r)).toBe(174);
     expect(Math.round(back.b)).toBe(232);
