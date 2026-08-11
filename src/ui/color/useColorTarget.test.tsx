@@ -70,6 +70,9 @@ function Harness({ sel }: { sel: SelectionStyle }) {
       <output data-testid="hex">{t.hex}</output>
       <output data-testid="alpha">{String(t.alpha)}</output>
       <output data-testid="available">{t.available.join(",")}</output>
+      <output data-testid="mixed">{String(t.isMixed)}</output>
+      <output data-testid="partFill">{t.partColor("fill")}</output>
+      <output data-testid="partStroke">{t.partColor("stroke")}</output>
       <button onClick={() => t.setPart("stroke")}>use stroke</button>
       <button onClick={() => t.setColor("#00ff00", 50, false)}>set green</button>
       <button onClick={() => t.setColor("#00ff00", 50, true)}>set green transient</button>
@@ -114,6 +117,27 @@ describe("reading", () => {
     render(<Harness sel={sel} />);
     expect(screen.getByTestId("hex")).toHaveTextContent("#eeeeee");
   });
+
+  it("reports a single-valued selection as not mixed", () => {
+    render(<Harness sel={fakeSel()} />);
+    expect(screen.getByTestId("mixed")).toHaveTextContent("false");
+  });
+
+  it("exposes each part's own color for the chooser boxes", () => {
+    render(<Harness sel={fakeSel()} />);
+    expect(screen.getByTestId("partFill")).toHaveTextContent("#eeeeee");
+    expect(screen.getByTestId("partStroke")).toHaveTextContent("#111111");
+  });
+
+  it("flags a mixed selection", () => {
+    const sel = fakeSel({
+      elements: [rect, { ...rect, id: "r2", backgroundColor: "#123456" }] as never,
+      selectedIds: { r1: true, r2: true },
+      selectedCount: 2,
+    });
+    render(<Harness sel={sel} />);
+    expect(screen.getByTestId("mixed")).toHaveTextContent("true");
+  });
 });
 
 describe("part selection", () => {
@@ -138,7 +162,21 @@ describe("writing", () => {
     const sel = fakeSel();
     render(<Harness sel={sel} />);
     fireEvent.click(screen.getByText("set green"));
-    expect(sel.update).toHaveBeenCalled();
+    // Asserting the VALUE, not just that update ran: with a bare
+    // `toHaveBeenCalled()` the alpha could be dropped entirely and this passes.
+    const [ids, updater, currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(ids).toEqual({ r1: true });
+    expect(updater(rect)).toEqual({ backgroundColor: "#00ff0080" });
+    expect(currentItems).toEqual({ currentItemBackgroundColor: "#00ff0080" });
+  });
+
+  it("forwards the transient flag so a drag is one undo entry", () => {
+    const sel = fakeSel();
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("set green transient"));
+    expect((sel.update as ReturnType<typeof vi.fn>).mock.calls[0][3]).toBe(true);
+    fireEvent.click(screen.getByText("set green"));
+    expect((sel.update as ReturnType<typeof vi.fn>).mock.calls[1][3]).toBe(false);
   });
 
   it("records a recent on commit but not mid-drag", () => {
@@ -203,6 +241,44 @@ describe("quick colors", () => {
     fireEvent.click(screen.getByText("grey"));
     const [, updater] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(updater(rect)).toEqual({ strokeColor: "#808080" });
+  });
+
+  it("revives the stroke-width DEFAULT, not just the element", () => {
+    // With an empty selection the element updater never runs, so the default is
+    // the only path — and a default stuck at 0 draws every later shape invisible.
+    const sel = fakeSel({
+      selectedIds: {},
+      hasSelection: false,
+      selectedCount: 0,
+      appState: {
+        currentItemBackgroundColor: "transparent",
+        currentItemStrokeColor: "transparent",
+        currentItemTextColor: "#1e1e1e",
+        currentItemStrokeWidth: 0,
+      } as never,
+    });
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("use stroke"));
+    fireEvent.click(screen.getByText("grey"));
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(currentItems).toEqual({
+      currentItemStrokeColor: "#808080",
+      currentItemStrokeWidth: 1,
+    });
+  });
+
+  it("revives the stroke width when a swap moves a real color onto it", () => {
+    const zeroed = { ...rect, strokeColor: "transparent", strokeWidth: 0, backgroundColor: "#ff0000" };
+    const sel = fakeSel({ elements: [zeroed] as never });
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("swap"));
+    const [, updater] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Without the revival the shape vanishes: no fill, and a real stroke at width 0.
+    expect(updater(zeroed)).toEqual({
+      backgroundColor: "transparent",
+      strokeColor: "#ff0000",
+      strokeWidth: 1,
+    });
   });
 
   it("does nothing for none on the text part", () => {

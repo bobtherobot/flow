@@ -18,6 +18,22 @@ const QUICK_HEX: Record<Exclude<QuickColor, "none">, string> = {
 /** Width a stroke is revived at when a color is applied over "none". */
 const REVIVED_STROKE_WIDTH = 1;
 
+/**
+ * Whether applying `color` to a stroke of `width` has to restore a width too.
+ *
+ * A stroke whose width is 0 is invisible, so handing it a real color without a
+ * width makes the click appear to do nothing. Every path that can put a color
+ * on a stroke goes through here — `setColor`, `swap`, and both of their
+ * `currentItem*` counterparts — because wiring it in only some of them is how
+ * you get a default that stays at 0 forever.
+ *
+ * `??` not `||`: a width of 0 is real data. Coercing it has already cost this
+ * project three fork edits (see [[drawing-defaults]]).
+ */
+function needsRevival(color: string, width: number | undefined): boolean {
+  return color !== "transparent" && (width ?? REVIVED_STROKE_WIDTH) === 0;
+}
+
 export interface ColorTarget {
   part: ColorPart;
   available: ColorPart[];
@@ -86,9 +102,9 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
     ) === MIXED;
 
   /**
-   * Write one color to the active part. Stroke carries an extra rule: a stroke
-   * whose width is 0 is invisible, so applying a real color to it has to give
-   * it a width back or the click appears to do nothing.
+   * Write one color to the active part, reviving a zeroed stroke width per
+   * `needsRevival` — both the selected elements and, when there is no
+   * selection, the `currentItem*` default that new shapes will inherit.
    *
    * This is why the write goes through `sel.update` rather than the simpler
    * `sel.setProp`: `setProp` only ever writes the one property it was given,
@@ -96,26 +112,31 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
    * same element write — otherwise the two would split into two undo steps,
    * or a first write's width bump could be clobbered by a second write that
    * only knows about color.
-   *
-   * `?? ` not `||` on strokeWidth — 0 is real data here, and coercing it has
-   * already cost this project three fork edits (see [[drawing-defaults]]).
    */
   const setColor: ColorTarget["setColor"] = (nextHex, nextAlpha, transient) => {
     const value = combineColorAlpha(nextHex, nextAlpha);
-    const revive = part === "stroke" && nextHex !== "transparent";
+    const isStroke = part === "stroke";
+
+    // The default needs reviving on its own terms: with an empty selection the
+    // element updater never runs, so this is the ONLY path, and a default left
+    // at 0 makes every shape drawn afterwards invisible.
+    const defaultWidth = a?.currentItemStrokeWidth as number | undefined;
+    const reviveDefault = isStroke && needsRevival(nextHex, defaultWidth);
 
     sel.update(
       spec.ids,
       (el) => {
         const record = el as unknown as Record<string, unknown>;
-        const width = (record.strokeWidth as number | undefined) ?? REVIVED_STROKE_WIDTH;
-        const needsWidth = revive && width === 0;
+        const needsWidth =
+          isStroke && needsRevival(nextHex, record.strokeWidth as number | undefined);
         if (record[spec.prop] === value && !needsWidth) return null;
         return needsWidth
           ? { [spec.prop]: value, strokeWidth: REVIVED_STROKE_WIDTH }
           : { [spec.prop]: value };
       },
-      { [spec.currentItemKey]: value },
+      reviveDefault
+        ? { [spec.currentItemKey]: value, currentItemStrokeWidth: REVIVED_STROKE_WIDTH }
+        : { [spec.currentItemKey]: value },
       transient,
     );
 
@@ -124,10 +145,36 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
   };
 
   const swap: ColorTarget["swap"] = () => {
-    sel.update(sel.selectedIds, (el) => swapFillStroke(el as never), {
-      currentItemBackgroundColor: fallbackFor("stroke"),
-      currentItemStrokeColor: fallbackFor("fill"),
-    });
+    // The color arriving on the stroke came from the fill, so the same revival
+    // rule applies — without it, swapping a fill onto a zeroed stroke makes the
+    // shape disappear with nothing in the panel to explain why.
+    const nextStrokeDefault = fallbackFor("fill");
+    const reviveDefault = needsRevival(
+      nextStrokeDefault,
+      a?.currentItemStrokeWidth as number | undefined,
+    );
+
+    sel.update(
+      sel.selectedIds,
+      (el) => {
+        const patch = swapFillStroke(el as never);
+        if (!patch) return null;
+        const record = el as unknown as Record<string, unknown>;
+        return needsRevival(patch.strokeColor as string, record.strokeWidth as number | undefined)
+          ? { ...patch, strokeWidth: REVIVED_STROKE_WIDTH }
+          : patch;
+      },
+      reviveDefault
+        ? {
+            currentItemBackgroundColor: fallbackFor("stroke"),
+            currentItemStrokeColor: nextStrokeDefault,
+            currentItemStrokeWidth: REVIVED_STROKE_WIDTH,
+          }
+        : {
+            currentItemBackgroundColor: fallbackFor("stroke"),
+            currentItemStrokeColor: nextStrokeDefault,
+          },
+    );
   };
 
   const quickSet: ColorTarget["quickSet"] = (kind) => {
