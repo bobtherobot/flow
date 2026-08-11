@@ -167,7 +167,14 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
             value={current.id}
             title="Double-click to rename"
             onChange={(e) => choosePalette(e.target.value)}
-            onDoubleClick={() => setRenaming(true)}
+            onDoubleClick={() => {
+              // Clear the abandon flag on ENTRY, not only in onBlur's abandon
+              // branch: Escape unmounts the input without necessarily firing a
+              // blur, so a flag cleared only there strands at `true` and
+              // silently swallows the NEXT genuine rename.
+              abandonRename.current = false;
+              setRenaming(true);
+            }}
           >
             {palettes.map((p) => (
               <option key={p.id} value={p.id}>

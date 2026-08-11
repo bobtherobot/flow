@@ -189,30 +189,36 @@ describe("PaletteSection", () => {
       .toBe("Pastel");
   });
 
-  it("leaves rename mode when the palette is switched", () => {
-    setup();
-    fireEvent.doubleClick(screen.getByLabelText("Palette"));
-    expect(screen.getByLabelText("Palette name")).toBeInTheDocument();
-    fireEvent.keyDown(screen.getByLabelText("Palette name"), { key: "Escape" });
-    const select = screen.getByLabelText("Palette") as HTMLSelectElement;
-    const vibrant = [...select.options].find((o) => o.textContent === "Vibrant")!;
-    fireEvent.change(select, { target: { value: vibrant.value } });
-    expect(screen.queryByLabelText("Palette name")).not.toBeInTheDocument();
-  });
-
   it("leaves rename mode when a palette is switched via Add palette mid-rename", () => {
     // The select is hidden while renaming, so the only way to invoke
     // choosePalette() without going through Escape first is the "Add
     // palette" button — it stays mounted in the same row throughout. This is
-    // the actual regression path: the test above always clears `renaming`
-    // via Escape before switching, so it can't tell whether choosePalette
-    // itself resets rename mode.
+    // the actual regression path for whether choosePalette itself resets
+    // rename mode: a variant of this test that triggers Escape before
+    // switching can't tell, because Escape already clears `renaming` on its
+    // own before the switch ever happens.
     setup();
     fireEvent.doubleClick(screen.getByLabelText("Palette"));
     expect(screen.getByLabelText("Palette name")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /add palette/i }));
     expect(screen.queryByLabelText("Palette name")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Palette")).toBeInTheDocument();
+  });
+
+  it("still commits a rename after an earlier Escape", () => {
+    // The abandon flag must not survive the session it was set in: Escape
+    // unmounts without a blur in jsdom, so a flag cleared only in onBlur
+    // strands and eats the next real rename.
+    setup();
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    fireEvent.keyDown(screen.getByLabelText("Palette name"), { key: "Escape" });
+
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    const input = screen.getByLabelText("Palette name");
+    fireEvent.change(input, { target: { value: "Kept" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect((screen.getByLabelText("Palette") as HTMLSelectElement).selectedOptions[0].textContent)
+      .toBe("Kept");
   });
 
   it("has no set-as-default control", () => {
