@@ -426,3 +426,23 @@
   display: flex;
   gap: 8px;
 }
+
+/* The panel assembly (Task 14): part chooser + saturation box on top, then
+   the shared PickerRow/NumericFields/PaletteSection stack. */
+
+.flow-clr-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px;
+}
+
+.flow-clr-panel__top {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.flow-clr-panel__top > .flow-clr-satbox {
+  flex: 1 1 auto;
+}

@@ -1,57 +1,165 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ColorPanel } from "./ColorPanel";
+import { reloadColorStore } from "../../lib/color-store";
+import { reloadPaletteStore } from "../../lib/palette-store";
 import type { SelectionStyle } from "./useSelectionStyle";
 
-/** Minimal SelectionStyle stub — empty scene, tool-default colors. */
-function makeSel(overrides: Partial<SelectionStyle> = {}): SelectionStyle {
+// jsdom/Node's native `localStorage` global does not implement a usable
+// Storage in this project's vitest setup (see src/lib/palette-store.test.ts,
+// src/lib/color-store.test.ts, src/app/preferences.test.ts,
+// src/ui/panels/SwatchesPanel.test.tsx and src/ui/color/PaletteSection.test.tsx,
+// which all use this same in-memory mock for the identical reason). Without
+// this stub, `localStorage.clear()` throws "not a function" — an environment
+// gap, not a behavior change.
+const mockStorage: Record<string, string> = {};
+
+const mockLocalStorage = {
+  getItem: (key: string) => mockStorage[key] ?? null,
+  setItem: (key: string, value: string) => {
+    mockStorage[key] = String(value);
+  },
+  removeItem: (key: string) => {
+    delete mockStorage[key];
+  },
+  clear: () => {
+    for (const key in mockStorage) {
+      delete mockStorage[key];
+    }
+  },
+  key: (index: number) => {
+    const keys = Object.keys(mockStorage);
+    return keys[index] ?? null;
+  },
+  get length() {
+    return Object.keys(mockStorage).length;
+  },
+};
+
+vi.stubGlobal("localStorage", mockLocalStorage);
+
+const rect = {
+  id: "r1", type: "rectangle",
+  strokeColor: "#111111", backgroundColor: "#eeeeee", strokeWidth: 2,
+};
+
+function fakeSel(over: Partial<SelectionStyle> = {}): SelectionStyle {
   return {
-    elements: [],
+    elements: [rect],
     appState: {
       currentItemBackgroundColor: "transparent",
       currentItemStrokeColor: "#1e1e1e",
       currentItemTextColor: "#1e1e1e",
-    } as unknown as SelectionStyle["appState"],
-    selectedIds: {},
+    },
+    selectedIds: { r1: true },
     textTargetIds: {},
-    hasSelection: false,
-    selectedCount: 0,
+    hasSelection: true,
+    selectedCount: 1,
     hasText: false,
     hasLinear: false,
     setProp: vi.fn(),
     update: vi.fn(),
     executeAction: vi.fn(),
-    ...overrides,
-  };
+    ...over,
+  } as unknown as SelectionStyle;
 }
 
+// A labeled container: a rectangle carrying `boundElements` pointing at its
+// bound text, the way real Excalidraw represents a shape with a caption
+// (never `containerId` alone). Every other fixture in this plan has used bare
+// text, where `selectedIds` and `textTargetIds` happen to be the same map —
+// this one deliberately selects the container but targets the child, so a
+// write that accidentally lands on the container id would be caught.
+const container = {
+  id: "c1", type: "rectangle",
+  strokeColor: "#111111", backgroundColor: "#eeeeee", strokeWidth: 2,
+  boundElements: [{ id: "t1", type: "text" }],
+};
+const boundText = {
+  id: "t1", type: "text", strokeColor: "#222222",
+};
+
+function fakeSelWithLabeledContainer(): SelectionStyle {
+  return {
+    elements: [container, boundText],
+    appState: {
+      currentItemBackgroundColor: "transparent",
+      currentItemStrokeColor: "#1e1e1e",
+      currentItemTextColor: "#1e1e1e",
+    },
+    selectedIds: { c1: true },
+    textTargetIds: { t1: true },
+    hasSelection: true,
+    selectedCount: 1,
+    hasText: true,
+    hasLinear: false,
+    setProp: vi.fn(),
+    update: vi.fn(),
+    executeAction: vi.fn(),
+  } as unknown as SelectionStyle;
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  reloadColorStore();
+  reloadPaletteStore();
+});
+
 describe("ColorPanel", () => {
-  it("renders the three per-element color rows", () => {
-    render(<ColorPanel sel={makeSel()} />);
-    for (const label of ["Fill", "Stroke", "Text"]) {
-      expect(screen.getByRole("button", { name: `${label} color` })).toBeInTheDocument();
-      expect(screen.getByLabelText(`${label} opacity`)).toBeInTheDocument();
-    }
+  it("renders every section", () => {
+    render(<ColorPanel sel={fakeSel()} />);
+    expect(screen.getByRole("radiogroup", { name: /color target/i })).toBeInTheDocument();
+    expect(screen.getByRole("application", { name: /saturation/i })).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: /hue/i })).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: /opacity/i })).toBeInTheDocument();
+    // "Hue" alone is ambiguous: the hue slider (role="slider") and the HSLA
+    // numeric field both carry aria-label="Hue". The slider is already
+    // asserted above by role; this checks the numeric field specifically.
+    expect(screen.getByLabelText("Hue", { selector: "input" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Palette")).toBeInTheDocument();
   });
 
-  it("writes an opacity change to the selection", () => {
-    const sel = makeSel();
+  it("no longer renders the old fill/stroke/text rows", () => {
+    render(<ColorPanel sel={fakeSel()} />);
+    expect(screen.queryByLabelText("Fill opacity")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Stroke color")).not.toBeInTheDocument();
+  });
+
+  it("seeds the picker from the selection's fill", () => {
+    render(<ColorPanel sel={fakeSel()} />);
+    // #eeeeee is achromatic and nearly white.
+    expect(screen.getByLabelText("Lightness")).toHaveValue(93);
+  });
+
+  it("follows the active part to the stroke color", () => {
+    render(<ColorPanel sel={fakeSel()} />);
+    fireEvent.click(screen.getByRole("radio", { name: /stroke/i }));
+    expect(screen.getByLabelText("Lightness")).toHaveValue(7);
+  });
+
+  it("writes when a palette swatch is applied", () => {
+    const sel = fakeSel();
     render(<ColorPanel sel={sel} />);
-
-    const opacity = screen.getByLabelText("Stroke opacity");
-    fireEvent.change(opacity, { target: { value: "50" } });
-    fireEvent.blur(opacity);
-
-    expect(sel.setProp).toHaveBeenCalledWith(
-      expect.objectContaining({ prop: "strokeColor", value: "#1e1e1e80" }),
-    );
+    fireEvent.click(screen.getAllByRole("button", { name: /^swatch /i })[0]);
+    expect(sel.update).toHaveBeenCalled();
   });
 
-  // The laser trail is a global preference, not an element property — it moved
-  // to File ▸ Preferences. See PreferencesDialog.test.tsx.
-  it("no longer renders a Laser row", () => {
-    render(<ColorPanel sel={makeSel()} />);
-    expect(screen.queryByRole("button", { name: "Laser color" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Laser opacity")).not.toBeInTheDocument();
+  it("writes when a hue is dragged", () => {
+    const sel = fakeSel();
+    render(<ColorPanel sel={sel} />);
+    const hue = screen.getByRole("slider", { name: /hue/i });
+    fireEvent.keyDown(hue, { key: "ArrowRight" });
+    expect(sel.update).toHaveBeenCalled();
+  });
+
+  it("targets the bound text element's id, not the container's, when the text part is active on a labeled container", () => {
+    const sel = fakeSelWithLabeledContainer();
+    render(<ColorPanel sel={sel} />);
+    fireEvent.click(screen.getByRole("radio", { name: /^text/i }));
+    const hue = screen.getByRole("slider", { name: /hue/i });
+    fireEvent.keyDown(hue, { key: "ArrowRight" });
+    expect(sel.update).toHaveBeenCalled();
+    const ids = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(ids).toEqual({ t1: true });
   });
 });
