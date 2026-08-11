@@ -73,3 +73,66 @@
   box-shadow: 0 0 0 1px rgb(0 0 0 / 40%);
   pointer-events: none;
 }
+
+.flow-clr-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.flow-clr-row__tracks {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.flow-clr-preview {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 1px solid var(--flow-border);
+  background-image: conic-gradient(#c8c8c8 0 25%, #fff 0 50%, #c8c8c8 0 75%, #fff 0);
+  background-size: 10px 10px;
+}
+
+.flow-clr-preview__fill {
+  position: absolute;
+  inset: 0;
+}
+
+/* "No color": a red slash over white, matching the quartet's none chip. */
+.flow-clr-preview--none {
+  background-image: linear-gradient(
+    to bottom right,
+    #fff calc(50% - 1px), #e03131 calc(50% - 1px),
+    #e03131 calc(50% + 1px), #fff calc(50% + 1px)
+  );
+  background-size: 100% 100%;
+}
+
+.flow-clr-eyedropper {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--flow-ink);
+  background: none;
+  border: none;
+  border-radius: 4px;
+}
+
+.flow-clr-eyedropper:hover:not(:disabled) {
+  background: var(--flow-hover);
+}
+
+.flow-clr-eyedropper:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
