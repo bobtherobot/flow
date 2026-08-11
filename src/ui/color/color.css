@@ -329,3 +329,100 @@
     #fff calc(50% + 1px)
   );
 }
+
+/* Palette section: ports `.flow-sw-*` (src/ui/panels/panels.css) sizing under
+   the `flow-clr-*` naming so the absorbed Swatches panel keeps today's tile
+   density and control sizing exactly, rather than reinventing the layout. */
+
+.flow-clr-palette {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flow-clr-palette__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flow-clr-palette__select,
+.flow-clr-palette__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.flow-clr-palette__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--flow-ink);
+  background: transparent;
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-sm);
+}
+
+.flow-clr-palette__icon:hover {
+  background: var(--flow-hover);
+}
+
+.flow-clr-palette__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.flow-clr-palette__add,
+.flow-clr-palette__tile {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  cursor: pointer;
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-sm);
+}
+
+.flow-clr-palette__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--flow-ink);
+  background: transparent;
+}
+
+.flow-clr-palette__add:hover {
+  background: var(--flow-hover);
+}
+
+.flow-clr-palette__tile[aria-pressed="true"] {
+  outline: 2px solid var(--flow-accent);
+  outline-offset: 1px;
+}
+
+.flow-clr-palette__confirm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 12px;
+  border-radius: var(--flow-radius-md);
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  color: var(--flow-ink);
+}
+
+.flow-clr-palette__confirm-actions {
+  display: flex;
+  gap: 8px;
+}
