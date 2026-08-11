@@ -42,3 +42,34 @@
   transform: translateY(-50%);
   pointer-events: none;
 }
+
+/* Saturation/value field: a white→transparent wash across, black up from the
+   bottom, over a solid backdrop of the current hue set inline. */
+.flow-clr-satbox {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 4px;
+  cursor: crosshair;
+  touch-action: none;
+  background-image:
+    linear-gradient(to top, #000, transparent),
+    linear-gradient(to right, #fff, transparent);
+  border: 1px solid var(--flow-border);
+}
+
+.flow-clr-satbox:focus-visible {
+  outline: 2px solid var(--flow-accent);
+  outline-offset: 2px;
+}
+
+.flow-clr-satbox__thumb {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 40%);
+  pointer-events: none;
+}
