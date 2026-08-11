@@ -151,7 +151,10 @@ free; HEX is a plain text field spanning the row.
 The reference screenshot draws the switcher as a small chevron stack. It is
 implemented as a labelled `<select>` styled to look like that — a cycle button
 would be unreachable by keyboard and unnamed to a screen reader. A MIXED
-selection renders the fields empty rather than showing a fabricated value.
+selection shows the resolved first-element values rather than blanking the
+fields, consistent with the part chooser seeding from the first element too
+(§4) — blank numeric fields sitting beside a populated saturation box and
+sliders would be incoherent, not more honest.
 
 ### 6. Write path
 

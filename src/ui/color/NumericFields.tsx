@@ -15,7 +15,6 @@ interface NumericFieldsProps {
   mode: NumericMode;
   onModeChange: (mode: NumericMode) => void;
   onChange: (next: { hsv: Hsv; alpha: number }, transient: boolean) => void;
-  disabled?: boolean;
 }
 
 const MODE_LABELS: Record<NumericMode, string> = {
@@ -35,7 +34,7 @@ const MODE_LABELS: Record<NumericMode, string> = {
  * cross-engine spin-button handling that control already solved.
  */
 export function NumericFields({
-  hsv, alpha, mode, onModeChange, onChange, disabled = false,
+  hsv, alpha, mode, onModeChange, onChange,
 }: NumericFieldsProps) {
   // Free-typed hex text between focus and commit. null means "not editing" —
   // the field then falls back to formatting the live hsv/alpha.
@@ -57,7 +56,6 @@ export function NumericFields({
       step={0.01}
       onChange={onAlpha}
       ariaLabel="Alpha"
-      disabled={disabled}
       className="flow-clr-num"
     />
   );
@@ -67,7 +65,6 @@ export function NumericFields({
       className="flow-clr-mode"
       aria-label="Color format"
       value={mode}
-      disabled={disabled}
       onChange={(e) => onModeChange(e.target.value as NumericMode)}
     >
       {(Object.keys(MODE_LABELS) as NumericMode[]).map((m) => (
@@ -97,7 +94,6 @@ export function NumericFields({
           className="flow-clr-hex"
           aria-label="Hex"
           value={shown}
-          disabled={disabled}
           onChange={(e) => setHexText(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
@@ -116,9 +112,9 @@ export function NumericFields({
       emit({ hsv: rgbToHsv({ ...rgb, [key]: v }) }, transient);
     return (
       <div className="flow-clr-numrow">
-        <NumberInput value={Math.round(rgb.r)} min={0} max={255} onChange={setChannel("r")} ariaLabel="Red" disabled={disabled} className="flow-clr-num" />
-        <NumberInput value={Math.round(rgb.g)} min={0} max={255} onChange={setChannel("g")} ariaLabel="Green" disabled={disabled} className="flow-clr-num" />
-        <NumberInput value={Math.round(rgb.b)} min={0} max={255} onChange={setChannel("b")} ariaLabel="Blue" disabled={disabled} className="flow-clr-num" />
+        <NumberInput value={Math.round(rgb.r)} min={0} max={255} onChange={setChannel("r")} ariaLabel="Red" className="flow-clr-num" />
+        <NumberInput value={Math.round(rgb.g)} min={0} max={255} onChange={setChannel("g")} ariaLabel="Green" className="flow-clr-num" />
+        <NumberInput value={Math.round(rgb.b)} min={0} max={255} onChange={setChannel("b")} ariaLabel="Blue" className="flow-clr-num" />
         {alphaField}
         {switcher}
       </div>
@@ -131,9 +127,9 @@ export function NumericFields({
 
   return (
     <div className="flow-clr-numrow">
-      <NumberInput value={Math.round(hsl.h)} min={0} max={360} onChange={setHsl("h")} ariaLabel="Hue" disabled={disabled} className="flow-clr-num" />
-      <NumberInput value={Math.round(hsl.s)} min={0} max={100} onChange={setHsl("s")} ariaLabel="Saturation" disabled={disabled} className="flow-clr-num" />
-      <NumberInput value={Math.round(hsl.l)} min={0} max={100} onChange={setHsl("l")} ariaLabel="Lightness" disabled={disabled} className="flow-clr-num" />
+      <NumberInput value={Math.round(hsl.h)} min={0} max={360} onChange={setHsl("h")} ariaLabel="Hue" className="flow-clr-num" />
+      <NumberInput value={Math.round(hsl.s)} min={0} max={100} onChange={setHsl("s")} ariaLabel="Saturation" className="flow-clr-num" />
+      <NumberInput value={Math.round(hsl.l)} min={0} max={100} onChange={setHsl("l")} ariaLabel="Lightness" className="flow-clr-num" />
       {alphaField}
       {switcher}
     </div>

@@ -313,8 +313,8 @@
 }
 
 .flow-clr-chip {
-  width: 22px;
-  height: 22px;
+  width: var(--flow-clr-chip-size, 22px);
+  height: var(--flow-clr-chip-size, 22px);
   padding: 0;
   cursor: pointer;
   border: 1px solid var(--flow-ink);
@@ -330,9 +330,9 @@
   );
 }
 
-/* Palette section: ports `.flow-sw-*` (src/ui/panels/panels.css) sizing under
-   the `flow-clr-*` naming so the absorbed Swatches panel keeps today's tile
-   density and control sizing exactly, rather than reinventing the layout. */
+/* Palette section: tile density and control sizing carried forward from the
+   retired Swatches panel (`SwatchGrid`/`SwatchesPanel`, both deleted), under
+   the `flow-clr-*` naming this panel uses throughout. */
 
 .flow-clr-palette {
   position: relative;
@@ -519,9 +519,4 @@
 .flow-clr-chooser--compact .flow-clr-quartet {
   --flow-clr-chip-size: 16px;
   gap: 3px;
-}
-
-.flow-clr-chip {
-  width: var(--flow-clr-chip-size);
-  height: var(--flow-clr-chip-size);
 }

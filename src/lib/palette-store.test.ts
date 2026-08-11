@@ -161,17 +161,16 @@ describe("mutations notify + persist", () => {
     );
   });
 
-  it("addSwatch / updateSwatch / removeSwatches operate by index", () => {
+  it("addSwatch / removeSwatches operate by index", () => {
     const p = store.addPalette();
     store.addSwatch(p.id, "abc");            // scrubbed → #aabbcc
     store.addSwatch(p.id, "#ff0000");
     let colors = store.getSnapshot().palettes.find((x) => x.id === p.id)!.colors;
     expect(colors).toEqual(["#aabbcc", "#ff0000"]);
 
-    store.updateSwatch(p.id, 0, "#00ff00");
     store.removeSwatches(p.id, [1]);
     colors = store.getSnapshot().palettes.find((x) => x.id === p.id)!.colors;
-    expect(colors).toEqual(["#00ff00"]);
+    expect(colors).toEqual(["#aabbcc"]);
   });
 
   it("reorderSwatches moves an item", () => {
