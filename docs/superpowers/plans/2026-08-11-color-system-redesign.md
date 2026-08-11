@@ -3529,7 +3529,9 @@ const QUICK: { kind: QuickColor; label: string; hex: string }[] = [
  * control in the picker is editing, and clicking a back box brings it forward.
  *
  * Radios rather than buttons: this is a single choice among a small set, which
- * is what a radiogroup means, and it gets arrow-key navigation for free.
+ * is what a radiogroup means semantically. A custom radiogroup does NOT get
+ * keyboard navigation for free the way native grouped inputs do, so the roving
+ * tabindex and arrow handling below are required, not decorative.
  */
 export function PartChooser({ target, compact = false }: PartChooserProps) {
   const { part, available, setPart, isMixed, partColor, swap, quickSet } = target;
@@ -3621,34 +3623,37 @@ Append to `src/ui/color/color.css`:
 }
 
 .flow-clr-chooser__stack {
+  --flow-clr-part-size: 46px;
   position: relative;
   width: 74px;
   height: 74px;
 }
 
 .flow-clr-chooser--compact .flow-clr-chooser__stack {
+  --flow-clr-part-size: 32px;
   width: 52px;
   height: 52px;
 }
 
 .flow-clr-part {
   position: absolute;
-  width: 46px;
-  height: 46px;
+  width: var(--flow-clr-part-size);
+  height: var(--flow-clr-part-size);
   padding: 0;
   cursor: pointer;
   background: var(--flow-clr-part-color, #fff);
   border: 2px solid var(--flow-ink);
 }
 
-.flow-clr-chooser--compact .flow-clr-part {
-  width: 32px;
-  height: 32px;
+/* Boxes step down the diagonal by their index among the VISIBLE parts, so two
+   parts sit at the corners and three spread evenly between them. Driven by a
+   custom property rather than per-part rules because `stroke` and `text` are
+   never both at the same offset — an earlier version gave them identical
+   `right/bottom`, which made whichever was behind completely unclickable. */
+.flow-clr-part {
+  top: calc(var(--flow-clr-part-offset) * (100% - var(--flow-clr-part-size)));
+  left: calc(var(--flow-clr-part-offset) * (100% - var(--flow-clr-part-size)));
 }
-
-.flow-clr-part--fill { top: 0; left: 0; }
-.flow-clr-part--stroke { right: 0; bottom: 0; }
-.flow-clr-part--text { right: 0; bottom: 0; }
 
 /* The stroke box is a ring: a thick border around a hole. */
 .flow-clr-part--stroke {
