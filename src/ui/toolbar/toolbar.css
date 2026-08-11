@@ -13,6 +13,11 @@
   background: var(--flow-panel-bg);
   font-family: var(--flow-font);
   color: var(--flow-ink);
+  /* The docked rail carries a 1px right border. Under the default content-box
+     the box would be RAIL_WIDTH + 1 while `--flow-toolbar-reserved` reserves
+     exactly RAIL_WIDTH, so the rail (z-index 90) paints its border over the
+     canvas's leftmost pixel. Border-box makes the two agree. */
+  box-sizing: border-box;
 }
 .flow-toolbar--docked {
   border-right: 1px solid var(--flow-border);
@@ -73,7 +78,7 @@
   color: var(--flow-ink);
 }
 
-/* Tool button column. */
+/* Tool button grid (two columns). */
 .flow-toolbar__tools {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -82,6 +87,11 @@
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
+  /* `.flow-toolbar` is `align-items: center`, so without this the grid hugs
+     its content and centres itself — the `1fr` tracks then size to max-content
+     instead of splitting the rail, and anything wider than the buttons (the
+     quartet in Task 16's control) overflows. */
+  align-self: stretch;
 }
 .flow-toolbar__btn {
   display: inline-flex;
