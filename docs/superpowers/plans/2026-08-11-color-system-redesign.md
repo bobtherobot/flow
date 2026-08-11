@@ -2894,6 +2894,9 @@ function Harness({ sel }: { sel: SelectionStyle }) {
       <output data-testid="hex">{t.hex}</output>
       <output data-testid="alpha">{String(t.alpha)}</output>
       <output data-testid="available">{t.available.join(",")}</output>
+      <output data-testid="mixed">{String(t.isMixed)}</output>
+      <output data-testid="partFill">{t.partColor("fill")}</output>
+      <output data-testid="partStroke">{t.partColor("stroke")}</output>
       <button onClick={() => t.setPart("stroke")}>use stroke</button>
       <button onClick={() => t.setColor("#00ff00", 50, false)}>set green</button>
       <button onClick={() => t.setColor("#00ff00", 50, true)}>set green transient</button>
@@ -2929,6 +2932,27 @@ describe("reading", () => {
     expect(screen.getByTestId("hex")).toHaveTextContent("transparent");
   });
 
+  it("reports a single-valued selection as not mixed", () => {
+    render(<Harness sel={fakeSel()} />);
+    expect(screen.getByTestId("mixed")).toHaveTextContent("false");
+  });
+
+  it("exposes each part's own color for the chooser boxes", () => {
+    render(<Harness sel={fakeSel()} />);
+    expect(screen.getByTestId("partFill")).toHaveTextContent("#eeeeee");
+    expect(screen.getByTestId("partStroke")).toHaveTextContent("#111111");
+  });
+
+  it("flags a mixed selection", () => {
+    const sel = fakeSel({
+      elements: [rect, { ...rect, id: "r2", backgroundColor: "#123456" }] as never,
+      selectedIds: { r1: true, r2: true },
+      selectedCount: 2,
+    });
+    render(<Harness sel={sel} />);
+    expect(screen.getByTestId("mixed")).toHaveTextContent("true");
+  });
+
   it("resolves a mixed selection to a concrete color", () => {
     const sel = fakeSel({
       elements: [rect, { ...rect, id: "r2", backgroundColor: "#123456" }] as never,
@@ -2962,7 +2986,21 @@ describe("writing", () => {
     const sel = fakeSel();
     render(<Harness sel={sel} />);
     fireEvent.click(screen.getByText("set green"));
-    expect(sel.update).toHaveBeenCalled();
+    // Asserting the VALUE, not just that update ran: with a bare
+    // `toHaveBeenCalled()` the alpha could be dropped entirely and this passes.
+    const [ids, updater, currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(ids).toEqual({ r1: true });
+    expect(updater(rect)).toEqual({ backgroundColor: "#00ff0080" });
+    expect(currentItems).toEqual({ currentItemBackgroundColor: "#00ff0080" });
+  });
+
+  it("forwards the transient flag so a drag is one undo entry", () => {
+    const sel = fakeSel();
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("set green transient"));
+    expect((sel.update as ReturnType<typeof vi.fn>).mock.calls[0][3]).toBe(true);
+    fireEvent.click(screen.getByText("set green"));
+    expect((sel.update as ReturnType<typeof vi.fn>).mock.calls[1][3]).toBe(false);
   });
 
   it("records a recent on commit but not mid-drag", () => {
@@ -3029,6 +3067,44 @@ describe("quick colors", () => {
     expect(updater(rect)).toEqual({ strokeColor: "#808080" });
   });
 
+  it("revives the stroke-width DEFAULT, not just the element", () => {
+    // With an empty selection the element updater never runs, so the default is
+    // the only path — and a default stuck at 0 draws every later shape invisible.
+    const sel = fakeSel({
+      selectedIds: {},
+      hasSelection: false,
+      selectedCount: 0,
+      appState: {
+        currentItemBackgroundColor: "transparent",
+        currentItemStrokeColor: "transparent",
+        currentItemTextColor: "#1e1e1e",
+        currentItemStrokeWidth: 0,
+      },
+    });
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("use stroke"));
+    fireEvent.click(screen.getByText("grey"));
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(currentItems).toEqual({
+      currentItemStrokeColor: "#808080",
+      currentItemStrokeWidth: 1,
+    });
+  });
+
+  it("revives the stroke width when a swap moves a real color onto it", () => {
+    const zeroed = { ...rect, strokeColor: "transparent", strokeWidth: 0, backgroundColor: "#ff0000" };
+    const sel = fakeSel({ elements: [zeroed] as never });
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("swap"));
+    const [, updater] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Without the revival the shape vanishes: no fill, and a real stroke at width 0.
+    expect(updater(zeroed)).toEqual({
+      backgroundColor: "transparent",
+      strokeColor: "#ff0000",
+      strokeWidth: 1,
+    });
+  });
+
   it("does nothing for none on the text part", () => {
     const text = { id: "t1", type: "text", strokeColor: "#222222", backgroundColor: "transparent", containerId: null };
     const sel = fakeSel({ elements: [text] as never, selectedIds: { t1: true }, textTargetIds: { t1: true }, hasText: true });
@@ -3068,6 +3144,22 @@ const QUICK_HEX: Record<Exclude<QuickColor, "none">, string> = {
 
 /** Width a stroke is revived at when a color is applied over "none". */
 const REVIVED_STROKE_WIDTH = 1;
+
+/**
+ * Whether applying `color` to a stroke of `width` has to restore a width too.
+ *
+ * A stroke whose width is 0 is invisible, so handing it a real color without a
+ * width makes the click appear to do nothing. Every path that can put a color
+ * on a stroke goes through here — `setColor`, `swap`, and both of their
+ * `currentItem*` counterparts — because wiring it in only some of them is how
+ * you get a default that stays at 0 forever.
+ *
+ * `??` not `||`: a width of 0 is real data. Coercing it has already cost this
+ * project three fork edits (see [[drawing-defaults]]).
+ */
+function needsRevival(color: string, width: number | undefined): boolean {
+  return color !== "transparent" && (width ?? REVIVED_STROKE_WIDTH) === 0;
+}
 
 export interface ColorTarget {
   part: ColorPart;
@@ -3143,20 +3235,28 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
    */
   const setColor: ColorTarget["setColor"] = (nextHex, nextAlpha, transient) => {
     const value = combineColorAlpha(nextHex, nextAlpha);
-    const revive = part === "stroke" && nextHex !== "transparent";
+    const isStroke = part === "stroke";
+
+    // The default needs reviving on its own terms: with an empty selection the
+    // element updater never runs, so this is the ONLY path, and a default left
+    // at 0 makes every shape drawn afterwards invisible.
+    const defaultWidth = a?.currentItemStrokeWidth as number | undefined;
+    const reviveDefault = isStroke && needsRevival(nextHex, defaultWidth);
 
     sel.update(
       spec.ids,
       (el) => {
         const record = el as unknown as Record<string, unknown>;
-        const width = (record.strokeWidth as number | undefined) ?? REVIVED_STROKE_WIDTH;
-        const needsWidth = revive && width === 0;
+        const needsWidth =
+          isStroke && needsRevival(nextHex, record.strokeWidth as number | undefined);
         if (record[spec.prop] === value && !needsWidth) return null;
         return needsWidth
           ? { [spec.prop]: value, strokeWidth: REVIVED_STROKE_WIDTH }
           : { [spec.prop]: value };
       },
-      { [spec.currentItemKey]: value },
+      reviveDefault
+        ? { [spec.currentItemKey]: value, currentItemStrokeWidth: REVIVED_STROKE_WIDTH }
+        : { [spec.currentItemKey]: value },
       transient,
     );
 
@@ -3165,10 +3265,36 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
   };
 
   const swap: ColorTarget["swap"] = () => {
-    sel.update(sel.selectedIds, (el) => swapFillStroke(el as never), {
-      currentItemBackgroundColor: fallbackFor("stroke"),
-      currentItemStrokeColor: fallbackFor("fill"),
-    });
+    // The color arriving on the stroke came from the fill, so the same revival
+    // rule applies — without it, swapping a fill onto a zeroed stroke makes the
+    // shape disappear with nothing in the panel to explain why.
+    const nextStrokeDefault = fallbackFor("fill");
+    const reviveDefault = needsRevival(
+      nextStrokeDefault,
+      a?.currentItemStrokeWidth as number | undefined,
+    );
+
+    sel.update(
+      sel.selectedIds,
+      (el) => {
+        const patch = swapFillStroke(el as never);
+        if (!patch) return null;
+        const record = el as unknown as Record<string, unknown>;
+        return needsRevival(patch.strokeColor as string, record.strokeWidth as number | undefined)
+          ? { ...patch, strokeWidth: REVIVED_STROKE_WIDTH }
+          : patch;
+      },
+      reviveDefault
+        ? {
+            currentItemBackgroundColor: fallbackFor("stroke"),
+            currentItemStrokeColor: nextStrokeDefault,
+            currentItemStrokeWidth: REVIVED_STROKE_WIDTH,
+          }
+        : {
+            currentItemBackgroundColor: fallbackFor("stroke"),
+            currentItemStrokeColor: nextStrokeDefault,
+          },
+    );
   };
 
   const quickSet: ColorTarget["quickSet"] = (kind) => {
