@@ -8,10 +8,18 @@ const hsv = { h: 200, s: 25, v: 91 };
 function setup(mode: "hsla" | "rgba" | "hex" = "hsla") {
   const onChange = vi.fn();
   const onModeChange = vi.fn();
+  const onHexCommit = vi.fn();
   render(
-    <NumericFields hsv={hsv} alpha={100} mode={mode} onChange={onChange} onModeChange={onModeChange} />,
+    <NumericFields
+      hsv={hsv}
+      alpha={100}
+      mode={mode}
+      onChange={onChange}
+      onModeChange={onModeChange}
+      onHexCommit={onHexCommit}
+    />,
   );
-  return { onChange, onModeChange };
+  return { onChange, onModeChange, onHexCommit };
 }
 
 describe("NumericFields", () => {
@@ -84,7 +92,14 @@ describe("NumericFields", () => {
   it("routes a typed green channel to green, leaving red and blue alone", () => {
     const onChange = vi.fn();
     render(
-      <NumericFields hsv={hsv} alpha={100} mode="rgba" onChange={onChange} onModeChange={vi.fn()} />,
+      <NumericFields
+        hsv={hsv}
+        alpha={100}
+        mode="rgba"
+        onChange={onChange}
+        onModeChange={vi.fn()}
+        onHexCommit={vi.fn()}
+      />,
     );
     const field = screen.getByLabelText("Green");
     fireEvent.change(field, { target: { value: "100" } });
@@ -104,42 +119,32 @@ describe("NumericFields", () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ alpha: 50 }), false);
   });
 
-  it("commits a typed hex on Enter", () => {
-    const onChange = vi.fn();
-    render(
-      <NumericFields hsv={hsv} alpha={100} mode="hex" onChange={onChange} onModeChange={vi.fn()} />,
-    );
+  it("commits a typed hex on Enter through onHexCommit, not onChange", () => {
+    const { onChange, onHexCommit } = setup("hex");
     const field = screen.getByLabelText("Hex");
     fireEvent.change(field, { target: { value: "#ff0000" } });
     fireEvent.keyDown(field, { key: "Enter" });
-    expect(onChange).toHaveBeenCalledWith(
-      { hsv: { h: 0, s: 100, v: 100 }, alpha: 100 },
-      false,
-    );
+    expect(onHexCommit).toHaveBeenCalledWith("#ff0000", 100);
+    // The Hex field is a whole colour: it must not also fire the
+    // channel-adjustment callback, or a caller wiring the two to different
+    // writes (record vs. don't) would double-write.
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("ignores an unparseable hex", () => {
-    const onChange = vi.fn();
-    render(
-      <NumericFields hsv={hsv} alpha={100} mode="hex" onChange={onChange} onModeChange={vi.fn()} />,
-    );
+    const { onChange, onHexCommit } = setup("hex");
     const field = screen.getByLabelText("Hex");
     fireEvent.change(field, { target: { value: "nope" } });
     fireEvent.keyDown(field, { key: "Enter" });
     expect(onChange).not.toHaveBeenCalled();
+    expect(onHexCommit).not.toHaveBeenCalled();
   });
 
   it("reads an 8-digit hex as color plus alpha", () => {
-    const onChange = vi.fn();
-    render(
-      <NumericFields hsv={hsv} alpha={100} mode="hex" onChange={onChange} onModeChange={vi.fn()} />,
-    );
+    const { onHexCommit } = setup("hex");
     const field = screen.getByLabelText("Hex");
     fireEvent.change(field, { target: { value: "#ff000080" } });
     fireEvent.keyDown(field, { key: "Enter" });
-    expect(onChange).toHaveBeenCalledWith(
-      { hsv: { h: 0, s: 100, v: 100 }, alpha: 50 },
-      false,
-    );
+    expect(onHexCommit).toHaveBeenCalledWith("#ff0000", 50);
   });
 });

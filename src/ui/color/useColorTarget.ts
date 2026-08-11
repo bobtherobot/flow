@@ -45,7 +45,22 @@ export interface ColorTarget {
   isMixed: boolean;
   /** Color for one part, for the chooser boxes. */
   partColor: (part: ColorPart) => string;
+  /**
+   * Write a *whole colour* the user just picked: a HEX field commit, a
+   * palette swatch, an eyedropper pick, or a click on an existing recent.
+   * Also settles it into recents (see `recordRecent`).
+   */
   setColor: (hex: string, alpha: number, transient: boolean) => void;
+  /**
+   * Write one *channel* of a colour still being worked on: a hue/alpha/
+   * saturation drag or arrow-step, or an H/S/L, R/G/B, or A numeric field.
+   * Never joins recents — the user hasn't settled on a whole colour yet, so
+   * caching a mid-adjustment value would burn a slot on a colour they didn't
+   * choose. `setColor` is `adjustColor` plus `recordRecent`; this is the
+   * write half on its own, named so a new caller has to pick one on purpose
+   * instead of inheriting recording by accident.
+   */
+  adjustColor: (hex: string, alpha: number, transient: boolean) => void;
   swap: () => void;
   quickSet: (kind: QuickColor) => void;
 }
@@ -113,10 +128,13 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
    * or a first write's width bump could be clobbered by a second write that
    * only knows about color.
    *
-   * Split out from `setColor` so `quickSet`'s white/grey/black chips can reuse
-   * the write + revival logic without also recording a recent — those three
-   * colors already have permanent dedicated chips, so caching them would just
-   * evict colors the user actually chose.
+   * Exposed on the hook's return as `adjustColor` — the write half with no
+   * recording, for channel-level edits (hue/alpha/saturation, the numeric
+   * fields). `setColor` wraps it with `recordRecent` for whole-colour picks.
+   * `quickSet`'s white/grey/black chips also call this directly rather than
+   * `setColor`: those three colors already have permanent dedicated chips one
+   * click away, so caching them would just evict colors the user actually
+   * chose.
    */
   const applyColor = (nextHex: string, nextAlpha: number, transient: boolean) => {
     const value = combineColorAlpha(nextHex, nextAlpha);
@@ -151,6 +169,8 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
     // Mid-drag writes are noise; only a settled color joins the recents.
     if (!transient) recordRecent(nextHex);
   };
+
+  const adjustColor: ColorTarget["adjustColor"] = applyColor;
 
   const swap: ColorTarget["swap"] = () => {
     // The color arriving on the stroke came from the fill, so the same revival
@@ -224,6 +244,7 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
     isMixed,
     partColor: rawColor,
     setColor,
+    adjustColor,
     swap,
     quickSet,
   };

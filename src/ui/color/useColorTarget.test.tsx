@@ -76,6 +76,8 @@ function Harness({ sel }: { sel: SelectionStyle }) {
       <button onClick={() => t.setPart("stroke")}>use stroke</button>
       <button onClick={() => t.setColor("#00ff00", 50, false)}>set green</button>
       <button onClick={() => t.setColor("#00ff00", 50, true)}>set green transient</button>
+      <button onClick={() => t.adjustColor("#00ff00", 50, false)}>adjust green</button>
+      <button onClick={() => t.adjustColor("#00ff00", 50, true)}>adjust green transient</button>
       <button onClick={() => t.swap()}>swap</button>
       <button onClick={() => t.quickSet("none")}>none</button>
       <button onClick={() => t.quickSet("grey")}>grey</button>
@@ -184,6 +186,39 @@ describe("writing", () => {
     render(<Harness sel={sel} />);
     fireEvent.click(screen.getByText("set green transient"));
     expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([]);
+    fireEvent.click(screen.getByText("set green"));
+    expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual(["#00ff00"]);
+  });
+
+  it("adjustColor writes the same combined hex as setColor", () => {
+    // The channel-adjustment path must not silently write something
+    // different from the whole-colour path — only whether it records should
+    // differ.
+    const sel = fakeSel();
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("adjust green"));
+    const [ids, updater, currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(ids).toEqual({ r1: true });
+    expect(updater(rect)).toEqual({ backgroundColor: "#00ff0080" });
+    expect(currentItems).toEqual({ currentItemBackgroundColor: "#00ff0080" });
+  });
+
+  it("adjustColor never records a recent, transient or settled", () => {
+    // This is the behavior under test: a hue/alpha/saturation drag or arrow
+    // step, or a numeric-field edit, is a channel adjustment, not a whole
+    // colour pick — it must never join recents. Before `adjustColor` existed,
+    // every one of these went through `setColor` (see useColorDraft's
+    // onCommit wiring prior to this change) and DID record on every
+    // non-transient call, i.e. on every arrow keypress. This test would fail
+    // against that prior behavior.
+    const sel = fakeSel();
+    render(<Harness sel={sel} />);
+    fireEvent.click(screen.getByText("adjust green transient"));
+    expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([]);
+    fireEvent.click(screen.getByText("adjust green"));
+    expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([]);
+    // setColor, by contrast, still records — proves the harness/store wiring
+    // itself is live, not just silent for some unrelated reason.
     fireEvent.click(screen.getByText("set green"));
     expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual(["#00ff00"]);
   });

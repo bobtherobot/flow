@@ -158,13 +158,35 @@ sliders would be incoherent, not more honest.
 
 ### 6. Write path
 
-`useColorTarget(sel)` → `{ part, setPart, available, color, setColor, swap, quickSet }`.
+`useColorTarget(sel)` → `{ part, setPart, available, color, setColor, adjustColor, swap, quickSet }`.
 
-`setColor` resolves the part through `color-parts`, combines the alpha into
-8-digit hex, and writes through `sel.setProp` / `sel.update`. Slider and
-saturation-field drags pass `transient: true`, so `deferred-commit` batching
-makes one drag one undo entry — the pattern [[scrub-numeric-inputs]] established.
-Recents push on commit only, never mid-drag.
+`setColor` and `adjustColor` both resolve the part through `color-parts`, combine
+the alpha into 8-digit hex, and write through `sel.setProp` / `sel.update` — they
+share one write implementation and differ only in whether the write also joins
+recents. Slider and saturation-field drags pass `transient: true`, so
+`deferred-commit` batching makes one drag one undo entry — the pattern
+[[scrub-numeric-inputs]] established.
+
+Recents record a *whole colour*, never a *channel adjustment* — even a settled,
+non-transient one. A hue slider, an alpha slider, and the saturation box (drag
+**and** arrow-key steps alike) are channel adjustments, and so are the H/S/L,
+R/G/B, and A numeric fields: each moves one component of a color still being
+worked on. None of these call `setColor`; they all route through `adjustColor`,
+which writes identically but never touches recents. Only four paths call
+`setColor` and do record: the Hex field commit (a typed hex names a whole color
+outright), a palette swatch pick, an eyedropper pick, and a click on an existing
+recent. The white/grey/black quartet under the part chooser is the same rule
+applied to `quickSet`: those three colors already have permanent dedicated
+chips one click away, so `quickSet`'s non-`"none"` branch calls `adjustColor`
+directly rather than `setColor`, and caching them would just evict colors the
+user actually chose.
+
+The risk this guards against: without the split, an arrow-key step is
+non-transient (`transient: false`) exactly like a drag release, so it looks
+identical to a deliberate commit from the write path's point of view. Six
+ArrowRight presses on the hue track would replace the entire six-slot recents
+strip with six adjacent hues, and reaching one color by dragging hue then
+saturation would burn two slots for a single choice.
 
 `quickSet` carries the baseline colors, and the stroke rules are the sharp edge:
 

@@ -29,10 +29,13 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
   const { recents } = useColorUiState();
   const [pos, setPos] = useState<MenuPoint>(anchor);
 
+  // Channel-level edits only: hue/alpha/saturation drags and arrow-steps are
+  // not a whole colour on their own — see `useColorTarget.adjustColor`. The
+  // recents strip below calls `target.setColor` directly instead.
   const draft = useColorDraft({
     hex: target.hex,
     alpha: target.alpha,
-    onCommit: target.setColor,
+    onCommit: target.adjustColor,
   });
 
   // This popup can be unmounted out from under an in-flight pick — not just

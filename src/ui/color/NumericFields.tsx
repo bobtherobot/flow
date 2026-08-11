@@ -14,7 +14,18 @@ interface NumericFieldsProps {
   alpha: number;
   mode: NumericMode;
   onModeChange: (mode: NumericMode) => void;
+  /**
+   * A single channel moved — an H/S/L or R/G/B field, or Alpha. Never a whole
+   * new colour, so the caller must route this to a write that does NOT record
+   * a recent (see `useColorTarget.adjustColor`).
+   */
   onChange: (next: { hsv: Hsv; alpha: number }, transient: boolean) => void;
+  /**
+   * The Hex field committed (Enter or blur) with a parseable value. This IS a
+   * whole colour — unlike `onChange`, the caller should record it as a recent
+   * (see `useColorTarget.setColor`).
+   */
+  onHexCommit: (hex: string, alpha: number) => void;
 }
 
 const MODE_LABELS: Record<NumericMode, string> = {
@@ -34,7 +45,7 @@ const MODE_LABELS: Record<NumericMode, string> = {
  * cross-engine spin-button handling that control already solved.
  */
 export function NumericFields({
-  hsv, alpha, mode, onModeChange, onChange,
+  hsv, alpha, mode, onModeChange, onChange, onHexCommit,
 }: NumericFieldsProps) {
   // Free-typed hex text between focus and commit. null means "not editing" —
   // the field then falls back to formatting the live hsv/alpha.
@@ -82,10 +93,12 @@ export function NumericFields({
       // An 8-digit hex carries its own alpha; splitColorAlpha peels it off.
       const withHash = raw.startsWith("#") ? raw : `#${raw}`;
       const parts = splitColorAlpha(withHash);
-      const next = hexToHsv(parts.hex);
-      if (!next) return;
+      // Validate before committing — hexToHsv rejects an unparseable value.
+      // A whole colour, so this goes through onHexCommit (records a recent),
+      // not the channel-adjustment onChange every other field here uses.
+      if (!hexToHsv(parts.hex)) return;
       const hadAlphaByte = /^#[0-9a-f]{8}$/i.test(withHash);
-      emit({ hsv: next, alpha: hadAlphaByte ? parts.alpha : alpha }, false);
+      onHexCommit(parts.hex, hadAlphaByte ? parts.alpha : alpha);
     };
     return (
       <div className="flow-clr-numrow">
