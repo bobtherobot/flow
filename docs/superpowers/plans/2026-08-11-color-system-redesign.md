@@ -408,10 +408,16 @@ import {
   availableParts, partSpec, normalizeActivePart, swapFillStroke,
 } from "./color-parts";
 
-/** Minimal element stand-ins — these functions only read type/id/containerId. */
+/** Minimal element stand-ins.
+ *
+ *  Note the container binding: `resolveTextTargetIds` reads `boundElements` on
+ *  the CONTAINER (`selection-style.ts:46`), not `containerId` on the child.
+ *  Real Excalidraw keeps both in sync; a fixture carrying only `containerId`
+ *  would resolve to no text targets and quietly test nothing. */
 const rect = { id: "r1", type: "rectangle", strokeColor: "#111111", backgroundColor: "#eeeeee" };
-const text = { id: "t1", type: "text", strokeColor: "#222222", containerId: null };
+const text = { id: "t1", type: "text", strokeColor: "#222222" };
 const label = { id: "t2", type: "text", strokeColor: "#333333", containerId: "r1" };
+const labeledRect = { ...rect, boundElements: [{ id: "t2", type: "text" }] };
 
 describe("availableParts", () => {
   it("gives a shape fill and stroke", () => {
@@ -423,7 +429,7 @@ describe("availableParts", () => {
   });
 
   it("gives a labeled container all three", () => {
-    expect(availableParts([rect, label], { r1: true })).toEqual(["fill", "stroke", "text"]);
+    expect(availableParts([labeledRect, label], { r1: true })).toEqual(["fill", "stroke", "text"]);
   });
 
   it("falls back to fill and stroke with nothing selected", () => {

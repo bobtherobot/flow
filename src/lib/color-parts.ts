@@ -45,7 +45,7 @@ const TARGETS: Record<ColorPart, PartTarget> = {
 interface PartElement {
   id: string;
   type: string;
-  containerId?: string | null;
+  boundElements?: readonly { id: string; type: string }[] | null;
 }
 
 /**
@@ -61,16 +61,7 @@ export function availableParts(
   selectedIds: SelectedElementIds,
 ): ColorPart[] {
   const selected = elements.filter((el) => selectedIds[el.id] === true);
-
-  // Text targets via resolveTextTargetIds (boundElements) and direct containerId checks.
-  // resolveTextTargetIds handles real Excalidraw elements with boundElements;
-  // containerId checks handle test elements and other containment conventions.
-  const textViaResolve = Object.keys(resolveTextTargetIds(elements as never, selectedIds)).length > 0;
-  const textViaContainerId = elements.some((el) => {
-    if (el.type === "text" && el.containerId && selectedIds[el.containerId] === true) return true;
-    return false;
-  });
-  const hasText = textViaResolve || textViaContainerId;
+  const hasText = Object.keys(resolveTextTargetIds(elements, selectedIds)).length > 0;
 
   const textOnly = selected.length > 0 && selected.every((el) => el.type === "text");
   if (textOnly) return ["text"];
