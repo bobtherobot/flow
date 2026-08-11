@@ -182,3 +182,156 @@
   border: 1px solid var(--flow-border);
   border-radius: 4px;
 }
+
+/* Illustrator-style fill/stroke/text part chooser. */
+
+.flow-clr-chooser {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.flow-clr-chooser__stack {
+  position: relative;
+  width: 74px;
+  height: 74px;
+}
+
+.flow-clr-chooser--compact .flow-clr-chooser__stack {
+  width: 52px;
+  height: 52px;
+}
+
+.flow-clr-part {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  cursor: pointer;
+  background: var(--flow-clr-part-color, #fff);
+  border: 2px solid var(--flow-ink);
+}
+
+.flow-clr-chooser--compact .flow-clr-part {
+  width: 32px;
+  height: 32px;
+}
+
+.flow-clr-part--fill {
+  top: 0;
+  left: 0;
+}
+
+.flow-clr-part--stroke {
+  right: 0;
+  bottom: 0;
+}
+
+.flow-clr-part--text {
+  right: 0;
+  bottom: 0;
+}
+
+/*
+ * The stroke box reads as a ring, not a filled square: the swatch color
+ * covers the whole box, then `::after` punches a hole by painting a smaller
+ * centered square in the panel surface color on top of it.
+ *
+ * A brief for this task specified a double inset `box-shadow` for the ring
+ * instead (an outer inset shadow in the swatch color layered over an inner
+ * inset shadow in white). That doesn't work: box-shadow layers paint
+ * front-to-back in listing order, both on top of `background`, and both
+ * insets grow inward *from the edge* — so with this box's background already
+ * filled solid, the result is a color band at the edge, a thin white ring
+ * just inside it, and the untouched solid-color background showing again
+ * for the rest of the interior. That is a bullseye, not a ring: the center
+ * stays filled instead of reading as a hole. Nothing renders this file
+ * (Task 12's component isn't mounted until Task 14), so this was caught by
+ * reasoning through the paint order rather than by looking at it — the
+ * `::after` hole below replaces it.
+ */
+.flow-clr-part--stroke::after {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  background: var(--flow-panel-bg);
+}
+
+.flow-clr-chooser--compact .flow-clr-part--stroke::after {
+  inset: 6px;
+}
+
+.flow-clr-part--active {
+  z-index: 2;
+}
+
+.flow-clr-part--none {
+  background: linear-gradient(
+    to bottom right,
+    #fff calc(50% - 1.5px),
+    #e03131 calc(50% - 1.5px),
+    #e03131 calc(50% + 1.5px),
+    #fff calc(50% + 1.5px)
+  );
+}
+
+.flow-clr-part--mixed {
+  background-image: conic-gradient(#c8c8c8 0 25%, #fff 0 50%, #c8c8c8 0 75%, #fff 0);
+  background-size: 8px 8px;
+}
+
+/* A "none" or "mixed" stroke shows the same full-square treatment as fill
+   and text — the ring reading is only meaningful when a real color is
+   underneath it, so the punched hole is suppressed here. */
+.flow-clr-part--none::after,
+.flow-clr-part--mixed::after {
+  content: none;
+}
+
+.flow-clr-part__glyph {
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--flow-ink);
+  mix-blend-mode: difference;
+}
+
+.flow-clr-chooser__swap {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--flow-ink);
+  background: none;
+  border: none;
+}
+
+.flow-clr-quartet {
+  display: flex;
+  gap: 4px;
+}
+
+.flow-clr-chip {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  cursor: pointer;
+  border: 1px solid var(--flow-ink);
+}
+
+.flow-clr-chip--none {
+  background: linear-gradient(
+    to bottom right,
+    #fff calc(50% - 1px),
+    #e03131 calc(50% - 1px),
+    #e03131 calc(50% + 1px),
+    #fff calc(50% + 1px)
+  );
+}
