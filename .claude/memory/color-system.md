@@ -283,3 +283,27 @@ e2e" gotcha (still applies — `pkill -f vite` before any e2e run, checked at
 the start of this task), [[drawing-defaults]] for the `??`-not-`||` pattern
 this branch's `needsRevival` extends, and [[color-swatches]] (superseded) for
 the palette-store design this branch built on top of but did not change.
+
+## Two e2e specs flake under parallel load — re-run in isolation before chasing
+
+`e2e/new-document.spec.ts:60` ("File ▸ New keeps flow's app-wide appState
+preferences") and `e2e/style-memory.spec.ts` both fail intermittently when the
+full suite runs in parallel, and both pass reliably on their own — including at
+`--workers=4`. Measured on the merge of this branch: `new-document` failed 3 of
+7 full-suite runs, always while the machine was otherwise busy, and passed every
+time it was run alone.
+
+Neither is related to the color work. `new-document` covers `flowSeedAppState`
+and `File ▸ New`, which this branch never touched, and the merge that surfaced
+it produced a tree byte-identical to the branch tip (`git diff` empty), so it
+cannot have been introduced by the merge. This branch does add 15 e2e tests,
+which raises worker contention and so probably raises how often the pre-existing
+flake shows.
+
+Separately and permanently red: `e2e/text-panel.spec.ts:201` and `:225`
+(container padding). Those are **not** flakes — they fail deterministically, and
+they reproduce byte-for-byte on `main` at main's own pinned vendor commit. Real
+pre-existing bugs, out of scope here.
+
+The whole suite's healthy state today is **127 passed / 2 failed**. Anything
+else, re-run the failing spec alone before believing it.
