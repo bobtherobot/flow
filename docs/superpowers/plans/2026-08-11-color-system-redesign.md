@@ -2145,6 +2145,7 @@ Create `src/ui/color/NumericFields.test.tsx`:
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { NumericFields } from "./NumericFields";
+import { hsvToHsl, hsvToRgb } from "../../lib/color-convert";
 
 const hsv = { h: 200, s: 25, v: 91 };
 
@@ -2195,6 +2196,45 @@ describe("NumericFields", () => {
       expect.objectContaining({ hsv: expect.objectContaining({ h: 300 }) }),
       false,
     );
+  });
+
+  // These three prove the FIELDS ARE WIRED TO THE RIGHT CHANNEL. Without them a
+  // transposition of s/l or g/b passes the whole suite, because the display
+  // assertions read from the same correct object regardless of which key the
+  // edit path writes. Values chosen to round-trip exactly through HSV; the
+  // untouched channel is asserted too, which is what catches a swap.
+  it("routes a typed saturation to saturation, leaving lightness alone", () => {
+    const { onChange } = setup();
+    const field = screen.getByLabelText("Saturation");
+    fireEvent.change(field, { target: { value: "40" } });
+    fireEvent.blur(field);
+    const back = hsvToHsl(onChange.mock.calls.at(-1)![0].hsv);
+    expect(Math.round(back.s)).toBe(40);
+    expect(Math.round(back.l)).toBe(80);
+  });
+
+  it("routes a typed lightness to lightness, leaving saturation alone", () => {
+    const { onChange } = setup();
+    const field = screen.getByLabelText("Lightness");
+    fireEvent.change(field, { target: { value: "40" } });
+    fireEvent.blur(field);
+    const back = hsvToHsl(onChange.mock.calls.at(-1)![0].hsv);
+    expect(Math.round(back.l)).toBe(40);
+    expect(Math.round(back.s)).toBe(56);
+  });
+
+  it("routes a typed green channel to green, leaving red and blue alone", () => {
+    const onChange = vi.fn();
+    render(
+      <NumericFields hsv={hsv} alpha={100} mode="rgba" onChange={onChange} onModeChange={vi.fn()} />,
+    );
+    const field = screen.getByLabelText("Green");
+    fireEvent.change(field, { target: { value: "100" } });
+    fireEvent.blur(field);
+    const back = hsvToRgb(onChange.mock.calls.at(-1)![0].hsv);
+    expect(Math.round(back.g)).toBe(100);
+    expect(Math.round(back.r)).toBe(174);
+    expect(Math.round(back.b)).toBe(232);
   });
 
   it("converts a typed alpha from 0-1 back to 0-100", () => {
