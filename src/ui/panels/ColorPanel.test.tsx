@@ -3,15 +3,15 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { ColorPanel } from "./ColorPanel";
 import { reloadColorStore } from "../../lib/color-store";
 import { reloadPaletteStore } from "../../lib/palette-store";
+import { hexToHsl } from "../../lib/color-convert";
 import type { SelectionStyle } from "./useSelectionStyle";
 
 // jsdom/Node's native `localStorage` global does not implement a usable
 // Storage in this project's vitest setup (see src/lib/palette-store.test.ts,
-// src/lib/color-store.test.ts, src/app/preferences.test.ts,
-// src/ui/panels/SwatchesPanel.test.tsx and src/ui/color/PaletteSection.test.tsx,
-// which all use this same in-memory mock for the identical reason). Without
-// this stub, `localStorage.clear()` throws "not a function" — an environment
-// gap, not a behavior change.
+// src/lib/color-store.test.ts, src/app/preferences.test.ts and
+// src/ui/color/PaletteSection.test.tsx, which all use this same in-memory
+// mock for the identical reason). Without this stub, `localStorage.clear()`
+// throws "not a function" — an environment gap, not a behavior change.
 const mockStorage: Record<string, string> = {};
 
 const mockLocalStorage = {
@@ -137,19 +137,51 @@ describe("ColorPanel", () => {
     expect(screen.getByLabelText("Lightness")).toHaveValue(7);
   });
 
-  it("writes when a palette swatch is applied", () => {
+  // Wiring IS the deliverable of this task, so these assert the value written,
+  // not merely that a write happened. `toHaveBeenCalled()` alone cannot tell
+  // correct wiring from a swapped onHue/onAlpha, a wrong alpha on a palette
+  // pick, or a numeric field routed through two setters instead of the
+  // combined one.
+  const chromatic = () =>
+    fakeSel({ elements: [{ ...rect, backgroundColor: "#2091c2" }] as never });
+
+  it("routes the hue slider to hue, not alpha", () => {
+    const sel = chromatic();
+    render(<ColorPanel sel={sel} />);
+    fireEvent.keyDown(screen.getByRole("slider", { name: /hue/i }), { key: "ArrowRight" });
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Alpha untouched, so still a 6-digit hex. Swapped wiring would have moved
+    // alpha to 99% and produced #2091c2fc instead.
+    expect(currentItems.currentItemBackgroundColor).toBe("#208fc2");
+  });
+
+  it("routes the alpha slider to alpha, not hue", () => {
+    const sel = chromatic();
+    render(<ColorPanel sel={sel} />);
+    fireEvent.keyDown(screen.getByRole("slider", { name: /opacity/i }), { key: "ArrowLeft" });
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // 99% alpha, rgb half untouched.
+    expect(currentItems.currentItemBackgroundColor).toBe("#2091c2fc");
+  });
+
+  it("sends a numeric-field edit through the combined setter", () => {
+    const sel = chromatic();
+    render(<ColorPanel sel={sel} />);
+    const field = screen.getByLabelText("Lightness", { selector: "input" });
+    fireEvent.change(field, { target: { value: "20" } });
+    fireEvent.blur(field);
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Two separate setters would revert the first; the lightness must land.
+    expect(Math.round(hexToHsl(currentItems.currentItemBackgroundColor as string)!.l)).toBe(20);
+  });
+
+  it("applies a palette swatch at full alpha", () => {
     const sel = fakeSel();
     render(<ColorPanel sel={sel} />);
     fireEvent.click(screen.getAllByRole("button", { name: /^swatch /i })[0]);
-    expect(sel.update).toHaveBeenCalled();
-  });
-
-  it("writes when a hue is dragged", () => {
-    const sel = fakeSel();
-    render(<ColorPanel sel={sel} />);
-    const hue = screen.getByRole("slider", { name: /hue/i });
-    fireEvent.keyDown(hue, { key: "ArrowRight" });
-    expect(sel.update).toHaveBeenCalled();
+    const [, , currentItems] = (sel.update as ReturnType<typeof vi.fn>).mock.calls[0];
+    // A wrong alpha here writes an invisible color; 6 digits proves alpha 100.
+    expect(currentItems.currentItemBackgroundColor).toMatch(/^#[0-9a-f]{6}$/);
   });
 
   it("targets the bound text element's id, not the container's, when the text part is active on a labeled container", () => {

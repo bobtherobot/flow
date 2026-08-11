@@ -6,10 +6,10 @@ import { reloadPaletteStore, getSnapshot, removePalette } from "../../lib/palett
 
 // jsdom/Node's native `localStorage` global does not implement a usable
 // Storage in this project's vitest setup (see src/lib/palette-store.test.ts,
-// src/lib/color-store.test.ts, src/app/preferences.test.ts and
-// src/ui/panels/SwatchesPanel.test.tsx, which all use this same in-memory
-// mock for the identical reason). Without this stub, `localStorage.clear()`
-// throws "not a function" — an environment gap, not a behavior change.
+// src/lib/color-store.test.ts and src/app/preferences.test.ts, which all use
+// this same in-memory mock for the identical reason). Without this stub,
+// `localStorage.clear()` throws "not a function" — an environment gap, not a
+// behavior change.
 const mockStorage: Record<string, string> = {};
 
 const mockLocalStorage = {
