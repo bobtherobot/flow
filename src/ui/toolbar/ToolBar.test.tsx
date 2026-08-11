@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ToolBar, RAIL_WIDTH } from "./ToolBar";
+import { ToolBar } from "./ToolBar";
+import { RAIL_WIDTH } from "./rail-layout";
 import { DEFAULT_TOOLBAR_STATE } from "./toolbar-state";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 

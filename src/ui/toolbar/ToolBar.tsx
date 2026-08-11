@@ -11,12 +11,8 @@ import { ToolbarConfigMenu } from "./ToolbarConfigMenu";
 import { RailColorControl } from "./RailColorControl";
 import { useActiveTool } from "./useActiveTool";
 import { shouldRedock, withHiddenToggled, type ToolbarState } from "./toolbar-state";
+import { RAIL_WIDTH } from "./rail-layout";
 
-/** Docked rail width; also the horizontal gutter reserved on the left. Two
- *  columns of 40px tool buttons plus padding — the second column exists to
- *  make room for the shape tools coming later, and for the color control
- *  pinned at the bottom. */
-export const RAIL_WIDTH = 88;
 const MENUBAR_H = 36;
 /** On first detach, drop the rail this far below the menu bar so its drag grip
  *  clears the top main menu and stays reachable. */

@@ -3,7 +3,7 @@ import "./toolbar.css";
 import { PartChooser } from "../color/PartChooser";
 import { useColorTarget, type ColorTarget } from "../color/useColorTarget";
 import { ColorPopup } from "./ColorPopup";
-import { RAIL_WIDTH } from "./ToolBar";
+import { RAIL_WIDTH } from "./rail-layout";
 import type { MenuPoint } from "../panels/dock/menu-position";
 import type { SelectionStyle } from "../panels/useSelectionStyle";
 

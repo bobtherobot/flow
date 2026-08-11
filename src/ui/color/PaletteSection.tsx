@@ -139,6 +139,13 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
             aria-label="Palette name"
             autoFocus
             defaultValue={current.name}
+            // Cleared on the input's OWN mount rather than by whichever handler
+            // happens to open rename mode: a ref callback can't be skipped by a
+            // future second entry point the way a reset tucked into
+            // onDoubleClick could be, so the flag can never strand at `true`.
+            ref={(el) => {
+              if (el) abandonRename.current = false;
+            }}
             onBlur={(e) => {
               // Escape sets this first. Unmounting a focused input can fire a
               // blur on the way out, which would commit the very edit Escape
@@ -167,14 +174,7 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
             value={current.id}
             title="Double-click to rename"
             onChange={(e) => choosePalette(e.target.value)}
-            onDoubleClick={() => {
-              // Clear the abandon flag on ENTRY, not only in onBlur's abandon
-              // branch: Escape unmounts the input without necessarily firing a
-              // blur, so a flag cleared only there strands at `true` and
-              // silently swallows the NEXT genuine rename.
-              abandonRename.current = false;
-              setRenaming(true);
-            }}
+            onDoubleClick={() => setRenaming(true)}
           >
             {palettes.map((p) => (
               <option key={p.id} value={p.id}>
