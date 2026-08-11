@@ -3862,6 +3862,29 @@ describe("PaletteSection", () => {
       .toBe("Mine");
   });
 
+  it("abandons a rename on Escape", () => {
+    // Unmounting a focused input can fire blur on the way out; without an
+    // explicit abandon flag that blur commits the edit Escape just cancelled.
+    setup();
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    const input = screen.getByLabelText("Palette name");
+    fireEvent.change(input, { target: { value: "Discarded" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect((screen.getByLabelText("Palette") as HTMLSelectElement).selectedOptions[0].textContent)
+      .toBe("Pastel");
+  });
+
+  it("leaves rename mode when the palette is switched", () => {
+    setup();
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    expect(screen.getByLabelText("Palette name")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText("Palette name"), { key: "Escape" });
+    const select = screen.getByLabelText("Palette") as HTMLSelectElement;
+    const vibrant = [...select.options].find((o) => o.textContent === "Vibrant")!;
+    fireEvent.change(select, { target: { value: vibrant.value } });
+    expect(screen.queryByLabelText("Palette name")).not.toBeInTheDocument();
+  });
+
   it("has no set-as-default control", () => {
     setup();
     expect(screen.queryByRole("button", { name: /default/i })).not.toBeInTheDocument();
@@ -3911,14 +3934,20 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   const [confirming, setConfirming] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const dragFrom = useRef<number | null>(null);
+  /** Set by Escape so the input's blur-on-unmount does not commit the edit. */
+  const abandonRename = useRef(false);
 
   // Resolve defensively: the id may point at a just-deleted palette.
   const current = palettes.find((p) => p.id === defaultPaletteId) ?? palettes[0];
 
   const choosePalette = (id: string) => {
     setDefaultPalette(id);
+    // Every piece of transient state tied to "which palette is current" resets
+    // together — leaving `renaming` set would edit the new palette's name in an
+    // input seeded from the old one's.
     setSelected([]);
     setConfirming(false);
+    setRenaming(false);
   };
 
   const onTrash = () => {
@@ -3993,17 +4022,32 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
       <div className="flow-clr-palette__row">
         {renaming ? (
           <input
+            // Keyed so switching palettes rebuilds the field from the new name
+            // instead of carrying the old one's text across.
+            key={current.id}
             className="flow-clr-palette__name"
             aria-label="Palette name"
             autoFocus
             defaultValue={current.name}
             onBlur={(e) => {
+              // Escape sets this first. Unmounting a focused input can fire a
+              // blur on the way out, which would commit the very edit Escape
+              // was meant to discard — so abandonment is an explicit flag, not
+              // an assumption about event ordering.
+              if (abandonRename.current) {
+                abandonRename.current = false;
+                setRenaming(false);
+                return;
+              }
               renamePalette(current.id, e.target.value);
               setRenaming(false);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-              if (e.key === "Escape") setRenaming(false);
+              if (e.key === "Escape") {
+                abandonRename.current = true;
+                setRenaming(false);
+              }
             }}
           />
         ) : (
