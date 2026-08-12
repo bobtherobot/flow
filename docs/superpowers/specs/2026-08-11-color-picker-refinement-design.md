@@ -233,11 +233,15 @@ treatment; empty recent slots keep their border.
 
 ### 7. The preview well is removed
 
-`src/ui/color/ColorPreview.tsx` and `src/ui/color/preview.test.tsx` are
-deleted, along with `.flow-clr-preview*` in `color.css`. `PickerRow` drops its
-`isNone` prop — it exists only to feed the preview — and `ColorPanel` and
-`ColorPopup` stop passing it. `useColorDraft.isNone` itself stays; only the
-prop threading goes.
+`src/ui/color/ColorPreview.tsx` is deleted, along with `.flow-clr-preview*` in
+`color.css`. `PickerRow` drops its `isNone` prop — it exists only to feed the
+preview — and `ColorPanel` and `ColorPopup` stop passing it.
+`useColorDraft.isNone` itself stays; only the prop threading goes.
+
+`preview.test.tsx` is **renamed** to `PickerRow.test.tsx`, not deleted: it
+covers both components, and deleting it would drop `PickerRow`'s coverage
+along with the preview's. (`sliders.test.tsx` is untouched — it renders
+`HueSlider` and `AlphaSlider` directly and never mounts `PickerRow`.)
 
 **Cost, accepted:** the preview well is currently the only control that renders
 alpha, as a checkerboard blend. After this, opacity is legible from the alpha
@@ -267,14 +271,13 @@ Two things the mockup appears to change that are already in the desired state:
 | `src/ui/color/PaletteSection.tsx` | trash tile, drop handling, `title`s |
 | `src/ui/color/PickerRow.tsx` | `isNone` prop and preview removed |
 | `src/ui/color/ColorPreview.tsx` | deleted |
-| `src/ui/color/preview.test.tsx` | deleted |
+| `src/ui/color/preview.test.tsx` | renamed to `PickerRow.test.tsx`, `ColorPreview` cases dropped |
 | `src/ui/color/color.css` | part rules cut to layout only, stack sizing, quartet grid, size tokens, tile/recent styling, preview and `230-247` blocks deleted |
 | `src/ui/panels/ColorPanel.tsx` | stop passing `isNone` |
 | `src/ui/toolbar/ColorPopup.tsx` | stop passing `isNone` |
 | `src/ui/color/PartChooser.test.tsx` | reworked for the new geometry |
 | `src/ui/color/PartArt.test.tsx` | **new** — layer order, colour states, id uniqueness |
 | `src/ui/color/PaletteSection.test.tsx` | drop-to-delete, disabled-when-empty, tooltips |
-| `src/ui/color/sliders.test.tsx` | preview-less `PickerRow` |
 | `e2e/color-panel.spec.ts` | rail measurements re-taken; a drag-to-trash flow |
 
 ## Testing
@@ -297,12 +300,16 @@ trash is `disabled` with no selection and enabled with one; clicking it with a
 selection removes exactly the selected indices; the footer trash's `title`
 tracks its two states.
 
-**E2E.** `e2e/color-panel.spec.ts`'s exact-pixel rail assertion is re-measured
-against the taller control (it compares a real `boundingBox()` against the
-canvas gutter, so it will fail loudly rather than silently drift). A
-drag-a-swatch-onto-the-trash flow is added via Playwright's `dragAndDrop`,
-which drives HTML5 DnD in Chromium — the grid uses native `draggable`, not
-pointer events.
+**E2E.** Two tests are appended to `e2e/color-panel.spec.ts`. A
+drag-a-swatch-onto-the-trash flow, via Playwright's `dragAndDrop` — it drives
+real HTML5 DnD in Chromium, which is what the grid uses (native `draggable`,
+not pointer events). And a rail vertical-fit assertion with a labelled
+container selected, which is the tallest case and the only part of §1's height
+cost that nothing currently covers.
+
+The existing exact-pixel rail assertion (`:320`) is **not** touched: it
+compares `rail.x + rail.width` against `--flow-toolbar-reserved` and is a
+width check, unaffected by the control growing taller.
 
 **Visual.** Unit tests can assert the layer *order and widths* but not that the
 bands actually land where intended — stroke geometry, the T's proportions, the
