@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 // The eyedropper bridge (src/lib/eyedropper.ts) imports the real vendor
 // package; stub the two exports it touches with a minimal real store (`get`
