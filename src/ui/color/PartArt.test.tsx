@@ -74,8 +74,20 @@ describe("PartArt", () => {
   it("drops the ring for a none stroke", () => {
     // A ring means nothing without a color in it, so none falls back to the
     // plain square — same intent as the deleted `--none::after { content: none }`.
+    // The ring suppression (drop from 3 to 2 rendered layers) is what matters here.
     const { container } = render(<PartArt part="stroke" color="transparent" />);
-    expect(layers(container)).toHaveLength(2);
+    const renderedLayers = layers(container).filter((l) => l.stroke !== null);
+    expect(renderedLayers).toHaveLength(2);
+  });
+
+  it("shows a slash for a none stroke", () => {
+    // A none stroke (zeroed width) should display the same "no colour" indicator
+    // as fill and text parts — a slashed square. Stroke is a first-class part
+    // in the chooser's quartet, so setting it to none must be visually distinct.
+    const { container } = render(<PartArt part="stroke" color="transparent" />);
+    const slash = container.querySelector("line");
+    expect(slash).not.toBeNull();
+    expect(slash!.getAttribute("stroke")).toBe("#e03131");
   });
 
   it("drops the ring for a mixed stroke", () => {

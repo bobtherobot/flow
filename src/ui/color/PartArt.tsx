@@ -113,7 +113,7 @@ export function PartArt({ part, color, isMixed = false }: PartArtProps) {
         />
       ))}
 
-      {(isMixed || (isNone && part !== "stroke")) && (
+      {(isMixed || isNone) && (
         <defs>
           {isMixed && (
             <pattern id={checkerId} width="8" height="8" patternUnits="userSpaceOnUse">
@@ -122,7 +122,7 @@ export function PartArt({ part, color, isMixed = false }: PartArtProps) {
               <rect x="4" y="4" width="4" height="4" fill="#c8c8c8" />
             </pattern>
           )}
-          {isNone && part !== "stroke" && (
+          {isNone && (
             <clipPath id={clipId}>
               <path d={d} />
             </clipPath>
@@ -130,7 +130,7 @@ export function PartArt({ part, color, isMixed = false }: PartArtProps) {
         </defs>
       )}
 
-      {isNone && part !== "stroke" && (
+      {isNone && (
         <line
           x1="4"
           y1="4"
