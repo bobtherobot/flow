@@ -406,6 +406,36 @@ behind.
 
 ### Every part always renders; `available` dims, it does not remove
 
+**Paint order has two rules, not one.** The active part renders last so it sits
+in front — and, separately, **text sinks to the bottom whenever it is not the
+active part**. The T overlaps stroke's bottom-left corner; painted above stroke
+while fill or stroke was active, it read as though the picker were aimed at the
+text, and nothing else on screen contradicted that. `PartChooser` builds the
+render list as `[text-if-inactive, other-inactive, active]`.
+
+**The stack's width is derived from the quartet, not declared.**
+`--flow-clr-group-w` is the quartet's natural width (`2 * chip + gap`), and
+`--flow-clr-part-size` is that over 1.5, because the stack spans 1.5 part-sizes
+horizontally (fill plus stroke's half-step). Both rows of the chooser are then
+exactly one group wide — 44px docked, 39px on the rail — and everything left
+over goes to the saturation box. These used to be independent numbers that had
+drifted to 69px against 44px. Change a chip size or gap and the stack follows;
+do not re-declare `--flow-clr-part-size` anywhere.
+
+Two things that fell out of narrowing it, both fixed here and both worth not
+undoing:
+
+- **The swap arrow is sized off `--flow-clr-part-size`** (0.6x, offset -0.14x).
+  Fixed at 22px it swamped the narrowed stack and covered most of the rail's
+  stroke box. It deliberately overhangs into the 10px gap beside the chooser,
+  which is how the group still measures exactly one quartet wide.
+- **`e2e/color-panel.spec.ts` clicks stroke via a `clickStroke` helper**, at 80%
+  of the box rather than its centre. The stroke box's centre is both its own
+  ring hole and fill's bottom-right corner, so a centre click resolves to fill
+  and Playwright reports the fill path intercepting. That was always true of the
+  geometry — it merely cleared by one pixel at the old size. Don't "simplify"
+  those calls back to `.click()`.
+
 **The stack is one fixed size — `1.5 × 2.25` part-sizes — at every
 selection**, because all three boxes render unconditionally and a part the
 selection cannot address is merely dimmed (`.flow-clr-part--off`,

@@ -27,6 +27,26 @@ async function seedSaturation(page: Page) {
 }
 
 const panel = ".flow-clr-panel";
+
+/**
+ * Click the stroke box where a user actually clicks it: the exposed ring in
+ * its lower-right.
+ *
+ * Its geometric centre is two unhelpful things at once — the ring's own hole,
+ * and the fill box's bottom-right corner. Fill is stacked above stroke
+ * whenever fill is active, so a default centre-click resolves to fill and
+ * Playwright reports the fill path intercepting pointer events. That was
+ * always true of the geometry; it merely used to squeak past by a single
+ * pixel while the boxes were larger, which is not a target to rely on.
+ */
+async function clickStroke(page: Page, root: string) {
+  const box = (await page
+    .locator(root)
+    .getByRole("radio", { name: /Stroke/ })
+    .boundingBox())!;
+  await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.8);
+}
+
 const popup = '[role="dialog"][aria-label="Color picker"]';
 
 test("the dock has exactly one color panel", async ({ page }) => {
@@ -60,7 +80,7 @@ test("switching part retargets the picker", async ({ page }) => {
   await drawRect(page, 560, 300, 680, 380);
 
   const fillL = await page.locator(panel).getByLabel("Lightness").inputValue();
-  await page.locator(panel).getByRole("radio", { name: /Stroke/ }).click();
+  await clickStroke(page, panel);
   await expect(page.locator(panel).getByLabel("Lightness")).not.toHaveValue(fillL);
 });
 
@@ -166,7 +186,7 @@ test("none on stroke zeroes the width and a color revives it", async ({ page }) 
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
-  await page.locator(panel).getByRole("radio", { name: /Stroke/ }).click();
+  await clickStroke(page, panel);
   await page.locator(panel).getByRole("button", { name: "None" }).click();
   await expect(page.getByLabel("Stroke width")).toHaveValue("0");
 
