@@ -313,28 +313,55 @@
   gap: 6px;
 }
 
+/* flow is desktop-only: these are mouse targets, sized for density. */
+.flow-clr-palette__grid {
+  --flow-clr-tile-size: 18px;
+}
+
 .flow-clr-palette__add,
+.flow-clr-palette__trash,
 .flow-clr-palette__tile {
-  width: 22px;
-  height: 22px;
+  width: var(--flow-clr-tile-size);
+  height: var(--flow-clr-tile-size);
   padding: 0;
   cursor: pointer;
-  border: 1px solid var(--flow-border);
   border-radius: var(--flow-radius-sm);
 }
 
-.flow-clr-palette__add {
+/* A colour tile carries no border: a hairline competes with the swatch it is
+   supposed to be showing. The shadow gives a pale swatch an edge instead. */
+.flow-clr-palette__tile {
+  border: none;
+  box-shadow: 0 1px 2px rgb(43 43 51 / 18%);
+}
+
+/* The trash and [+] carry no colour, so they keep a hairline against the
+   panel background. */
+.flow-clr-palette__add,
+.flow-clr-palette__trash {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 12px;
   line-height: 1;
   color: var(--flow-ink);
   background: transparent;
+  border: 1px solid var(--flow-border);
 }
 
-.flow-clr-palette__add:hover {
+.flow-clr-palette__add:hover,
+.flow-clr-palette__trash:hover {
   background: var(--flow-hover);
+}
+
+.flow-clr-palette__trash[aria-disabled="true"] {
+  color: var(--flow-ink-disabled);
+}
+
+/* Only while a swatch is actually over it — this is the drop affordance. */
+.flow-clr-palette__trash--over {
+  background: var(--flow-active);
+  border-color: var(--flow-accent);
 }
 
 .flow-clr-palette__tile[aria-pressed="true"] {
@@ -434,12 +461,15 @@
   padding: 0;
   cursor: pointer;
   background: var(--flow-panel-bg);
-  border: 1px solid var(--flow-border);
+  border: none;
+  box-shadow: 0 1px 2px rgb(43 43 51 / 18%);
   border-radius: var(--flow-radius-sm);
 }
 
 .flow-clr-recents__slot:disabled {
   cursor: default;
+  border: 1px solid var(--flow-border);
+  box-shadow: none;
 }
 
 /* flow is desktop-only: these are mouse targets, sized for density. */
