@@ -375,7 +375,7 @@ export function NoneSwatch() {
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npx vitest run src/ui/color/PartArt.test.tsx`
-Expected: PASS, 13 tests.
+Expected: PASS, 14 tests (13 in `PartArt`, 1 in `NoneSwatch`).
 
 - [ ] **Step 5: Typecheck**
 
@@ -1359,7 +1359,7 @@ npx playwright test
 ```
 
 Expected:
-- vitest: all files pass. The count grows from 835 by the tests added here; the exact number is whatever it is — what matters is zero failures.
+- vitest: all files pass. The measured baseline on this branch's first commit is **83 files / 845 tests**; the count grows by the tests added here. What matters is zero failures.
 - typecheck: exit 0.
 - playwright: **129 passed / 2 failed**. The two failures must be `e2e/text-panel.spec.ts:201` and `:225` and nothing else — they reproduce on `main` and are out of scope. If `e2e/new-document.spec.ts:60` or `e2e/style-memory.spec.ts` also fail, re-run that spec alone before believing it; both flake under parallel load.
 
