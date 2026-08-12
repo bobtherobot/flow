@@ -8,11 +8,12 @@ A visual refinement pass over the two color surfaces shipped by
 docked Color panel and the tool rail's popup. Driven by two mockups —
 `working/color-picker-panel-2.png` and `working/color-picker-popup-2.png`.
 
-Four changes with behaviour behind them (a drag-to-delete target in the palette
-grid, a T-shaped text part, a rearranged part stack, a removed preview well) and
-a handful that are purely styling. No change to the write path, to
-`useColorTarget`, to `useColorDraft`, or to how color is derived from the
-selection.
+Four changes with substance behind them — the part artwork moves wholesale from
+CSS to SVG (which is also what makes the text part a real T silhouette), the
+part stack is rearranged, the palette grid gains a drag-to-delete target, and
+the preview well is removed — plus a handful that are purely styling. No change
+to the write path, to `useColorTarget`, to `useColorDraft`, or to how color is
+derived from the selection.
 
 ## Problem
 
@@ -89,68 +90,82 @@ gap + 16 quartet) to 87px for a shape and 111px for a labelled container, once
 §3 and §4's sizes are applied. `RAIL_WIDTH` is untouched — this is height only,
 and the rail's tool grid sits above it.
 
-### 2. Part chooser double edge
+### 2. Part artwork moves to SVG
 
-Each box gets a dark outer rule that separates it from whatever it overlaps and
-a light inner rule that holds the swatch color off that dark rule. In flow's
-tokens: `--flow-ink` (`#2b2b33`) outside, `--flow-panel-bg` (`#ffffff`) inside.
+Every part gets a dark outer rule that separates it from whatever it overlaps
+and a light inner rule that holds the swatch color off that dark rule. In
+flow's tokens: `--flow-ink` (`#2b2b33`) outside, `--flow-panel-bg` (`#ffffff`)
+inside.
 
-- **fill** — `border: 2px solid var(--flow-panel-bg)`,
-  `box-shadow: 0 0 0 2px var(--flow-ink)`, background = the part color.
-- **stroke** — the same border and outer shadow, **no background**, plus three
-  inset layers listed thinnest-first: the part color, then `--flow-panel-bg`,
-  then `--flow-ink`. Because `box-shadow` paints first-listed on top and every
-  inset grows inward from the same edge, the *spreads* are cumulative while the
-  *visible bands* are their differences. The untouched centre falls through to
-  the panel, which is what makes it read as a ring.
-- **text** — see §2b.
+**All three parts are drawn as SVG.** No `background`, no `border`, no
+`box-shadow`, no `::after` — the CSS route can express the fill box and the
+stroke ring only through three unrelated tricks (a background, a stack of inset
+shadows, a pseudo-element hole-punch), and the T not at all. One drawing model
+means one place that decides how a part is coloured and one place that decides
+how its edges are built.
 
-Box sizing moves to `border-box` so `--flow-clr-part-size` stays the rendered
-size. Spreads scale with it:
+#### The layering rule
 
-| | inset spreads | visible bands | hole |
-|---|---|---|---|
-| docked (46px) | 7, 9, 11 | 7 color / 2 light / 2 dark | 20px |
-| rail (32px) | 4, 5.5, 7 | 4 color / 1.5 light / 1.5 dark | 14px |
+Each part is a `<path>` `d`, painted as concentric stroked copies of that same
+`d` on a shared `viewBox="0 0 46 46"`. A stroke of width *W* straddles the path
+line by *W*/2 on each side, so listing widest-first and painting in document
+order produces even bands:
 
-**This supersedes the argument in `color.css:230-247`,** which currently says
-inset shadows cannot produce a ring. That reasoning was correct *for the
-version it was written against*, which kept `background: var(--flow-clr-part-color)`
-on the stroke box: with the interior already painted, insets growing from the
-edge leave the solid centre showing and the result is a bullseye. Dropping the
-background is the whole difference. The comment must be rewritten rather than
-deleted, so the next person to try `background` on the stroke box learns why it
-breaks; the `::after` hole-punch it introduced is removed.
+| Part | Layers, back to front | Reads as |
+|---|---|---|
+| fill | `--flow-ink` w8 → `--flow-panel-bg` w4, filled with the color, `paint-order: stroke fill` | dark 2, light 2, solid color |
+| text | same two layers on the T silhouette's `d` | dark 2, light 2, solid color |
+| stroke | `--flow-ink` w15 → `--flow-panel-bg` w11 → color w7, `fill: none` | dark 2, light 2, color 7, light 2, dark 2, hole |
 
-`--none` and `--mixed` keep their current treatment (red slash, checkerboard)
-and keep suppressing the ring, since a ring only means something with a real
-color in it.
+`paint-order: stroke fill` on the filled parts is what makes the light rule
+read as 2 units rather than 4: the fill paints over the inner half of its own
+stroke.
 
-### 2b. The text part becomes a T
+The SVG's `width`/`height` are `--flow-clr-part-size` against a fixed
+`viewBox`, so every rule and band scales with the box automatically. The rail's
+compact variant is the *identical* markup at a smaller size — there is no
+second set of stroke widths to keep in sync, which is the main thing the CSS
+version could not offer.
 
-The text part stops being a box. It renders as a T silhouette carrying the
-same two-rule edge as the boxes: two `<path>` elements sharing one `d`, the
-back one stroked `--flow-ink` at 8 units, the front stroked `--flow-panel-bg`
-at 4 with `paint-order: stroke` and filled with the part color. Half of each
-stroke lies outside the path, so the visible edge is 2px dark then 2px light —
-matching the boxes exactly.
+#### Colour states
 
-The same silhouette is used on the rail; the compact variant is the identical
-SVG at a smaller `--flow-clr-part-size`, with the stroke widths scaled to hold
-the 2px/2px reading.
+The three states are uniform across all parts, defined once and reused:
 
-Two edge states:
+- **a colour** — the `fill` (fill/text) or the innermost `stroke` (stroke part)
+  is the part colour, passed as an SVG attribute. `--flow-clr-part-color` is
+  retired; there is no longer a CSS layer that needs to know the colour.
+- **`--none`** — `--flow-panel-bg` plus a red diagonal, drawn as a `<line>`
+  clipped to the part's own `d`. The stroke part additionally suppresses its
+  ring and draws as a plain square, since a ring means nothing without a colour
+  in it (unchanged intent from today's `.flow-clr-part--none::after { content: none }`).
+- **`--mixed`** — filled with a checkerboard `<pattern>`, same suppression rule
+  for the stroke part.
 
-- `--mixed` fills the T with a checkerboard `<pattern>`. Pattern ids must come
-  from `useId()`, because the docked chooser and the rail chooser are both
-  mounted at once and duplicate ids would cross-reference.
-- `--none` fills the T with `--flow-panel-bg`, leaving just the two rules. This
-  is close to unreachable in practice — Excalidraw text colour lives on
-  `strokeColor` and is never `"transparent"` — but `partColor` can return it,
-  so it needs a defined rendering rather than an accident.
+Pattern and clip-path ids must come from `useId()`. The docked chooser and the
+rail chooser are both mounted at once (`PanelsRoot` and `ToolBar` each own a
+`useSelectionStyle` instance — deliberate, see the color-system memory), and
+hardcoded ids would make one chooser's mixed state reference the other's
+`<defs>`.
 
-The `T` glyph span, `.flow-clr-part__glyph`, and its `mix-blend-mode: difference`
-are deleted.
+The quartet's *none* chip shares the same none artwork rather than
+re-expressing it as a CSS gradient, so there is exactly one definition of what
+"no colour" looks like.
+
+#### What this deletes
+
+`.flow-clr-part`'s `background`/`border`, `.flow-clr-part--stroke::after` and
+its compact override, `.flow-clr-part--none`, `.flow-clr-part--mixed`,
+`.flow-clr-part--none::after, .flow-clr-part--mixed::after`,
+`.flow-clr-part__glyph` and its `mix-blend-mode: difference`, and
+`.flow-clr-chip--none`. What survives in CSS is position, size, cursor, and
+`z-index` — layout only.
+
+**`color.css:230-247` goes with it.** That comment argues inset shadows cannot
+produce a ring, which was correct for the version it was written against (one
+that kept a background on the stroke box, leaving a bullseye). It is being
+deleted rather than rewritten because the trap it documents can no longer be
+reached: there is no background and no box-shadow on a part any more. Its
+replacement is the layering table above, restated in the component.
 
 ### 3. Quick chips become 2×2
 
@@ -174,11 +189,9 @@ The popup's six recents are excluded: they are already fluid
 (`grid-template-columns: repeat(6, 1fr)` with `aspect-ratio: 1`), sized by the
 popup's 280px width rather than by a token, and §6 changes only their styling.
 
-Recorded honestly: this puts the palette tiles and the rail chips below WCAG
-2.2's 24×24 Target Size (Minimum, 2.5.8) AA threshold. Every one of these
-controls remains keyboard-reachable and the grid is arrow-navigable, so the
-functionality is not gated on pointer precision — but the pointer targets
-themselves are under the guideline, deliberately.
+Density is the goal — more of the palette visible per row, a quartet that
+doesn't dominate the chooser. Layout wins over pointer-target sizing
+guidelines here; that is a deliberate call, not an oversight.
 
 ### 5. Palette grid: a trash tile
 
@@ -249,15 +262,17 @@ Two things the mockup appears to change that are already in the desired state:
 
 | File | Change |
 |---|---|
-| `src/ui/color/PartChooser.tsx` | fixed geometry, `--parts-N` modifier, T silhouette, glyph span deleted |
+| `src/ui/color/PartArt.tsx` | **new** — the SVG for one part: `d` per part, the layer table, the three colour states, `useId` defs |
+| `src/ui/color/PartChooser.tsx` | fixed geometry, `--parts-N` modifier, renders `PartArt`, glyph span deleted |
 | `src/ui/color/PaletteSection.tsx` | trash tile, drop handling, `title`s |
 | `src/ui/color/PickerRow.tsx` | `isNone` prop and preview removed |
 | `src/ui/color/ColorPreview.tsx` | deleted |
 | `src/ui/color/preview.test.tsx` | deleted |
-| `src/ui/color/color.css` | part edges, stack sizing, quartet grid, size tokens, tile/recent styling, preview rules deleted, `230-247` comment rewritten |
+| `src/ui/color/color.css` | part rules cut to layout only, stack sizing, quartet grid, size tokens, tile/recent styling, preview and `230-247` blocks deleted |
 | `src/ui/panels/ColorPanel.tsx` | stop passing `isNone` |
 | `src/ui/toolbar/ColorPopup.tsx` | stop passing `isNone` |
-| `src/ui/color/PartChooser.test.tsx` | reworked for the new geometry and the T |
+| `src/ui/color/PartChooser.test.tsx` | reworked for the new geometry |
+| `src/ui/color/PartArt.test.tsx` | **new** — layer order, colour states, id uniqueness |
 | `src/ui/color/PaletteSection.test.tsx` | drop-to-delete, disabled-when-empty, tooltips |
 | `src/ui/color/sliders.test.tsx` | preview-less `PickerRow` |
 | `e2e/color-panel.spec.ts` | rail measurements re-taken; a drag-to-trash flow |
@@ -267,12 +282,20 @@ Two things the mockup appears to change that are already in the desired state:
 **Unit.** `PartChooser` gets a case per `availableParts` shape asserting the
 modifier class and that each part is present and clickable — in particular
 that in the three-part case stroke and text are at distinct positions, which
-is the regression the deleted `offsetOf` existed to prevent. The T renders two
-paths with one shared `d`; `--mixed` uses a `useId`-derived pattern id, and two
-mounted choosers do not collide. `PaletteSection` gets: drop on trash removes
-that swatch and only that swatch; trash is `disabled` with no selection and
-enabled with one; clicking it with a selection removes exactly the selected
-indices; the footer trash's `title` tracks its two states.
+is the regression the deleted `offsetOf` existed to prevent.
+
+`PartArt` is where the drawing is pinned down, and it is testable in jsdom in a
+way the CSS version was not — layer widths and document order are attributes,
+not computed paint: each part emits its layers in the documented widest-first
+order with the documented widths and paints, all layers of a part share one
+`d`, the colour lands on the documented layer per part, `--none` and `--mixed`
+suppress the stroke part's ring, and two mounted instances produce disjoint
+`useId` defs.
+
+`PaletteSection` gets: drop on trash removes that swatch and only that swatch;
+trash is `disabled` with no selection and enabled with one; clicking it with a
+selection removes exactly the selected indices; the footer trash's `title`
+tracks its two states.
 
 **E2E.** `e2e/color-panel.spec.ts`'s exact-pixel rail assertion is re-measured
 against the taller control (it compares a real `boundingBox()` against the
@@ -281,24 +304,28 @@ drag-a-swatch-onto-the-trash flow is added via Playwright's `dragAndDrop`,
 which drives HTML5 DnD in Chromium — the grid uses native `draggable`, not
 pointer events.
 
-**Visual.** The stroke ring, the T's two rules, and the drag-over highlight are
-all paint-order-dependent and none of them are visible to jsdom. They must be
-confirmed in the running app before this is called done — the `color.css`
-comment being superseded here is itself a record of what happens when
-paint-order reasoning goes unchecked (`background` on the stroke box was
-reasoned about correctly but never looked at).
+**Visual.** Unit tests can assert the layer *order and widths* but not that the
+bands actually land where intended — stroke geometry, the T's proportions, the
+overlap between parts, and the drag-over highlight all have to be looked at in
+the running app before this is called done. The `color.css` comment deleted in
+§2 is itself a record of what happens when paint reasoning goes unchecked: the
+`background`-on-the-stroke-box version was reasoned about carefully and never
+rendered.
 
 ## Risks
 
-- **The stroke ring is paint-order-dependent and easy to get backwards.**
-  `box-shadow` layers paint first-listed on top, and every inset grows inward
-  from the same edge, so the three bands only appear if they are listed
-  thinnest-first *and* the box has no background. Either mistake yields a
-  bullseye that still looks deliberate.
+- **SVG layer order is the whole design, and getting it backwards still looks
+  deliberate.** Widest-first, painted in document order. Reversed, the stroke
+  ring collapses to a solid dark square and the fill box loses its light rule —
+  both plausible-looking results that no type error catches. The layer table in
+  §2 is the specification; the unit tests assert against it directly.
+- **`paint-order: stroke fill` is load-bearing on the filled parts.** Without
+  it the light rule reads 4 units wide instead of 2 and the fill/text parts
+  stop matching the stroke part's edge.
 - **The rail control grows up to 35px taller** (76 → 111 with a labelled
   container selected). Verify the rail still fits its tool grid at a small
   viewport height.
-- **`useId` in the T pattern.** Two choosers mount simultaneously
+- **`useId` for the `<defs>`.** Two choosers mount simultaneously
   (`PanelsRoot` and `ToolBar` each own a `useSelectionStyle` instance —
-  deliberate, see the color-system memory). A hardcoded pattern id would make
-  one chooser's mixed state reference the other's `<defs>`.
+  deliberate, see the color-system memory). Hardcoded pattern or clip-path ids
+  would make one chooser's mixed or none state reference the other's `<defs>`.
