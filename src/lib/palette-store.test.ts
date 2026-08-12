@@ -430,3 +430,70 @@ describe("getRecentPaletteColors", () => {
     expect(store.getRecentPaletteColors()).toEqual(["#123456"]);
   });
 });
+
+describe("copySwatchesTo", () => {
+  const colorsOf = (id: string) =>
+    store.getSnapshot().palettes.find((p) => p.id === id)!.colors;
+
+  it("appends colors the target does not have", () => {
+    const target = store.addPalette("Target");
+    store.copySwatchesTo(target.id, ["#111111", "#222222"]);
+    expect(colorsOf(target.id)).toEqual(["#111111", "#222222"]);
+  });
+
+  it("skips colors the target already has", () => {
+    const target = store.addPalette("Target");
+    store.copySwatchesTo(target.id, ["#111111"]);
+    store.copySwatchesTo(target.id, ["#111111", "#222222"]);
+    expect(colorsOf(target.id)).toEqual(["#111111", "#222222"]);
+  });
+
+  it("drops duplicates within a single copy", () => {
+    const target = store.addPalette("Target");
+    store.copySwatchesTo(target.id, ["#111111", "#111111"]);
+    expect(colorsOf(target.id)).toEqual(["#111111"]);
+  });
+
+  it("commits ONCE for a multi-swatch copy", () => {
+    // The regression this guards: implementing copy as a loop over addSwatch.
+    // That fires one notify and one localStorage write per swatch for a single
+    // user action, and is invisible in every other assertion here.
+    const target = store.addPalette("Target");
+    const listener = vi.fn();
+    const unsub = store.subscribe(listener);
+    store.copySwatchesTo(target.id, ["#111111", "#222222", "#333333"]);
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsub();
+  });
+
+  it("does not notify when every color is already present", () => {
+    const target = store.addPalette("Target");
+    store.copySwatchesTo(target.id, ["#111111"]);
+    const listener = vi.fn();
+    const unsub = store.subscribe(listener);
+    store.copySwatchesTo(target.id, ["#111111"]);
+    expect(listener).not.toHaveBeenCalled();
+    unsub();
+  });
+
+  it("scrubs forgiving input the way swatches do", () => {
+    const target = store.addPalette("Target");
+    store.copySwatchesTo(target.id, ["ABC", "transparent", "#DDEEFF"]);
+    expect(colorsOf(target.id)).toEqual(["#aabbcc", "#ddeeff"]);
+  });
+
+  it("no-ops on an unknown target id", () => {
+    const before = store.getSnapshot();
+    store.copySwatchesTo("nope", ["#111111"]);
+    expect(store.getSnapshot()).toBe(before);
+  });
+
+  it("leaves the source palette untouched", () => {
+    // Copy, not move. Uses Recent as the source since that is the intended use.
+    store.recordUsedColor("#abcdef");
+    const target = store.addPalette("Target");
+    store.copySwatchesTo(target.id, ["#abcdef"]);
+    expect(colorsOf(RECENT_PALETTE_ID)).toEqual(["#abcdef"]);
+    expect(colorsOf(target.id)).toEqual(["#abcdef"]);
+  });
+});
