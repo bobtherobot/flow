@@ -78,6 +78,26 @@ describe("PartChooser", () => {
     expect(radiosAfterSwap[radiosAfterSwap.length - 1]).toHaveAccessibleName(/stroke/i);
   });
 
+  /** Names in paint order, back to front — DOM order is the stacking order. */
+  const stackOrder = () =>
+    screen.getAllByRole("radio").map((r) => (r.getAttribute("title") ?? "").split(" ")[0]);
+
+  it("keeps text behind the edges whenever an edge is the active part", () => {
+    // The T overlaps stroke's bottom-left corner. Painted on top of stroke
+    // while fill is active, it reads as if the picker were aimed at the text —
+    // there is nothing on screen to say otherwise.
+    const { rerender } = render(<PartChooser target={target({ part: "fill" })} />);
+    expect(stackOrder()).toEqual(["Text", "Stroke", "Fill"]);
+
+    rerender(<PartChooser target={target({ part: "stroke" })} />);
+    expect(stackOrder()).toEqual(["Text", "Fill", "Stroke"]);
+  });
+
+  it("brings text to the front when text is the active part", () => {
+    render(<PartChooser target={target({ available: ["fill", "stroke", "text"], part: "text" })} />);
+    expect(stackOrder()[2]).toBe("Text");
+  });
+
   it("swaps through the arrow button", () => {
     const t = target();
     render(<PartChooser target={t} />);

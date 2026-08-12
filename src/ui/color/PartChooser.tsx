@@ -63,9 +63,20 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
   // saturation box beside it on every click.
   const isLive = (p: ColorPart) => available.includes(p);
 
-  // The active part renders last so it paints over its neighbours (DOM order
-  // doubles as the stacking order here, backed up by `--active`'s z-index).
-  const ordered = [...CANONICAL_ORDER.filter((p) => p !== part), part];
+  // DOM order doubles as the stacking order here (backed up by `--active`'s
+  // z-index). Two rules decide it:
+  //
+  //  1. The active part renders last, so it paints over its neighbours.
+  //  2. Text sinks to the bottom whenever it is NOT the active part. The T
+  //     overlaps stroke's bottom-left corner, and painted on top of stroke
+  //     while an edge is active it reads as though the picker were aimed at
+  //     the text — nothing else on screen contradicts that.
+  const back = CANONICAL_ORDER.filter((p) => p !== part);
+  const ordered = [
+    ...back.filter((p) => p === "text"),
+    ...back.filter((p) => p !== "text"),
+    part,
+  ];
 
   /** The parts arrow-key cycling steps through — dimmed boxes are not stops,
    *  or the cycle would land the picker on a write that goes nowhere. */
@@ -151,8 +162,6 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
           onClick={() => canSwap && swap()}
         >
           <svg
-            width="18"
-            height="18"
             viewBox="0 0 24 24"
             aria-hidden="true"
             fill="none"
