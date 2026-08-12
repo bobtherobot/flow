@@ -329,6 +329,15 @@
   background: var(--flow-hover);
 }
 
+/* Same treatment as the grid's __trash[aria-disabled="true"] below: the
+   inert footer trash (Recent palette, nothing selected) must not still look
+   like a working hover/click target. Placed after :hover so equal-
+   specificity source order — not a specificity bump — is what wins here. */
+.flow-clr-palette__icon[aria-disabled="true"] {
+  color: var(--flow-ink-disabled);
+  cursor: default;
+}
+
 /* flow is desktop-only: these are mouse targets, sized for density. */
 .flow-clr-palette__grid {
   display: flex;
