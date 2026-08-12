@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { RECENT_PALETTE_ID, RECENT_PALETTE_NAME } from "../src/lib/color-palettes";
 
 /** Draw a rectangle by dragging; leaves it selected. */
 async function drawRect(page: Page, x1: number, y1: number, x2: number, y2: number) {
@@ -48,6 +49,58 @@ async function clickStroke(page: Page, root: string) {
 }
 
 const popup = '[role="dialog"][aria-label="Color picker"]';
+
+/**
+ * Drive the docked panel's palette dropdown by the option label the user reads.
+ *
+ * `exact: true` is load-bearing: `getByLabel("Palette")` also substring-matches
+ * the "Add palette" and "Delete palette" buttons sitting beside the select, and
+ * Playwright rejects the ambiguity under strict mode.
+ */
+async function selectPalette(page: Page, name: string) {
+  await page.locator(panel).getByLabel("Palette", { exact: true }).selectOption({ label: name });
+}
+
+/** The swatch tiles of whichever palette the docked panel currently shows.
+ *  Scoped to `__tile`, so the grid's leading trash and [+] tiles don't count. */
+const paletteTiles = (page: Page) => page.locator(panel).locator(".flow-clr-palette__tile");
+
+/**
+ * The last-drawn element's fill, reduced to the six-digit hex a palette stores.
+ *
+ * The scene value carries an alpha byte (`#rrggbbaa`): a fresh rectangle's fill
+ * is "transparent", which `splitColorAlpha` reads as alpha 0, so every write
+ * from the picker recombines to a zero-alpha color until someone touches
+ * opacity. `scrubHex` drops that byte on the way into a palette, so swatch and
+ * strip labels are always six digits. The regex asserts the shape rather than
+ * assuming it — a change in either direction fails loudly here instead of
+ * quietly mismatching a selector somewhere downstream. It also subsumes the
+ * "not still transparent" check: "transparent" cannot match it.
+ */
+async function appliedFill(page: Page): Promise<string> {
+  const raw: string = await page.evaluate(
+    () => (window as any).h.elements.at(-1).backgroundColor,
+  );
+  expect(raw).toMatch(/^#[0-9a-f]{6}([0-9a-f]{2})?$/);
+  return raw.slice(0, 7);
+}
+
+/**
+ * One whole rail-popup session: open it on the active box, click the saturation
+ * area at the given fractions, close it. Returns the hex it left on the
+ * selection — which is the hex closing should have recorded.
+ */
+async function pickInRailPopup(page: Page, fx: number, fy: number): Promise<string> {
+  await page.locator(".flow-toolbar__color").getByRole("radio", { name: /Fill/ }).click();
+  const dialog = page.locator(popup);
+  await expect(dialog).toBeVisible();
+  const box = (await dialog.getByRole("application").boundingBox())!;
+  await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+  const hex = await appliedFill(page);
+  await dialog.getByRole("button", { name: /close color picker/i }).click();
+  await expect(dialog).toHaveCount(0);
+  return hex;
+}
 
 test("the dock has exactly one color panel", async ({ page }) => {
   await page.goto("/");
@@ -228,36 +281,31 @@ test("the rail popup and the panel stay in step", async ({ page }) => {
   await expect(page.locator(popup)).toHaveCount(0);
 });
 
-test("recents accumulate and survive a reload", async ({ page }) => {
+test("two popup sessions accumulate two colors", async ({ page }) => {
+  // Was "recents accumulate and survive a reload", driven through the docked
+  // panel's Hex field. That route no longer records anything: the six-slot
+  // recents cache became the Recent palette, and the rail popup's close is the
+  // only automatic way into it. The accumulation this test exists for is real
+  // and unchanged; only the way a color gets there moved.
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
-  // NOT Black/White/Grey: the quartet's quick colors are deliberately excluded
-  // from recents (useColorTarget.quickSet routes them through `applyColor`,
-  // not `setColor`) — they already have permanent dedicated chips one click
-  // away, so caching them would just evict colors the user actually chose.
-  // Real, non-quartet colors go through the numeric fields' Hex commit path
-  // instead, which does record.
-  await page.locator(panel).getByLabel("Color format").selectOption("hex");
-  const hex = page.locator(panel).getByLabel("Hex", { exact: true });
-
-  await hex.fill("#ff00ff");
-  await hex.press("Enter");
-  await hex.fill("#00ffff");
-  await hex.press("Enter");
+  const first = await pickInRailPopup(page, 0.8, 0.3);
+  const second = await pickInRailPopup(page, 0.25, 0.75);
+  // Two genuinely different colors, or the "accumulate" in the title is a lie
+  // and the second session is silently a no-op re-record of the first.
+  expect(second).not.toBe(first);
 
   await page.locator(".flow-toolbar__color").getByRole("radio", { name: /Fill/ }).click();
-  await expect(page.locator(popup).getByRole("button", { name: "Recent color #00ffff" })).toBeVisible();
-  await expect(page.locator(popup).getByRole("button", { name: "Recent color #ff00ff" })).toBeVisible();
-
-  await page.reload();
-  await page.waitForSelector(".flow-pnl");
-  await page.locator(".flow-toolbar__color").getByRole("radio", { name: /Fill/ }).click();
-  await expect(page.locator(popup).getByRole("button", { name: "Recent color #00ffff" })).toBeVisible();
+  await expect(page.locator(popup).getByRole("button", { name: `Recent color ${second}` })).toBeVisible();
+  await expect(page.locator(popup).getByRole("button", { name: `Recent color ${first}` })).toBeVisible();
 });
 
 test("quickSet white/grey/black does not pollute recents", async ({ page }) => {
+  // The quartet chips live on the rail *outside* the popup and write straight
+  // through `useColorTarget`, so no picker session ever captures them — the
+  // Recent palette must stay untouched by all three.
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
@@ -489,4 +537,134 @@ test("the rail's color control fits the rail without overflowing", async ({ page
   });
   expect(overflow.h).toBeLessThanOrEqual(0);
   expect(overflow.v).toBeLessThanOrEqual(0);
+});
+
+// --- the Recent palette: the rotating-color loop ---
+//
+// flow's six-slot recents cache became a real, editable palette (fixed id
+// `flow-recent`, capacity 20) that appears in the dropdown like any other, and
+// the rail popup's close is the ONLY automatic way a color enters it. Three of
+// that design's risks are invisible to jsdom — `aria-disabled` instead of the
+// native `disabled` attribute (Chrome delivers no mouse events at all to a
+// disabled form control, and these tiles are HTML5 drop targets), the inert
+// trash's CSS cascade, and the fact that the dropdown, the popup's strip and
+// the scene are three surfaces that have to agree. Hence these live here.
+
+test("a color picked in the rail popup joins the Recent palette on close", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await drawRect(page, 560, 300, 680, 380);
+
+  // A fresh profile starts with an empty Recent palette — nothing to confuse
+  // the assertions with, and no hardcoded hex anywhere in this test.
+  await selectPalette(page, RECENT_PALETTE_NAME);
+  await expect(paletteTiles(page)).toHaveCount(0);
+
+  // Open the rail's popup on the active box and give the fill a real color.
+  await page.locator(".flow-toolbar__color").getByRole("radio", { name: /Fill/ }).click();
+  const dialog = page.locator(popup);
+  await expect(dialog).toBeVisible();
+  const box = (await dialog.getByRole("application").boundingBox())!;
+  await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.3);
+
+  const applied = await appliedFill(page);
+
+  // Still nothing: the color settles when the session ends, not before. A
+  // forty-event hue drag has to contribute one color, not forty, and the only
+  // way to know which one is to wait for the session to finish.
+  await expect(paletteTiles(page)).toHaveCount(0);
+
+  await dialog.getByRole("button", { name: /close color picker/i }).click();
+
+  await expect(page.locator(panel).getByRole("button", { name: `Swatch ${applied}` })).toBeVisible();
+  await expect(paletteTiles(page)).toHaveCount(1);
+});
+
+test("the popup's strip shows what the Recent palette holds", async ({ page }) => {
+  // The strip and the dropdown's Recent entry are one array, not two stores
+  // kept in step — this is the assertion that would catch them drifting apart.
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await drawRect(page, 560, 300, 680, 380);
+
+  const applied = await pickInRailPopup(page, 0.8, 0.3);
+
+  await page.locator(".flow-toolbar__color").getByRole("radio", { name: /Fill/ }).click();
+  await expect(page.locator(popup).getByRole("button", { name: `Recent color ${applied}` }))
+    .toBeVisible();
+
+  // Same color, other surface: the docked panel's Recent entry holds it too.
+  await page.keyboard.press("Escape");
+  await selectPalette(page, RECENT_PALETTE_NAME);
+  await expect(page.locator(panel).getByRole("button", { name: `Swatch ${applied}` })).toBeVisible();
+});
+
+test("a color set from the docked panel does NOT join the Recent palette", async ({ page }) => {
+  // The core of the brief: the popup is the only automatic route in. This is
+  // the assertion that fails if recording ever drifts back into the shared
+  // useColorTarget write path — `setColor` is one method again, and the docked
+  // panel's saturation box calls exactly the same one the popup does.
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await drawRect(page, 560, 300, 680, 380);
+
+  await seedSaturation(page);
+
+  // Prove the edit actually landed before asserting that nothing recorded it.
+  // Without this the test would pass just as happily if the click had missed
+  // the saturation box entirely — an empty palette proves nothing on its own.
+  await expect(page.locator(panel).getByLabel("Lightness")).not.toHaveValue("0");
+  await appliedFill(page);
+
+  await selectPalette(page, RECENT_PALETTE_NAME);
+  await expect(paletteTiles(page)).toHaveCount(0);
+});
+
+test("the Recent palette cannot be deleted", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await selectPalette(page, RECENT_PALETTE_NAME);
+
+  // `aria-disabled`, never the native `disabled` attribute: Chrome delivers no
+  // mouse events to a disabled form control, and this grid's tiles are HTML5
+  // drop targets that run on them. jsdom models none of that, so a unit test
+  // keeps passing with `disabled` swapped back in — this is the only place the
+  // distinction can be asserted.
+  const trash = page.locator(panel).getByRole("button", { name: "Delete palette" });
+  await expect(trash).toHaveAttribute("aria-disabled", "true");
+  await expect(trash).not.toHaveAttribute("disabled", /.*/);
+
+  // `force: true` is required, and is the point rather than a workaround:
+  // Playwright's actionability check honours `aria-disabled` and would sit
+  // there retrying "element is not enabled" until the test timed out, never
+  // dispatching anything. Forcing it sends a real mouse click at the element —
+  // which Chrome *does* deliver, because the element is not natively disabled —
+  // so what this asserts is that the handler itself declines, not that the
+  // browser swallowed the event.
+  await trash.click({ force: true });
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(page.locator(panel).getByLabel("Palette", { exact: true }))
+    .toHaveValue(RECENT_PALETTE_ID);
+
+  // Control, so the assertions above can't pass against a trash that had
+  // quietly stopped working for every palette: a palette that CAN be deleted
+  // still opens the confirmation from the same button. A new empty palette
+  // rather than a named builtin — which palettes ship is a product decision.
+  await page.locator(panel).getByRole("button", { name: "Add palette" }).click();
+  await expect(trash).toHaveAttribute("aria-disabled", "false");
+  await trash.click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+});
+
+test("the Recent palette survives a reload", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await drawRect(page, 560, 300, 680, 380);
+
+  const applied = await pickInRailPopup(page, 0.8, 0.3);
+
+  await page.reload();
+  await page.waitForSelector(".flow-pnl");
+  await selectPalette(page, RECENT_PALETTE_NAME);
+  await expect(page.locator(panel).getByRole("button", { name: `Swatch ${applied}` })).toBeVisible();
 });
