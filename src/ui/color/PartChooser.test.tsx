@@ -20,6 +20,10 @@ function target(over: Partial<ColorTarget> = {}): ColorTarget {
   };
 }
 
+/** State now lives in the SVG, not in a modifier class on the button. */
+const isNoneArt = (el: HTMLElement) => el.querySelector("line") !== null;
+const isMixedArt = (el: HTMLElement) => el.querySelector("pattern") !== null;
+
 describe("PartChooser", () => {
   it("renders a box per available part", () => {
     render(<PartChooser target={target()} />);
@@ -77,43 +81,70 @@ describe("PartChooser", () => {
     expect(screen.queryByRole("button", { name: /swap/i })).not.toBeInTheDocument();
   });
 
-  it("marks a transparent part as none", () => {
+  it("draws a transparent part as none", () => {
     render(<PartChooser target={target({ partColor: () => "transparent" })} />);
-    expect(screen.getByRole("radio", { name: /fill/i })).toHaveClass("flow-clr-part--none");
+    expect(isNoneArt(screen.getByRole("radio", { name: /fill/i }))).toBe(true);
   });
 
-  it("does not mark an opaque part as none", () => {
-    // Would still pass if `--none` were applied unconditionally.
+  it("does not draw an opaque part as none", () => {
+    // Would still pass if the slash were drawn unconditionally.
     render(<PartChooser target={target()} />);
-    expect(screen.getByRole("radio", { name: /fill/i })).not.toHaveClass("flow-clr-part--none");
+    expect(isNoneArt(screen.getByRole("radio", { name: /fill/i }))).toBe(false);
   });
 
-  it("marks a mixed active part", () => {
+  it("draws a mixed active part as mixed", () => {
     render(<PartChooser target={target({ isMixed: true })} />);
-    expect(screen.getByRole("radio", { name: /fill/i })).toHaveClass("flow-clr-part--mixed");
+    expect(isMixedArt(screen.getByRole("radio", { name: /fill/i }))).toBe(true);
   });
 
-  it("does not mark a non-mixed active part as mixed", () => {
-    // Would still pass if `--mixed` were applied unconditionally.
+  it("does not draw a non-mixed active part as mixed", () => {
     render(<PartChooser target={target({ isMixed: false })} />);
-    expect(screen.getByRole("radio", { name: /fill/i })).not.toHaveClass("flow-clr-part--mixed");
+    expect(isMixedArt(screen.getByRole("radio", { name: /fill/i }))).toBe(false);
   });
 
-  it("does not mark an inactive part as mixed even when isMixed is true", () => {
+  it("does not draw an inactive part as mixed even when isMixed is true", () => {
     // isMixed describes only the active part's read; the back box has no
-    // opinion on mixedness and must not borrow the active part's class.
+    // opinion on mixedness and must not borrow the active part's state.
     render(<PartChooser target={target({ isMixed: true })} />);
-    expect(screen.getByRole("radio", { name: /stroke/i })).not.toHaveClass("flow-clr-part--mixed");
+    expect(isMixedArt(screen.getByRole("radio", { name: /stroke/i }))).toBe(false);
   });
 
-  it("gives every visible part a distinct diagonal offset", () => {
+  const posOf = (el: HTMLElement) => {
+    const s = (el as HTMLElement).style;
+    return `${s.getPropertyValue("--flow-clr-part-top")},${s.getPropertyValue("--flow-clr-part-left")}`;
+  };
+
+  it("gives every visible part a distinct position", () => {
     // stroke and text once shared right:0/bottom:0, which made whichever sat
-    // behind unclickable in the three-part case.
+    // behind completely covered and unclickable in the three-part case.
     render(<PartChooser target={target({ available: ["fill", "stroke", "text"] })} />);
-    const offsets = screen
-      .getAllByRole("radio")
-      .map((el) => (el as HTMLElement).style.getPropertyValue("--flow-clr-part-offset"));
-    expect(new Set(offsets).size).toBe(3);
+    const positions = screen.getAllByRole("radio").map(posOf);
+    expect(new Set(positions).size).toBe(3);
+  });
+
+  it("steps fill and stroke down the diagonal and drops text below fill", () => {
+    render(<PartChooser target={target({ available: ["fill", "stroke", "text"] })} />);
+    expect(posOf(screen.getByRole("radio", { name: /fill/i }))).toBe("0,0");
+    expect(posOf(screen.getByRole("radio", { name: /stroke/i }))).toBe("0.5,0.5");
+    expect(posOf(screen.getByRole("radio", { name: /^text/i }))).toBe("1.25,0");
+  });
+
+  it("puts a lone text part at the origin rather than on row two", () => {
+    // Otherwise a bare text selection renders its only box floating below an
+    // empty gap where fill and stroke would have been.
+    render(<PartChooser target={target({ available: ["text"], part: "text" })} />);
+    expect(posOf(screen.getByRole("radio", { name: /^text/i }))).toBe("0,0");
+  });
+
+  it("sizes the stack by how many parts are showing", () => {
+    const { rerender } = render(<PartChooser target={target()} />);
+    expect(screen.getByRole("radiogroup")).toHaveClass("flow-clr-chooser__stack--parts-2");
+
+    rerender(<PartChooser target={target({ available: ["fill", "stroke", "text"] })} />);
+    expect(screen.getByRole("radiogroup")).toHaveClass("flow-clr-chooser__stack--parts-3");
+
+    rerender(<PartChooser target={target({ available: ["text"], part: "text" })} />);
+    expect(screen.getByRole("radiogroup")).toHaveClass("flow-clr-chooser__stack--parts-1");
   });
 
   it("moves the active part with arrow keys and wraps", () => {
@@ -143,5 +174,18 @@ describe("PartChooser", () => {
   it("still shows the quartet in compact mode", () => {
     render(<PartChooser target={target()} compact />);
     expect(screen.getByRole("button", { name: /^black$/i })).toBeInTheDocument();
+  });
+
+  it("lays the quartet out in reading order so a 2x2 grid stays predictable", () => {
+    render(<PartChooser target={target()} />);
+    const chips = screen
+      .getAllByRole("button")
+      .filter((b) => b.className.split(" ").includes("flow-clr-chip"));
+    expect(chips.map((c) => c.getAttribute("aria-label"))).toEqual([
+      "None",
+      "White",
+      "Grey",
+      "Black",
+    ]);
   });
 });

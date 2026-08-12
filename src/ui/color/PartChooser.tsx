@@ -2,6 +2,7 @@ import { useRef } from "react";
 import "./color.css";
 import type { ColorPart } from "../../lib/color-parts";
 import type { ColorTarget, QuickColor } from "./useColorTarget";
+import { PartArt, NoneSwatch } from "./PartArt";
 
 interface PartChooserProps {
   target: ColorTarget;
@@ -18,6 +19,22 @@ const PART_LABEL: Record<ColorPart, string> = {
 /** Canonical left-to-right/top-to-bottom order the diagonal steps through —
  *  independent of render order, which moves the active part last. */
 const CANONICAL_ORDER: ColorPart[] = ["fill", "stroke", "text"];
+
+/**
+ * Where each part sits, in units of `--flow-clr-part-size`. Fill and stroke
+ * step down a diagonal; text drops below fill and left-aligned with it, so it
+ * reads as "the two edges" plus "the label".
+ *
+ * Fixed positions are safe here only because these three are distinct by
+ * construction AND `availableParts` returns exactly three shapes
+ * (`src/lib/color-parts.ts:59-70`). An earlier fixed-position attempt gave
+ * stroke and text the same spot, which buried whichever sat behind.
+ */
+const POSITION: Record<ColorPart, { top: number; left: number }> = {
+  fill: { top: 0, left: 0 },
+  stroke: { top: 0.5, left: 0.5 },
+  text: { top: 1.25, left: 0 },
+};
 
 const QUICK: { kind: QuickColor; label: string; hex: string }[] = [
   { kind: "none", label: "None", hex: "transparent" },
@@ -46,11 +63,12 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
     ? [...available.filter((p) => p !== part), part]
     : available;
 
-  // Diagonal position is driven by index among the parts actually on screen,
-  // in canonical (not render) order — two parts land on the corners, three
-  // spread evenly between them.
   const visible = CANONICAL_ORDER.filter((p) => available.includes(p));
-  const offsetOf = (p: ColorPart) => (visible.length > 1 ? visible.indexOf(p) / (visible.length - 1) : 0);
+
+  // A bare text selection shows its only box at the origin, not floating on
+  // row two below an empty gap where fill and stroke would have been.
+  const singlePart = visible.length === 1;
+  const positionOf = (p: ColorPart) => (singlePart ? { top: 0, left: 0 } : POSITION[p]);
 
   const onStackKeyDown = (e: React.KeyboardEvent) => {
     const forward = e.key === "ArrowRight" || e.key === "ArrowDown";
@@ -66,7 +84,7 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
   return (
     <div className={`flow-clr-chooser${compact ? " flow-clr-chooser--compact" : ""}`}>
       <div
-        className="flow-clr-chooser__stack"
+        className={`flow-clr-chooser__stack flow-clr-chooser__stack--parts-${visible.length}`}
         role="radiogroup"
         aria-label="Color target"
         onKeyDown={onStackKeyDown}
@@ -77,13 +95,7 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
           // isMixed describes only the currently active part's read; a back
           // box has no independent opinion on mixedness.
           const mixed = isMixed && p === part;
-          const classes = [
-            "flow-clr-part",
-            `flow-clr-part--${p}`,
-            p === part ? "flow-clr-part--active" : "",
-            none ? "flow-clr-part--none" : "",
-            mixed ? "flow-clr-part--mixed" : "",
-          ]
+          const classes = ["flow-clr-part", p === part ? "flow-clr-part--active" : ""]
             .filter(Boolean)
             .join(" ");
 
@@ -101,16 +113,12 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
               className={classes}
               tabIndex={p === part ? 0 : -1}
               style={{
-                ["--flow-clr-part-offset" as string]: offsetOf(p),
-                ...(none || mixed ? {} : { ["--flow-clr-part-color" as string]: color }),
+                ["--flow-clr-part-top" as string]: positionOf(p).top,
+                ["--flow-clr-part-left" as string]: positionOf(p).left,
               }}
               onClick={() => setPart(p)}
             >
-              {p === "text" && (
-                <span className="flow-clr-part__glyph" aria-hidden="true">
-                  T
-                </span>
-              )}
+              <PartArt part={p} color={color} isMixed={mixed} />
             </button>
           );
         })}
@@ -147,12 +155,14 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
           <button
             key={q.kind}
             type="button"
-            className={`flow-clr-chip${q.kind === "none" ? " flow-clr-chip--none" : ""}`}
+            className="flow-clr-chip"
             style={q.kind === "none" ? undefined : { background: q.hex }}
             aria-label={q.label}
             title={q.label}
             onClick={() => quickSet(q.kind)}
-          />
+          >
+            {q.kind === "none" && <NoneSwatch />}
+          </button>
         ))}
       </div>
     </div>

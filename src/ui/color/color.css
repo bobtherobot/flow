@@ -88,33 +88,6 @@
   min-width: 0;
 }
 
-.flow-clr-preview {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 auto;
-  overflow: hidden;
-  border-radius: 50%;
-  border: 1px solid var(--flow-border);
-  background-image: conic-gradient(#c8c8c8 0 25%, #fff 0 50%, #c8c8c8 0 75%, #fff 0);
-  background-size: 10px 10px;
-}
-
-.flow-clr-preview__fill {
-  position: absolute;
-  inset: 0;
-}
-
-/* "No color": a red slash over white, matching the quartet's none chip. */
-.flow-clr-preview--none {
-  background-image: linear-gradient(
-    to bottom right,
-    #fff calc(50% - 1px), #e03131 calc(50% - 1px),
-    #e03131 calc(50% + 1px), #fff calc(50% + 1px)
-  );
-  background-size: 100% 100%;
-}
-
 .flow-clr-eyedropper {
   display: grid;
   place-items: center;
@@ -194,101 +167,57 @@
 
 .flow-clr-chooser__stack {
   position: relative;
-  width: 74px;
-  height: 74px;
   --flow-clr-part-size: 46px;
 }
 
 .flow-clr-chooser--compact .flow-clr-chooser__stack {
-  width: 52px;
-  height: 52px;
   --flow-clr-part-size: 32px;
 }
 
+/* Stack extent per part count, in units of `--flow-clr-part-size`: 1x1 for a
+   lone text part, 1.5x1.5 for a shape (fill+stroke), 1.5x2.25 for a labelled
+   container (fill+stroke+text). `--parts-N` is set by PartChooser from
+   `visible.length` and does the actual sizing work here — it used to be a
+   test-only hook while an inline style carried these numbers instead. */
+.flow-clr-chooser__stack--parts-1 {
+  width: var(--flow-clr-part-size);
+  height: var(--flow-clr-part-size);
+}
+
+.flow-clr-chooser__stack--parts-2 {
+  width: calc(1.5 * var(--flow-clr-part-size));
+  height: calc(1.5 * var(--flow-clr-part-size));
+}
+
+.flow-clr-chooser__stack--parts-3 {
+  width: calc(1.5 * var(--flow-clr-part-size));
+  height: calc(2.25 * var(--flow-clr-part-size));
+}
+
 /*
- * Boxes step down the diagonal by their index among the VISIBLE parts (set
- * from `--flow-clr-part-offset`, 0..1), so two parts sit at the corners and
- * three spread evenly between them. Driven by a custom property rather than
- * per-part `top`/`left`/`right`/`bottom` rules because `stroke` and `text`
- * are never both visible at once as siblings of a two-part stack, but they
- * ARE both visible in the three-part (labeled container) case — fixed
- * per-part offsets there gave them the identical position, so whichever sat
- * behind was completely covered and unclickable.
+ * Layout only. Every pixel of a part's artwork — the dark and light rules, the
+ * stroke ring, the T silhouette, none and mixed — is drawn by PartArt.tsx.
+ * Nothing here paints.
  */
 .flow-clr-part {
   position: absolute;
-  top: calc(var(--flow-clr-part-offset, 0) * (100% - var(--flow-clr-part-size)));
-  left: calc(var(--flow-clr-part-offset, 0) * (100% - var(--flow-clr-part-size)));
+  top: calc(var(--flow-clr-part-top, 0) * var(--flow-clr-part-size));
+  left: calc(var(--flow-clr-part-left, 0) * var(--flow-clr-part-size));
   width: var(--flow-clr-part-size);
   height: var(--flow-clr-part-size);
   padding: 0;
   cursor: pointer;
-  background: var(--flow-clr-part-color, #fff);
-  border: 2px solid var(--flow-ink);
+  background: none;
+  border: none;
 }
 
-/*
- * The stroke box reads as a ring, not a filled square: the swatch color
- * covers the whole box, then `::after` punches a hole by painting a smaller
- * centered square in the panel surface color on top of it.
- *
- * A brief for this task specified a double inset `box-shadow` for the ring
- * instead (an outer inset shadow in the swatch color layered over an inner
- * inset shadow in white). That doesn't work: box-shadow layers paint
- * front-to-back in listing order, both on top of `background`, and both
- * insets grow inward *from the edge* — so with this box's background already
- * filled solid, the result is a color band at the edge, a thin white ring
- * just inside it, and the untouched solid-color background showing again
- * for the rest of the interior. That is a bullseye, not a ring: the center
- * stays filled instead of reading as a hole. Nothing renders this file
- * (Task 12's component isn't mounted until Task 14), so this was caught by
- * reasoning through the paint order rather than by looking at it — the
- * `::after` hole below replaces it.
- */
-.flow-clr-part--stroke::after {
-  content: "";
-  position: absolute;
-  inset: 9px;
-  background: var(--flow-panel-bg);
-}
-
-.flow-clr-chooser--compact .flow-clr-part--stroke::after {
-  inset: 6px;
+/* The SVG fills its button; `display: block` kills the inline-baseline gap. */
+.flow-clr-art {
+  display: block;
 }
 
 .flow-clr-part--active {
   z-index: 2;
-}
-
-.flow-clr-part--none {
-  background: linear-gradient(
-    to bottom right,
-    #fff calc(50% - 1.5px),
-    #e03131 calc(50% - 1.5px),
-    #e03131 calc(50% + 1.5px),
-    #fff calc(50% + 1.5px)
-  );
-}
-
-.flow-clr-part--mixed {
-  background-image: conic-gradient(#c8c8c8 0 25%, #fff 0 50%, #c8c8c8 0 75%, #fff 0);
-  background-size: 8px 8px;
-}
-
-/* A "none" or "mixed" stroke shows the same full-square treatment as fill
-   and text — the ring reading is only meaningful when a real color is
-   underneath it, so the punched hole is suppressed here. */
-.flow-clr-part--none::after,
-.flow-clr-part--mixed::after {
-  content: none;
-}
-
-.flow-clr-part__glyph {
-  font-weight: 700;
-  font-size: 20px;
-  line-height: 1;
-  color: var(--flow-ink);
-  mix-blend-mode: difference;
 }
 
 .flow-clr-chooser__swap {
@@ -307,27 +236,26 @@
   border: none;
 }
 
+/* Two columns, filled in reading order: none, white / grey, black. */
 .flow-clr-quartet {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, var(--flow-clr-chip-size));
   gap: 4px;
+  --flow-clr-chip-size: 20px;
 }
 
 .flow-clr-chip {
-  width: var(--flow-clr-chip-size, 22px);
-  height: var(--flow-clr-chip-size, 22px);
+  /* No global box-sizing: border-box in this project (only toolbar.css has
+     one, scoped to the rail), so a bordered tile sized by width/height alone
+     grows 2px past a borderless tile of the same declared size — border-box
+     keeps this chip at its declared 20px instead of 22px. */
+  box-sizing: border-box;
+  width: var(--flow-clr-chip-size);
+  height: var(--flow-clr-chip-size);
   padding: 0;
+  overflow: hidden;
   cursor: pointer;
   border: 1px solid var(--flow-ink);
-}
-
-.flow-clr-chip--none {
-  background: linear-gradient(
-    to bottom right,
-    #fff calc(50% - 1px),
-    #e03131 calc(50% - 1px),
-    #e03131 calc(50% + 1px),
-    #fff calc(50% + 1px)
-  );
 }
 
 /* Palette section: tile density and control sizing carried forward from the
@@ -371,34 +299,63 @@
   background: var(--flow-hover);
 }
 
+/* flow is desktop-only: these are mouse targets, sized for density. */
 .flow-clr-palette__grid {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  --flow-clr-tile-size: 18px;
 }
 
 .flow-clr-palette__add,
+.flow-clr-palette__trash,
 .flow-clr-palette__tile {
-  width: 22px;
-  height: 22px;
+  /* No global box-sizing: border-box in this project (only toolbar.css has
+     one, scoped to the rail). __add/__trash carry a 1px border and __tile
+     doesn't, so without border-box the bordered cells total 20px against
+     the tile's 18px and sit visibly larger in the same grid row. */
+  box-sizing: border-box;
+  width: var(--flow-clr-tile-size);
+  height: var(--flow-clr-tile-size);
   padding: 0;
   cursor: pointer;
-  border: 1px solid var(--flow-border);
   border-radius: var(--flow-radius-sm);
 }
 
-.flow-clr-palette__add {
+/* A colour tile carries no border: a hairline competes with the swatch it is
+   supposed to be showing. The shadow gives a pale swatch an edge instead. */
+.flow-clr-palette__tile {
+  border: none;
+  box-shadow: 0 1px 2px rgb(43 43 51 / 18%);
+}
+
+/* The trash and [+] carry no colour, so they keep a hairline against the
+   panel background. */
+.flow-clr-palette__add,
+.flow-clr-palette__trash {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 12px;
   line-height: 1;
   color: var(--flow-ink);
   background: transparent;
+  border: 1px solid var(--flow-border);
 }
 
-.flow-clr-palette__add:hover {
+.flow-clr-palette__add:hover,
+.flow-clr-palette__trash:hover {
   background: var(--flow-hover);
+}
+
+.flow-clr-palette__trash[aria-disabled="true"] {
+  color: var(--flow-ink-disabled);
+}
+
+/* Only while a swatch is actually over it — this is the drop affordance. */
+.flow-clr-palette__trash--over {
+  background: var(--flow-active);
+  border-color: var(--flow-accent);
 }
 
 .flow-clr-palette__tile[aria-pressed="true"] {
@@ -498,25 +455,19 @@
   padding: 0;
   cursor: pointer;
   background: var(--flow-panel-bg);
-  border: 1px solid var(--flow-border);
+  border: none;
+  box-shadow: 0 1px 2px rgb(43 43 51 / 18%);
   border-radius: var(--flow-radius-sm);
 }
 
 .flow-clr-recents__slot:disabled {
   cursor: default;
+  border: 1px solid var(--flow-border);
+  box-shadow: none;
 }
 
-/* The quartet at its default 22px chip doesn't fit the rail's compact chooser
-   (88px rail − 1px border − 8px padding = 79px usable; 4×22 + 3×4 gaps = 100px).
-   Same technique as `--flow-clr-part-size` (Task 12): a custom property on the
-   chooser, overridden under `--compact`. 16px chips at a 3px gap measure 73px
-   in the running rail (getBoundingClientRect, Chromium) — 6px of headroom
-   against the 79px usable width. */
-.flow-clr-quartet {
-  --flow-clr-chip-size: 22px;
-}
-
+/* flow is desktop-only: these are mouse targets, sized for density. */
 .flow-clr-chooser--compact .flow-clr-quartet {
-  --flow-clr-chip-size: 16px;
+  --flow-clr-chip-size: 14px;
   gap: 3px;
 }

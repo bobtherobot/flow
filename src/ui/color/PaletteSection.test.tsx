@@ -225,4 +225,94 @@ describe("PaletteSection", () => {
     setup();
     expect(screen.queryByRole("button", { name: /default/i })).not.toBeInTheDocument();
   });
+
+  const trash = () => screen.getByRole("button", { name: "Delete swatches" });
+  const swatches = () => screen.getAllByRole("button", { name: /^swatch /i });
+
+  /** HTML5 DnD in jsdom: dragStart on the source, then drop on the target.
+   *  PaletteSection tracks the source index in a ref, so no dataTransfer
+   *  payload is involved and none needs faking. */
+  function dragSwatchToTrash(index: number) {
+    fireEvent.dragStart(swatches()[index]);
+    fireEvent.dragOver(trash());
+    fireEvent.drop(trash());
+  }
+
+  it("deletes the dropped swatch and only that one", () => {
+    setup();
+    const before = swatches().map((s) => s.getAttribute("title"));
+    act(() => dragSwatchToTrash(2));
+    const after = swatches().map((s) => s.getAttribute("title"));
+    expect(after).toHaveLength(before.length - 1);
+    expect(after).toEqual(before.filter((_, i) => i !== 2));
+  });
+
+  it("does not let a cancelled drag strand an index the trash would later honour", () => {
+    // dragStart sets dragFrom.current but it was only ever cleared inside the
+    // two onDrop handlers. A drag released over the canvas or cancelled with
+    // Escape fires dragend on the source without either onDrop ever running,
+    // so dragFrom.current stays pointed at a real swatch indefinitely — the
+    // next drop on the trash, from anywhere, would then delete that stale
+    // swatch. dragend fires on the source whether or not the drag succeeded,
+    // so onDragEnd is where the ref must be cleared.
+    setup();
+    const before = swatches().length;
+    fireEvent.dragStart(swatches()[0]);
+    fireEvent.dragEnd(swatches()[0]);
+    fireEvent.dragOver(trash());
+    fireEvent.drop(trash());
+    expect(swatches()).toHaveLength(before);
+  });
+
+  it("accepts a drop while nothing is selected", () => {
+    // The regression this guards: a `disabled` trash gets no mouse events in
+    // Chrome, so it silently refuses drops in exactly the common case.
+    setup();
+    expect(trash()).not.toBeDisabled();
+    const before = swatches().length;
+    act(() => dragSwatchToTrash(0));
+    expect(swatches()).toHaveLength(before - 1);
+  });
+
+  it("marks the trash unavailable for clicking until swatches are selected", () => {
+    setup();
+    expect(trash()).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(swatches()[1], { metaKey: true });
+    expect(trash()).toHaveAttribute("aria-disabled", "false");
+  });
+
+  it("ignores a click while nothing is selected", () => {
+    setup();
+    const before = swatches().length;
+    fireEvent.click(trash());
+    expect(swatches()).toHaveLength(before);
+  });
+
+  it("removes exactly the selected swatches when clicked", () => {
+    setup();
+    const before = swatches().map((s) => s.getAttribute("title"));
+    fireEvent.click(swatches()[0], { metaKey: true });
+    fireEvent.click(swatches()[3], { metaKey: true });
+    act(() => {
+      fireEvent.click(trash());
+    });
+    const after = swatches().map((s) => s.getAttribute("title"));
+    expect(after).toEqual(before.filter((_, i) => i !== 0 && i !== 3));
+  });
+
+  it("explains the selection gesture on the grid trash", () => {
+    setup();
+    expect(trash().getAttribute("title")).toMatch(/drag/i);
+    expect(trash().getAttribute("title")).toMatch(/click/i);
+  });
+
+  it("says which of its two jobs the footer trash will do", () => {
+    setup();
+    const footer = () => screen.getByRole("button", { name: /delete palette/i });
+    expect(footer().getAttribute("title")).toMatch(/palette/i);
+
+    fireEvent.click(swatches()[0], { metaKey: true });
+    const withSelection = screen.getByRole("button", { name: /remove selected swatches/i });
+    expect(withSelection.getAttribute("title")).toMatch(/selected swatches/i);
+  });
 });

@@ -52,7 +52,6 @@ export function ColorPanel({ sel }: { sel: SelectionStyle }) {
       <PickerRow
         hsv={draft.hsv}
         alpha={draft.alpha}
-        isNone={draft.isNone}
         onHue={draft.setHue}
         onAlpha={draft.setAlpha}
         onPick={() => {

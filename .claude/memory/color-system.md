@@ -234,8 +234,12 @@ it needed no retuning for the wider rail, despite the spec predicting it would.
   recents (`flow.recentColors`, cross-document, no scene scan), numeric
   display mode (HSLA/RGBA/HEX)
 - `src/ui/color/` — every picker primitive (`SaturationBox`, `HueSlider`,
-  `AlphaSlider`, `NumericFields`, `PartChooser`), `useColorDraft`,
-  `useAreaDrag`
+  `AlphaSlider`, `NumericFields`, `PartChooser`, `PartArt`, `PaletteSection`,
+  `PickerRow`), `useColorDraft`, `useAreaDrag`. `PartArt` owns all part
+  artwork (see the picker-refinement section below — it replaced a CSS
+  `::after` trick). `PaletteSection` folds palette curation into the Color
+  panel. `PickerRow` no longer renders a preview well; `ColorPreview.tsx` is
+  gone from the tree entirely, not merely unlisted here.
 - `src/ui/panels/useSelectionStyle.ts`, `src/ui/panels/ColorPanel.tsx` — the
   docked surface, one `useSelectionStyle` instance owned by `PanelsRoot`
 - `src/ui/toolbar/RailColorControl.tsx` + `ColorPopup.tsx` — the rail
@@ -309,5 +313,141 @@ Separately and permanently red: `e2e/text-panel.spec.ts:201` and `:225`
 they reproduce byte-for-byte on `main` at main's own pinned vendor commit. Real
 pre-existing bugs, out of scope here.
 
-The whole suite's healthy state today is **127 passed / 2 failed**. Anything
+The whole suite's healthy state today is **129 passed / 2 failed**. Anything
 else, re-run the failing spec alone before believing it.
+
+## The picker-refinement branch (2026-08-11, second pass) — CSS artwork moved into `PartArt.tsx`
+
+A follow-up branch (`feat/color-picker-refinement`, created from `main` after
+the section above shipped; plan
+`docs/superpowers/plans/2026-08-11-color-picker-refinement.md`, spec
+`docs/superpowers/specs/2026-08-11-color-picker-refinement-design.md`;
+ledger `.superpowers/sdd/2026-08-11-color-picker-refinement/progress.md`)
+redid five things postdating everything above: all part-chooser artwork moved
+from CSS to SVG, the part stack rearranged (taller than wide), the
+quick-colour quartet became a 2×2 grid at smaller sizes, the palette grid
+gained a drag-to-delete trash tile, and the round preview well (`ColorPreview`)
+was removed from `PickerRow`. Verification at the end of Task 7 (this
+branch's last task): unit 868/868 (84 files), typecheck exit 0, e2e 129
+passed / 2 failed — the same two `text-panel.spec.ts` failures as always, no
+new ones.
+
+### `PartArt.tsx` replaces the CSS `::after` ring hole-punch
+
+The stroke box used to read as a ring via a `::after` pseudo-element painting
+a smaller inset square in the panel background color over a solid swatch.
+`color.css` used to carry a comment explaining why the more obvious approach
+(a double inset `box-shadow` — an outer inset shadow in the swatch color
+layered over an inner inset shadow in white) doesn't work: both insets grow
+inward *from the edge*, so over an already solid-filled background the result
+is a color band at the edge and a bullseye of solid white filling the rest of
+the interior — not a ring, and not fixable by adjusting the two inset
+amounts. `PartArt.tsx` replaces the whole approach with concentric stroked
+SVG paths and now carries that same "box-shadow can't do this" reasoning in
+its own comments — `color.css` no longer has an opinion on rings at all. (The
+old `flow-clr-part--{fill,stroke,text}` classes were left CSS-inert per the
+task brief rather than pruned at the time; the 2026-08-11 final-review pass
+removed them from `PartChooser.tsx` after confirming with `grep -rn
+"flow-clr-part--" src/ e2e/` that nothing selected them — `flow-clr-part` and
+`flow-clr-part--active` are the only ones any CSS rule uses.)
+
+**The mechanism**: one `<path>` per layer, stroked at successively narrower
+widths, **widest first**. An SVG stroke of width W straddles the path line by
+W/2 each side, so painting back-to-front in descending width produces even
+concentric bands — ink (width 8, or 15 for the ring), panel-surface (4, or 11
+for the ring), and for the stroke part a third band in the real color (7),
+all three `fill="none"` so the ring stays hollow. **Reversing the layer order
+is a silent visual regression, not a crash or a type error**: the ring
+collapses into a solid dark square and the filled parts lose their light rule
+entirely. `PartArt.test.tsx` is the only thing that catches it — check the
+DOM order of the `<path>` elements, not just their attributes, if this code
+ever looks subtly wrong.
+
+`paintOrder="stroke fill"` is applied **only** to the fill layer (the one
+with `fill !== "none"`): it makes that layer paint its fill over the inner
+half of its own stroke, which is what makes the light rule read as 2 units
+wide instead of 4. Applying it to every layer — an easy mistake, and Task 1's
+first draft did exactly this — makes the light rule disappear everywhere
+except that innermost edge.
+
+`useId()` on this codebase's React 19 yields an underscore-delimited id like
+`_r_0_` — no colon. (Older React versions used a colon-delimited id like
+`:r0:`: colons resolve fine through `getElementById`/`url(#id)`, which is how
+the component's own checkerboard `<pattern>` and `<clipPath>` references
+work, but they would break a **CSS class selector** built from the same
+string.) `PartArt` strips colons on principle (`useId().replace(/:/g, "")`)
+even though nothing in the current React version's id format needs it — a
+defensive guard against a future React version change, not something
+load-bearing today.
+
+### The part stack is a fixed, non-uniform layout — not a generic diagonal
+
+`PartChooser.tsx`'s `POSITION` table places each part explicitly, in units of
+`--flow-clr-part-size`: fill at `{top:0, left:0}`, stroke stepped to
+`{top:0.5, left:0.5}` (a half-part diagonal offset from fill), text dropped
+to `{top:1.25, left:0}` — back to fill's left edge, not a continuation of the
+diagonal. Fixed positions are safe only because `availableParts` always
+returns at most these three specific parts (`color-parts.ts`) — an earlier
+layout attempt stepped all three along one diagonal and put stroke and text
+at the same spot whenever a selection had both, burying whichever rendered
+behind. `STACK_SPAN` is likewise fixed per part count (1×1, 1.5×1.5,
+1.5×2.25 part-sizes) and drives `--flow-clr-stack-w/h`, which both the
+full-size and compact chooser consume from the same table. The 3-part case's
+extra height (2.25 vs 1.5 part-sizes) is what motivated Task 7's rail
+vertical-fit e2e test — see below for why that test doesn't actually reach
+the case it was written for.
+
+### `PaletteSection`'s trash tile: `aria-disabled`, never `disabled`
+
+The palette grid's leading trash tile intentionally carries `aria-disabled`
+instead of the native `disabled` attribute. **Chrome delivers no mouse events
+at all to a `disabled` form control**, and HTML5 drag-and-drop drop targets
+are implemented on top of mouse events (`dragover`/`drop`) — a `disabled`
+trash would silently refuse every drop in the single most common case
+(nothing selected, user just drags a swatch onto it). `aria-disabled`
+announces the same "can't act on this right now" state to assistive tech
+while keeping the element genuinely interactive for drops. **jsdom cannot
+catch a regression here** — it doesn't model Chrome's mouse-event suppression
+on disabled controls, so a jsdom-based drag simulation would keep passing
+even with `disabled` swapped back in. Only `e2e/color-panel.spec.ts`'s
+`"dragging a swatch onto the trash deletes it"` (Task 7), which drives real
+HTML5 DnD via Playwright's `dragAndDrop` in actual Chromium, is a genuine
+regression guard for this.
+
+### The rail vertical-fit e2e test needs an explicit re-select, and asserts it got one
+
+Task 7's first draft of `"the rail's color control fits the rail without
+overflowing"` (`e2e/color-panel.spec.ts`) drew a rectangle and gave it bound
+text via `Enter` → type → `Escape`, on the premise that a labelled container
+(3 parts: fill/stroke/text) is the tallest case the compact chooser renders.
+**That sequence alone does not reach the 3-part case.** Tool-lock stays on
+the Rectangle tool after drawing (flow forces it permanently on — see
+[[tool-override]]), and `Escape` out of the bound-text edit clears
+`selectedElementIds` to `{}` rather than restoring the container as selected.
+This is the same selection loss this file already documents as pre-existing
+and out of scope for `e2e/text-panel.spec.ts:201`/`:225` — the
+`addLabelledBox` helper those tests use is the identical
+`Enter`/type/`Escape` sequence, and they fail on the very next line for the
+same reason (the container reads as unselected, so the labelled-container-only
+UI stays disabled). A plain click on the canvas right after `Escape` does not
+reselect the container either: the active tool is still a drawing tool, not
+the selection tool, and Excalidraw only treats a plain click as a
+selection-click while the selection tool is active. A first-draft version of
+this test that stopped at `Escape` would pass while silently measuring the
+shorter `parts-2` case (1.5 part-sizes tall) instead of the `parts-3` case
+(2.25 part-sizes tall, stacked above the quartet) — passing for the wrong
+reason, with nothing in the test's output to reveal it.
+
+**The committed test routes around this explicitly**: after `Escape`, it
+clicks the Selection tool, then clicks the container's stroke edge (the
+interior doesn't hit-test — a fresh rectangle's fill is transparent) to force
+a genuine re-select, then asserts
+`page.locator(".flow-toolbar").getByRole("radio")` has count `3` **before**
+reading `scrollHeight`/`scrollWidth`. That count assertion is the durable
+part: if a future change breaks this re-selection trick (or the underlying
+Escape-selection-loss bug ever gets fixed and changes the interaction), the
+test fails loudly on the count instead of quietly reverting to measuring the
+2-part case again. Confirmed at the time of writing: `rail.scrollHeight -
+rail.clientHeight` is `0` for the real 3-part case at a 1440×900 viewport —
+the product risk the plan flagged is resolved, and now the test that says so
+actually proves it.

@@ -33,12 +33,18 @@ interface PaletteSectionProps {
  * through to "apply" would silently overwrite the live color instead of
  * just doing nothing). That split keeps the common action (apply a color)
  * one click, and the destructive one (queue for deletion) deliberate.
+ *
+ * The grid's leading trash tile is the discoverable route to the same thing:
+ * drag a swatch onto it, or select swatches and click it. The footer trash
+ * keeps both of its jobs (remove the selected swatches / delete the whole
+ * palette) and now says which one it will do via `title`.
  */
 export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   const { palettes, defaultPaletteId } = usePaletteState();
   const [selected, setSelected] = useState<number[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [overTrash, setOverTrash] = useState(false);
   const dragFrom = useRef<number | null>(null);
   /** Set by Escape so the input's blur-on-unmount does not commit the edit. */
   const abandonRename = useRef(false);
@@ -96,6 +102,38 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
       <div className="flow-clr-palette__grid">
         <button
           type="button"
+          className={`flow-clr-palette__trash${overTrash ? " flow-clr-palette__trash--over" : ""}`}
+          aria-label="Delete swatches"
+          title="Delete swatches — drag one here, or ⌘/Ctrl-click swatches to select them first"
+          // NOT `disabled`: Chrome delivers no mouse events to a disabled form
+          // control, and HTML5 drop targets run on mouse events — a disabled
+          // trash would refuse drops in exactly the common case (nothing
+          // selected, user drags a swatch onto it). aria-disabled announces
+          // the same thing and keeps the element live.
+          aria-disabled={selected.length === 0}
+          onClick={() => {
+            if (selected.length === 0) return;
+            removeSwatches(current.id, selected);
+            setSelected([]);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setOverTrash(true);
+          }}
+          onDragLeave={() => setOverTrash(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setOverTrash(false);
+            const from = dragFrom.current;
+            dragFrom.current = null;
+            if (from !== null) removeSwatches(current.id, [from]);
+            setSelected([]);
+          }}
+        >
+          🗑
+        </button>
+        <button
+          type="button"
           className="flow-clr-palette__add"
           aria-label="Add current color to palette"
           title="Add current color to palette"
@@ -116,6 +154,14 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
             onClick={(e) => onSwatchClick(i, e)}
             onDragStart={() => {
               dragFrom.current = i;
+            }}
+            // dragend fires on the source element whether the drag succeeded
+            // or was cancelled (dropped over the canvas, Escape). Without
+            // this, a cancelled drag leaves dragFrom.current pointing at a
+            // real index indefinitely, and the next unrelated drop on the
+            // trash would silently delete that stranded swatch.
+            onDragEnd={() => {
+              dragFrom.current = null;
             }}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
@@ -195,6 +241,11 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
           type="button"
           className="flow-clr-palette__icon"
           aria-label={selected.length > 0 ? "Remove selected swatches" : "Delete palette"}
+          title={
+            selected.length > 0
+              ? "Remove the selected swatches"
+              : `Delete the “${current.name}” palette`
+          }
           onClick={onTrash}
         >
           🗑
