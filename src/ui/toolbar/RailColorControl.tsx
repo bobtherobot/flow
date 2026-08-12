@@ -98,8 +98,10 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
         // Was `setOpen((o) => !o)`. The close half has to settle the session's
         // color, and `closePopup` is where that lives — a bare toggle would
         // silently drop it on the popup's most-used exit. Reading `open`
-        // directly is correct in an event handler: it is this render's value,
-        // and the only writer is this same handler.
+        // directly is correct in an event handler: `open` has a second writer
+        // (`closePopup`, via `ColorPopup`'s Escape/outside-pointerdown), but
+        // `chooserTarget` is rebuilt on every render, so the `open` this
+        // closure captures is always the latest committed value.
         if (!isArrowNav) {
           if (open) closePopup();
           else setOpen(true);

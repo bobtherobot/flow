@@ -192,8 +192,9 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
   const quickSet: ColorTarget["quickSet"] = (kind) => {
     if (kind !== "none") {
       // White/grey/black never join the Recent palette. They have permanent
-      // dedicated chips one click away, and these chips live on the rail
-      // outside the popup, so no session captures them either way.
+      // dedicated chips one click away, and `PartChooser`'s quartet chips
+      // (shared by both the rail popup and the docked panel) sit outside the
+      // popup on both surfaces, so no session captures them either way.
       setColor(QUICK_HEX[kind], 100, false);
       return;
     }

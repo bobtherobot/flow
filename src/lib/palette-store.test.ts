@@ -6,6 +6,7 @@ import {
   RECENT_PALETTE_ID,
   RECENT_PALETTE_NAME,
   RECENT_PALETTE_LIMIT,
+  builtinColors,
 } from "./color-palettes";
 
 // jsdom/Node's native `localStorage` global does not implement a usable
@@ -304,6 +305,40 @@ describe("the Recent palette", () => {
 
     expect(recent()!.colors).toEqual(["#abcdef"]);
     expect(store.getSnapshot().palettes.filter((p) => p.id === RECENT_PALETTE_ID)).toHaveLength(1);
+  });
+
+  it("survives being renamed to a builtin's name across a migration", () => {
+    // Named "Pastel", not "Recent" — deliberately. The sibling test above
+    // ("survives a builtin migration with its colors intact") keeps the name
+    // "Recent", so byName's Recent-vs-builtin collision never happens there
+    // and it can't catch migrateBuiltins matching by name. This test exercises
+    // the case that actually breaks it: the user renamed Recent to one of the
+    // nine BUILTIN_PALETTE_NAMES. Recent is stored LAST, so without the
+    // id-based exemption it would win the byName collision — the rebuilt
+    // Pastel builtin would steal id `flow-recent` and Pastel's seed colors,
+    // and the real Pastel builtin would never be recreated (dropped from
+    // `userMade` because its name now matches a builtin name too). If a
+    // future edit "simplifies" this test back to the name "Recent", it stops
+    // testing the fix — don't rename it back.
+    localStorage.setItem(
+      "flow.colorPalettes",
+      JSON.stringify([
+        { id: "p1", name: "Mine", colors: ["#112233"] },
+        { id: RECENT_PALETTE_ID, name: "Pastel", colors: ["#abcdef"] },
+      ]),
+    );
+    localStorage.setItem("flow.paletteSeedVersion", "0");
+    store.reloadPaletteStore();
+
+    const snapshot = store.getSnapshot();
+    const recentById = snapshot.palettes.find((p) => p.id === RECENT_PALETTE_ID);
+    expect(recentById?.colors).toEqual(["#abcdef"]);
+
+    const realPastel = snapshot.palettes.find(
+      (p) => p.name === "Pastel" && p.id !== RECENT_PALETTE_ID,
+    );
+    expect(realPastel).toBeDefined();
+    expect(realPastel!.colors).toEqual(builtinColors("Pastel"));
   });
 
   it("persists itself so the next load does not re-create it", () => {

@@ -106,10 +106,23 @@ function seedFresh(): PaletteState {
  *
  * Builtins are matched by NAME — the ids are generated per install, so the name
  * is the only stable handle. A user palette that happens to be named after a
- * builtin is therefore treated as that builtin and reseeded.
+ * builtin is therefore treated as that builtin and reseeded — EXCEPT the
+ * Recent palette, which is matched by its fixed id instead, precisely so a
+ * rename to a builtin's name (e.g. "Pastel") can't cost it its identity or
+ * its history. See the id-exemption comment below.
  */
 function migrateBuiltins(stored: ColorPalette[]): PaletteState {
-  const byName = new Map(stored.map((p) => [p.name, p]));
+  // The Recent palette is exempt from name matching in both directions, even
+  // though its name isn't in BUILTIN_PALETTE_NAMES. Name-based matching is
+  // the whole reason its id is fixed instead of generated (see
+  // RECENT_PALETTE_ID's comment) — a user can rename it to anything,
+  // including one of these nine builtin names. Without this exemption, that
+  // rename would let a rebuilt builtin steal id `flow-recent` on the next
+  // migration (grafting the user's history onto a builtin's seed colors) and
+  // drop Recent from `userMade` because its *name* now matches a builtin.
+  const byName = new Map(
+    stored.filter((p) => p.id !== RECENT_PALETTE_ID).map((p) => [p.name, p]),
+  );
 
   const builtins = BUILTIN_PALETTE_NAMES.map((name) => ({
     id: byName.get(name)?.id ?? generatePaletteId(),
@@ -117,7 +130,9 @@ function migrateBuiltins(stored: ColorPalette[]): PaletteState {
     colors: builtinColors(name) ?? [],
   }));
 
-  const userMade = stored.filter((p) => !BUILTIN_PALETTE_NAMES.includes(p.name));
+  const userMade = stored.filter(
+    (p) => p.id === RECENT_PALETTE_ID || !BUILTIN_PALETTE_NAMES.includes(p.name),
+  );
   const palettes = [...builtins, ...userMade];
   const pastel = palettes.find((p) => p.name === DEFAULT_SEED_PALETTE_NAME) ?? palettes[0];
 

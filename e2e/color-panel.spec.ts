@@ -303,9 +303,10 @@ test("two popup sessions accumulate two colors", async ({ page }) => {
 });
 
 test("quickSet white/grey/black does not pollute recents", async ({ page }) => {
-  // The quartet chips live on the rail *outside* the popup and write straight
-  // through `useColorTarget`, so no picker session ever captures them — the
-  // Recent palette must stay untouched by all three.
+  // The quartet chips (`PartChooser`, shared by the rail popup and this
+  // docked panel) sit outside any picker session and write straight through
+  // `useColorTarget`, so no picker session ever captures them — the Recent
+  // palette must stay untouched by all three, on either surface.
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);

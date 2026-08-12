@@ -25,6 +25,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 }));
 
 import { RailColorControl } from "./RailColorControl";
+import { RECENT_STRIP_SLOTS } from "./ColorPopup";
 import { reloadColorStore } from "../../lib/color-store";
 import {
   recordUsedColor,
@@ -136,7 +137,9 @@ describe("RailColorControl", () => {
   it("renders six recent slots", () => {
     render(<RailColorControl sel={fakeSel()} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
-    expect(screen.getAllByRole("button", { name: /recent color slot/i })).toHaveLength(6);
+    expect(screen.getAllByRole("button", { name: /recent color slot/i })).toHaveLength(
+      RECENT_STRIP_SLOTS,
+    );
   });
 
   it("fills slots from the Recent palette and applies one on click", () => {
@@ -377,7 +380,15 @@ describe("recording the popup session's color", () => {
     expect(getRecentPaletteColors()).toHaveLength(1);
   });
 
-  it("does not record twice when a close is followed by an unmount", () => {
+  it("a close followed by an unmount leaves the palette unchanged", () => {
+    // NOT a check that flushSession's null-before-record ordering prevents a
+    // second write: recordUsedColor no-ops on a hex already present, so a
+    // "records twice" bug and a "records once" fix produce the identical
+    // array here — both orderings dedupe to the same result. What this test
+    // does verify (and would catch) is a real mutation: the close flush not
+    // firing at all. If recordUsedColor ever gains ranking or append-then-trim
+    // semantics, this stops being equivalent and should assert the call count
+    // instead.
     const { unmount } = render(<RailColorControl sel={satSel()} />);
     openPopup();
     nudgeHue(45);
