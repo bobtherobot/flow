@@ -155,6 +155,14 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
             onDragStart={() => {
               dragFrom.current = i;
             }}
+            // dragend fires on the source element whether the drag succeeded
+            // or was cancelled (dropped over the canvas, Escape). Without
+            // this, a cancelled drag leaves dragFrom.current pointing at a
+            // real index indefinitely, and the next unrelated drop on the
+            // trash would silently delete that stranded swatch.
+            onDragEnd={() => {
+              dragFrom.current = null;
+            }}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();

@@ -247,6 +247,23 @@ describe("PaletteSection", () => {
     expect(after).toEqual(before.filter((_, i) => i !== 2));
   });
 
+  it("does not let a cancelled drag strand an index the trash would later honour", () => {
+    // dragStart sets dragFrom.current but it was only ever cleared inside the
+    // two onDrop handlers. A drag released over the canvas or cancelled with
+    // Escape fires dragend on the source without either onDrop ever running,
+    // so dragFrom.current stays pointed at a real swatch indefinitely — the
+    // next drop on the trash, from anywhere, would then delete that stale
+    // swatch. dragend fires on the source whether or not the drag succeeded,
+    // so onDragEnd is where the ref must be cleared.
+    setup();
+    const before = swatches().length;
+    fireEvent.dragStart(swatches()[0]);
+    fireEvent.dragEnd(swatches()[0]);
+    fireEvent.dragOver(trash());
+    fireEvent.drop(trash());
+    expect(swatches()).toHaveLength(before);
+  });
+
   it("accepts a drop while nothing is selected", () => {
     // The regression this guards: a `disabled` trash gets no mouse events in
     // Chrome, so it silently refuses drops in exactly the common case.

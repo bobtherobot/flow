@@ -165,19 +165,33 @@
   align-items: flex-start;
 }
 
-/* Extent comes from the part count via `--flow-clr-stack-w/h`, set inline by
-   PartChooser: 1x1 for a lone text part, 1.5x1.5 for a shape, 1.5x2.25 for a
-   labelled container. The `--parts-N` class is a hook for tests and for
-   anything that needs to style by count; the sizing itself is the vars. */
 .flow-clr-chooser__stack {
   position: relative;
-  width: calc(var(--flow-clr-stack-w, 1.5) * var(--flow-clr-part-size));
-  height: calc(var(--flow-clr-stack-h, 1.5) * var(--flow-clr-part-size));
   --flow-clr-part-size: 46px;
 }
 
 .flow-clr-chooser--compact .flow-clr-chooser__stack {
   --flow-clr-part-size: 32px;
+}
+
+/* Stack extent per part count, in units of `--flow-clr-part-size`: 1x1 for a
+   lone text part, 1.5x1.5 for a shape (fill+stroke), 1.5x2.25 for a labelled
+   container (fill+stroke+text). `--parts-N` is set by PartChooser from
+   `visible.length` and does the actual sizing work here — it used to be a
+   test-only hook while an inline style carried these numbers instead. */
+.flow-clr-chooser__stack--parts-1 {
+  width: var(--flow-clr-part-size);
+  height: var(--flow-clr-part-size);
+}
+
+.flow-clr-chooser__stack--parts-2 {
+  width: calc(1.5 * var(--flow-clr-part-size));
+  height: calc(1.5 * var(--flow-clr-part-size));
+}
+
+.flow-clr-chooser__stack--parts-3 {
+  width: calc(1.5 * var(--flow-clr-part-size));
+  height: calc(2.25 * var(--flow-clr-part-size));
 }
 
 /*
@@ -231,6 +245,11 @@
 }
 
 .flow-clr-chip {
+  /* No global box-sizing: border-box in this project (only toolbar.css has
+     one, scoped to the rail), so a bordered tile sized by width/height alone
+     grows 2px past a borderless tile of the same declared size — border-box
+     keeps this chip at its declared 20px instead of 22px. */
+  box-sizing: border-box;
   width: var(--flow-clr-chip-size);
   height: var(--flow-clr-chip-size);
   padding: 0;
@@ -280,20 +299,22 @@
   background: var(--flow-hover);
 }
 
+/* flow is desktop-only: these are mouse targets, sized for density. */
 .flow-clr-palette__grid {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-/* flow is desktop-only: these are mouse targets, sized for density. */
-.flow-clr-palette__grid {
   --flow-clr-tile-size: 18px;
 }
 
 .flow-clr-palette__add,
 .flow-clr-palette__trash,
 .flow-clr-palette__tile {
+  /* No global box-sizing: border-box in this project (only toolbar.css has
+     one, scoped to the rail). __add/__trash carry a 1px border and __tile
+     doesn't, so without border-box the bordered cells total 20px against
+     the tile's 18px and sit visibly larger in the same grid row. */
+  box-sizing: border-box;
   width: var(--flow-clr-tile-size);
   height: var(--flow-clr-tile-size);
   padding: 0;

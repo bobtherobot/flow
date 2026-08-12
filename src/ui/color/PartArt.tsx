@@ -70,14 +70,23 @@ function Canvas({ children }: { children: React.ReactNode }) {
  * catches it.
  */
 export function PartArt({ part, color, isMixed = false }: PartArtProps) {
-  // React's useId yields ":r0:". Colons resolve fine through getElementById,
-  // which is how an SVG url(#id) attribute reference works, but they break any
-  // CSS selector built from the same id — strip them rather than leave a trap.
+  // React 19 (this codebase's version) yields underscore-delimited ids like
+  // "_r_0_" — no colons, so nothing here currently needs stripping. Older
+  // React used colon-delimited ids like ":r0:", which resolve fine through
+  // getElementById (how an SVG url(#id) reference works) but would break a
+  // CSS selector built from the same id. The strip below is a defensive
+  // guard against that format, kept for a possible future React downgrade
+  // or version change, not because it does anything today.
   const uid = useId().replace(/:/g, "");
   const checkerId = `${uid}-checker`;
   const clipId = `${uid}-clip`;
 
-  const isNone = color === "transparent";
+  // isMixed wins over isNone: useColorTarget's rawColor resolves MIXED to
+  // the first selected element's value, so a mixed selection whose first
+  // element has `backgroundColor: "transparent"` still arrives here with
+  // `color === "transparent"`. Without the `!isMixed` guard both the
+  // checkerboard and the red none-slash would render on top of each other.
+  const isNone = color === "transparent" && !isMixed;
   // A ring only means something with a real color in it, so none and mixed
   // fall back to the plain square. Same intent as the CSS this replaces
   // (`.flow-clr-part--none::after { content: none }`).

@@ -313,7 +313,7 @@ Separately and permanently red: `e2e/text-panel.spec.ts:201` and `:225`
 they reproduce byte-for-byte on `main` at main's own pinned vendor commit. Real
 pre-existing bugs, out of scope here.
 
-The whole suite's healthy state today is **127 passed / 2 failed**. Anything
+The whole suite's healthy state today is **129 passed / 2 failed**. Anything
 else, re-run the failing spec alone before believing it.
 
 ## The picker-refinement branch (2026-08-11, second pass) — CSS artwork moved into `PartArt.tsx`
@@ -345,9 +345,11 @@ the interior — not a ring, and not fixable by adjusting the two inset
 amounts. `PartArt.tsx` replaces the whole approach with concentric stroked
 SVG paths and now carries that same "box-shadow can't do this" reasoning in
 its own comments — `color.css` no longer has an opinion on rings at all. (The
-old `flow-clr-part--{fill,stroke,text}` classes are still there, deliberately
-left CSS-inert per the task brief rather than pruned — a cleanup candidate
-next time this file is touched for something else.)
+old `flow-clr-part--{fill,stroke,text}` classes were left CSS-inert per the
+task brief rather than pruned at the time; the 2026-08-11 final-review pass
+removed them from `PartChooser.tsx` after confirming with `grep -rn
+"flow-clr-part--" src/ e2e/` that nothing selected them — `flow-clr-part` and
+`flow-clr-part--active` are the only ones any CSS rule uses.)
 
 **The mechanism**: one `<path>` per layer, stroked at successively narrower
 widths, **widest first**. An SVG stroke of width W straddles the path line by
@@ -368,13 +370,15 @@ wide instead of 4. Applying it to every layer — an easy mistake, and Task 1's
 first draft did exactly this — makes the light rule disappear everywhere
 except that innermost edge.
 
-`useId()` yields a colon-bearing id (`:r0:`). Colons resolve fine through
-`getElementById`/`url(#id)`, which is how the component's own checkerboard
-`<pattern>` and `<clipPath>` references work, but they would break a **CSS
-class selector** built from the same string. `PartArt` strips them on
-principle (`useId().replace(/:/g, "")`) even though nothing in the current
-code builds such a selector — a guard against a future consumer reaching for
-one.
+`useId()` on this codebase's React 19 yields an underscore-delimited id like
+`_r_0_` — no colon. (Older React versions used a colon-delimited id like
+`:r0:`: colons resolve fine through `getElementById`/`url(#id)`, which is how
+the component's own checkerboard `<pattern>` and `<clipPath>` references
+work, but they would break a **CSS class selector** built from the same
+string.) `PartArt` strips colons on principle (`useId().replace(/:/g, "")`)
+even though nothing in the current React version's id format needs it — a
+defensive guard against a future React version change, not something
+load-bearing today.
 
 ### The part stack is a fixed, non-uniform layout — not a generic diagonal
 

@@ -75,6 +75,13 @@ describe("PartArt", () => {
     // A ring means nothing without a color in it, so none falls back to the
     // plain square — same intent as the deleted `--none::after { content: none }`.
     // The ring suppression (drop from 3 to 2 rendered layers) is what matters here.
+    //
+    // The filter below is load-bearing, not a no-op: a none part also renders
+    // a <defs><clipPath> containing its own bare <path> (no fill/stroke/width,
+    // used only to clip the slash line to the part's silhouette), and
+    // `layers()` picks up every <path> in the DOM including that one. Without
+    // the filter this assertion would see 3 paths — the clip path plus the 2
+    // real layers — not the 2 that actually matter here.
     const { container } = render(<PartArt part="stroke" color="transparent" />);
     const renderedLayers = layers(container).filter((l) => l.stroke !== null);
     expect(renderedLayers).toHaveLength(2);
@@ -116,6 +123,34 @@ describe("PartArt", () => {
     expect(container.querySelector(`pattern#${id}`)).not.toBeNull();
   });
 
+  it("keeps each part's path inset equal to half its widest stroke", () => {
+    // PartArt.tsx documents that a shape's path inset must equal half its
+    // widest stroke, so the stroked outline's outer edge lands exactly on the
+    // viewBox edge. Nothing else enforces this: breaking it produces no type
+    // error and no crash, just an outer edge that misses the viewBox and
+    // bands that render unevenly — a defect that can still look deliberate
+    // at a glance. This is the guard for that equally-silent sibling of the
+    // layer-order invariant above.
+    const inset = (d: string) => Number(d.match(/^M([\d.]+)/)![1]);
+    for (const part of ["fill", "stroke", "text"] as const) {
+      const { container } = render(<PartArt part={part} color="#ff8800" />);
+      const l = layers(container);
+      const widest = Math.max(...l.map((x) => x.width));
+      expect(inset(l[0].d!)).toBe(widest / 2);
+    }
+  });
+
+  it("shows only the checkerboard, not the none slash, for a mixed+transparent part", () => {
+    // useColorTarget's rawColor resolves MIXED to the first selected
+    // element's value, so a mixed part whose first element is transparent
+    // arrives here with color === "transparent" AND isMixed === true. The
+    // checkerboard must win alone — the old CSS this replaces showed only
+    // the checkerboard in this case, so both rendering is a regression.
+    const { container } = render(<PartArt part="fill" color="transparent" isMixed />);
+    expect(container.querySelector("line")).toBeNull();
+    expect(container.querySelector("pattern")).not.toBeNull();
+  });
+
   it("gives two mounted instances disjoint def ids", () => {
     // The docked chooser and the rail chooser are both mounted at once. A
     // hardcoded id would make one reference the other's <defs>.
@@ -125,12 +160,18 @@ describe("PartArt", () => {
     expect(idOf(a.container)).not.toBe(idOf(b.container));
   });
 
-  it("produces def ids usable in a url() reference", () => {
-    // React's useId yields ":r0:" — colons are legal in an id and resolve fine
-    // via getElementById, but they break any CSS selector built from the id.
+  it("produces def ids safe to embed in both a url() reference and a CSS selector", () => {
+    // React 19 (this codebase's version) yields underscore-delimited ids like
+    // "_r_0_" with no colon, so `expect(id).not.toContain(":")` would pass
+    // trivially even with the defensive `.replace(/:/g, "")` in PartArt.tsx
+    // deleted — it asserts a format detail, not the actual constraint. Assert
+    // the real requirement instead: the id must be usable unescaped in a
+    // url(#id) attribute reference (works via getElementById regardless of
+    // format) AND in a CSS id/class selector (which colons would break),
+    // whatever React's id format happens to be on any given version.
     const { container } = render(<PartArt part="fill" color="transparent" />);
     const id = container.querySelector("clipPath")!.getAttribute("id")!;
-    expect(id).not.toContain(":");
+    expect(id).toMatch(/^[A-Za-z_-][A-Za-z0-9_-]*$/);
   });
 });
 

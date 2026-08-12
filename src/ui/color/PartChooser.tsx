@@ -36,13 +36,6 @@ const POSITION: Record<ColorPart, { top: number; left: number }> = {
   text: { top: 1.25, left: 0 },
 };
 
-/** Stack extent per part count, in units of `--flow-clr-part-size`. */
-const STACK_SPAN: Record<number, { w: number; h: number }> = {
-  1: { w: 1, h: 1 },
-  2: { w: 1.5, h: 1.5 },
-  3: { w: 1.5, h: 2.25 },
-};
-
 const QUICK: { kind: QuickColor; label: string; hex: string }[] = [
   { kind: "none", label: "None", hex: "transparent" },
   { kind: "white", label: "White", hex: "#ffffff" },
@@ -74,9 +67,8 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
 
   // A bare text selection shows its only box at the origin, not floating on
   // row two below an empty gap where fill and stroke would have been.
-  const soloText = visible.length === 1;
-  const positionOf = (p: ColorPart) => (soloText ? { top: 0, left: 0 } : POSITION[p]);
-  const span = STACK_SPAN[visible.length] ?? STACK_SPAN[2];
+  const singlePart = visible.length === 1;
+  const positionOf = (p: ColorPart) => (singlePart ? { top: 0, left: 0 } : POSITION[p]);
 
   const onStackKeyDown = (e: React.KeyboardEvent) => {
     const forward = e.key === "ArrowRight" || e.key === "ArrowDown";
@@ -96,10 +88,6 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
         role="radiogroup"
         aria-label="Color target"
         onKeyDown={onStackKeyDown}
-        style={{
-          ["--flow-clr-stack-w" as string]: span.w,
-          ["--flow-clr-stack-h" as string]: span.h,
-        }}
       >
         {ordered.map((p) => {
           const color = partColor(p);
@@ -107,11 +95,7 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
           // isMixed describes only the currently active part's read; a back
           // box has no independent opinion on mixedness.
           const mixed = isMixed && p === part;
-          const classes = [
-            "flow-clr-part",
-            `flow-clr-part--${p}`,
-            p === part ? "flow-clr-part--active" : "",
-          ]
+          const classes = ["flow-clr-part", p === part ? "flow-clr-part--active" : ""]
             .filter(Boolean)
             .join(" ");
 
