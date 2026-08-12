@@ -525,4 +525,47 @@
   box-shadow: none;
 }
 
+/* The palette gear's dropdown (Task 3): five actions, three of which can be
+   inert depending on selection/palette state. Tokens follow this file's
+   existing names — `--flow-panel-border`/`--flow-panel-ink`/`--flow-panel-hover`
+   from the brief don't exist here, so `--flow-border`/`--flow-ink`/`--flow-hover`
+   stand in for them, same as every other control in this file. */
+
+.flow-clr-palette__menu {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 4px;
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-md);
+}
+
+.flow-clr-palette__menuitem {
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--flow-ink);
+  cursor: pointer;
+  border-radius: var(--flow-radius-sm);
+}
+
+.flow-clr-palette__menuitem:hover {
+  background: var(--flow-hover);
+}
+
+/* Placed after :hover — equal specificity, source order decides — so an
+   inert item that happens to be under the pointer doesn't still look live. */
+.flow-clr-palette__menuitem[aria-disabled="true"] {
+  color: var(--flow-ink-disabled);
+  cursor: default;
+}
+
+.flow-clr-palette__menuitem[aria-disabled="true"]:hover {
+  background: none;
+}
+
 /* flow is desktop-only: these are mouse targets, sized for density. */
