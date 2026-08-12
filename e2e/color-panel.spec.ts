@@ -369,3 +369,44 @@ test("hiding the rail reclaims the canvas gutter", async ({ page }) => {
   await expect(page.locator(".flow-toolbar")).toHaveCount(0);
   expect(await reserved()).toBe("0px");
 });
+
+test("dragging a swatch onto the trash deletes it", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+
+  const swatches = page.locator(panel).getByRole("button", { name: /^Swatch /i });
+  const before = await swatches.count();
+  const doomed = await swatches.first().getAttribute("aria-label");
+
+  // Playwright's dragAndDrop drives real HTML5 DnD in Chromium, which is what
+  // the grid uses (native `draggable`, not pointer events).
+  await page.dragAndDrop(
+    `${panel} [aria-label="${doomed}"]`,
+    `${panel} [aria-label="Delete swatches"]`,
+  );
+
+  await expect(swatches).toHaveCount(before - 1);
+  await expect(page.locator(panel).getByRole("button", { name: doomed!, exact: true })).toHaveCount(0);
+});
+
+test("the rail's color control fits the rail without overflowing", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-toolbar");
+
+  // A labelled container is the tallest case: three parts, so the stack is
+  // 2.25 part-sizes tall on top of a two-row quartet.
+  await drawRect(page, 400, 300, 560, 400);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("hi");
+  await page.keyboard.press("Escape");
+
+  const overflow = await page.evaluate(() => {
+    const rail = document.querySelector(".flow-toolbar") as HTMLElement;
+    return {
+      v: rail.scrollHeight - rail.clientHeight,
+      h: rail.scrollWidth - rail.clientWidth,
+    };
+  });
+  expect(overflow.h).toBeLessThanOrEqual(0);
+  expect(overflow.v).toBeLessThanOrEqual(0);
+});
