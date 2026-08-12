@@ -5,7 +5,6 @@ import {
   SEED_VERSION,
   RECENT_PALETTE_ID,
   RECENT_PALETTE_NAME,
-  RECENT_PALETTE_LIMIT,
 } from "./color-palettes";
 
 // jsdom/Node's native `localStorage` global does not implement a usable
@@ -254,11 +253,17 @@ describe("the Recent palette", () => {
     expect(recent()!.colors).toEqual(["#ff0000", "#00ff00"]);
   });
 
-  it("does NOT re-seed from the legacy key once the palette exists", () => {
-    // The migration is a one-shot on creation. A stale legacy key must never
-    // resurrect colors the user has since deleted from the palette.
+  it("does NOT resurrect a color the user deleted, even with the legacy key still set", () => {
+    // The legacy key is never cleared, so the only thing standing between a
+    // stale entry and a deleted color coming back is the one-shot read. Start
+    // from truly empty storage so the palette is CREATED seeded — otherwise
+    // beforeEach's empty palette makes the delete below a no-op and the test
+    // proves nothing.
+    localStorage.clear();
     localStorage.setItem("flow.recentColors", JSON.stringify(["#ff0000"]));
     store.reloadPaletteStore();
+    expect(recent()!.colors).toEqual(["#ff0000"]);
+
     store.removeSwatches(RECENT_PALETTE_ID, [0]);
     expect(recent()!.colors).toEqual([]);
 
@@ -287,18 +292,5 @@ describe("the Recent palette", () => {
   it("persists itself so the next load does not re-create it", () => {
     const stored = JSON.parse(localStorage.getItem("flow.colorPalettes")!);
     expect(stored.some((p: { id: string }) => p.id === RECENT_PALETTE_ID)).toBe(true);
-  });
-
-  it("caps the legacy seed at the palette limit", () => {
-    // Same reason as above: clear first so this reload actually creates
-    // Recent from the legacy key instead of finding the beforeEach-seeded
-    // one already in place (which would make this assertion pass vacuously).
-    localStorage.clear();
-    const many = Array.from({ length: 30 }, (_, i) =>
-      `#${i.toString(16).padStart(2, "0")}0000`,
-    );
-    localStorage.setItem("flow.recentColors", JSON.stringify(many));
-    store.reloadPaletteStore();
-    expect(recent()!.colors.length).toBeLessThanOrEqual(RECENT_PALETTE_LIMIT);
   });
 });
