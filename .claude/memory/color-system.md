@@ -292,7 +292,7 @@ the start of this task), [[drawing-defaults]] for the `??`-not-`||` pattern
 this branch's `needsRevival` extends, and [[color-swatches]] (superseded) for
 the palette-store design this branch built on top of but did not change.
 
-## Two e2e specs flake under parallel load — re-run in isolation before chasing
+## Three e2e specs flake under parallel load — re-run in isolation before chasing
 
 `e2e/new-document.spec.ts:60` ("File ▸ New keeps flow's app-wide appState
 preferences") and `e2e/style-memory.spec.ts` both fail intermittently when the
@@ -300,6 +300,18 @@ full suite runs in parallel, and both pass reliably on their own — including a
 `--workers=4`. Measured on the merge of this branch: `new-document` failed 3 of
 7 full-suite runs, always while the machine was otherwise busy, and passed every
 time it was run alone.
+
+`e2e/selection-mode.spec.ts:57` ("marquee enclose ignores a mere intersect but
+selects a full enclosure") joined them on 2026-08-12, observed exactly once on
+the merge of `feat/color-chooser-fixed-height`. It failed in one full-suite run
+and then passed alone and in the two full-suite runs immediately after, on a
+tree `git diff`-identical to the branch tip that had already produced a clean
+130/2. It touches marquee selection and nothing in the color surfaces.
+
+**The healthy state is now 130 passed / 2 failed** (the fixed-height work adds
+one panel-resize test). A run showing 129/3 with a third name in the failure
+list is the parallel-load flake, not a regression — confirm by re-running that
+spec alone before spending time on it.
 
 Neither is related to the color work. `new-document` covers `flowSeedAppState`
 and `File ▸ New`, which this branch never touched, and the merge that surfaced
