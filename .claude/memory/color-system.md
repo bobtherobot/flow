@@ -313,7 +313,7 @@ Separately and permanently red: `e2e/text-panel.spec.ts:201` and `:225`
 they reproduce byte-for-byte on `main` at main's own pinned vendor commit. Real
 pre-existing bugs, out of scope here.
 
-The whole suite's healthy state today is **129 passed / 2 failed**. Anything
+The whole suite's healthy state today is **130 passed / 2 failed**. Anything
 else, re-run the failing spec alone before believing it.
 
 ## The picker-refinement branch (2026-08-11, second pass) — CSS artwork moved into `PartArt.tsx`
@@ -390,12 +390,44 @@ diagonal. Fixed positions are safe only because `availableParts` always
 returns at most these three specific parts (`color-parts.ts`) — an earlier
 layout attempt stepped all three along one diagonal and put stroke and text
 at the same spot whenever a selection had both, burying whichever rendered
-behind. `STACK_SPAN` is likewise fixed per part count (1×1, 1.5×1.5,
-1.5×2.25 part-sizes) and drives `--flow-clr-stack-w/h`, which both the
-full-size and compact chooser consume from the same table. The 3-part case's
-extra height (2.25 vs 1.5 part-sizes) is what motivated Task 7's rail
-vertical-fit e2e test — see below for why that test doesn't actually reach
-the case it was written for.
+behind.
+
+### Every part always renders; `available` dims, it does not remove
+
+**The stack is one fixed size — `1.5 × 2.25` part-sizes — at every
+selection**, because all three boxes render unconditionally and a part the
+selection cannot address is merely dimmed (`.flow-clr-part--off`,
+`aria-disabled`, skipped by arrow-key cycling, click guarded). The swap arrow
+dims in place for the same reason rather than unmounting.
+
+This replaced three sizes keyed to the part count (1×1 / 1.5×1.5 / 1.5×2.25,
+selected by `--parts-N` classes, briefly by a `STACK_SPAN` inline style).
+**Do not reintroduce selection-dependent sizing.** The panel's top row is two
+sections of equal height — the chooser, and the saturation box stretched to
+match it — so a chooser that grew and shrank dragged the entire picker around
+every time the user clicked a different element. That resizing, plus the
+saturation box's own `aspect-ratio` tying its height to the panel width, is
+what the fixed layout exists to stop.
+
+Consequences worth knowing:
+
+- **`partColor` still returns a value for an unavailable part** — a tool
+  default, or a property read off an element that doesn't really use it (a
+  text element does carry `backgroundColor`). The dimming is what means "not
+  applicable"; the colour underneath it is not meaningful. Don't wire it to
+  anything.
+- **The rail's compact chooser is now always at its tallest, 111px**
+  (72 stack + 8 gap + 31 quartet), where a plain shape used to give 87px.
+  The rail vertical-fit e2e test already measured 111px and passed, so this
+  cost nothing — but it is why that test's `toHaveCount(3)` assertion no
+  longer proves a state transition. Three is the only case now; the
+  assertion survives as a cheap "chooser is mounted and whole" guard.
+- **In the panel the saturation box has no `aspect-ratio`** — it is
+  overridden to `auto` under `.flow-clr-panel__top` so it scales
+  horizontally only. The base rule keeps 16/10 for the rail popup, where the
+  box spans the full width with nothing beside it to match. At a narrow panel
+  the docked one goes portrait; that is deliberate, chosen over breaking the
+  equal-height rule.
 
 ### `PaletteSection`'s trash tile: `aria-disabled`, never `disabled`
 

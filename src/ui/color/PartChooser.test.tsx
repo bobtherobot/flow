@@ -25,11 +25,32 @@ const isNoneArt = (el: HTMLElement) => el.querySelector("line") !== null;
 const isMixedArt = (el: HTMLElement) => el.querySelector("pattern") !== null;
 
 describe("PartChooser", () => {
-  it("renders a box per available part", () => {
+  it("always renders all three boxes, whatever the selection exposes", () => {
+    // The chooser is a fixed object: its size must not depend on the
+    // selection, or the saturation box beside it resizes on every click.
     render(<PartChooser target={target()} />);
-    expect(screen.getByRole("radio", { name: /fill/i })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /stroke/i })).toBeInTheDocument();
-    expect(screen.queryByRole("radio", { name: /^text/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("radio")).toHaveLength(3);
+    expect(screen.getByRole("radio", { name: /^text/i })).toBeInTheDocument();
+  });
+
+  it("marks parts the selection does not expose as unavailable", () => {
+    render(<PartChooser target={target()} />);
+    expect(screen.getByRole("radio", { name: /^text/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("radio", { name: /fill/i })).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
+  });
+
+  it("ignores a click on an unavailable part", () => {
+    // Would silently point the whole picker at a write that goes nowhere.
+    const t = target();
+    render(<PartChooser target={t} />);
+    fireEvent.click(screen.getByRole("radio", { name: /^text/i }));
+    expect(t.setPart).not.toHaveBeenCalled();
   });
 
   it("marks the active part checked", () => {
@@ -69,16 +90,31 @@ describe("PartChooser", () => {
     expect(screen.getAllByRole("radio")).toHaveLength(3);
   });
 
-  it("shows one box for a text-only selection", () => {
-    render(<PartChooser target={target({ available: ["text"], part: "text" })} />);
-    const boxes = screen.getAllByRole("radio");
-    expect(boxes).toHaveLength(1);
-    expect(boxes[0]).toHaveAccessibleName(/text/i);
+  it("keeps fill and stroke on screen for a text-only selection", () => {
+    // Bare text exposes only `text`. Dropping the other two would shrink the
+    // stack and shift everything beside it — the same jitter the always-on
+    // text box exists to prevent, just in the other direction.
+    const t = target({ available: ["text"], part: "text" });
+    render(<PartChooser target={t} />);
+    expect(screen.getAllByRole("radio")).toHaveLength(3);
+    expect(screen.getByRole("radio", { name: /^text/i })).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
+    for (const name of [/fill/i, /stroke/i]) {
+      expect(screen.getByRole("radio", { name })).toHaveAttribute("aria-disabled", "true");
+    }
   });
 
-  it("hides the swap arrow when stroke is unavailable", () => {
-    render(<PartChooser target={target({ available: ["text"], part: "text" })} />);
-    expect(screen.queryByRole("button", { name: /swap/i })).not.toBeInTheDocument();
+  it("keeps the swap arrow in place but inert when stroke is unavailable", () => {
+    // It is absolutely positioned, so unmounting it shifts nothing — but
+    // flickering it in and out is the same class of jitter.
+    const t = target({ available: ["text"], part: "text" });
+    render(<PartChooser target={t} />);
+    const arrow = screen.getByRole("button", { name: /swap/i });
+    expect(arrow).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(arrow);
+    expect(t.swap).not.toHaveBeenCalled();
   });
 
   it("draws a transparent part as none", () => {
@@ -129,22 +165,40 @@ describe("PartChooser", () => {
     expect(posOf(screen.getByRole("radio", { name: /^text/i }))).toBe("1.25,0");
   });
 
-  it("puts a lone text part at the origin rather than on row two", () => {
-    // Otherwise a bare text selection renders its only box floating below an
-    // empty gap where fill and stroke would have been.
-    render(<PartChooser target={target({ available: ["text"], part: "text" })} />);
-    expect(posOf(screen.getByRole("radio", { name: /^text/i }))).toBe("0,0");
-  });
+  it("puts every part in the same place whatever the selection exposes", () => {
+    // The whole point of the fixed layout: a part's position must not move
+    // because a different part became unavailable.
+    const places = () => ({
+      fill: posOf(screen.getByRole("radio", { name: /fill/i })),
+      stroke: posOf(screen.getByRole("radio", { name: /stroke/i })),
+      text: posOf(screen.getByRole("radio", { name: /^text/i })),
+    });
 
-  it("sizes the stack by how many parts are showing", () => {
-    const { rerender } = render(<PartChooser target={target()} />);
-    expect(screen.getByRole("radiogroup")).toHaveClass("flow-clr-chooser__stack--parts-2");
-
-    rerender(<PartChooser target={target({ available: ["fill", "stroke", "text"] })} />);
-    expect(screen.getByRole("radiogroup")).toHaveClass("flow-clr-chooser__stack--parts-3");
+    const { rerender } = render(
+      <PartChooser target={target({ available: ["fill", "stroke", "text"] })} />,
+    );
+    const whenAllLive = places();
 
     rerender(<PartChooser target={target({ available: ["text"], part: "text" })} />);
-    expect(screen.getByRole("radiogroup")).toHaveClass("flow-clr-chooser__stack--parts-1");
+    expect(places()).toEqual(whenAllLive);
+
+    rerender(<PartChooser target={target()} />);
+    expect(places()).toEqual(whenAllLive);
+  });
+
+  it("sizes the stack the same whatever the selection exposes", () => {
+    // Was three sizes keyed to the part count, which made the saturation box
+    // beside it resize on every selection change.
+    const size = () => screen.getByRole("radiogroup").className;
+
+    const { rerender } = render(<PartChooser target={target()} />);
+    const forShape = size();
+
+    rerender(<PartChooser target={target({ available: ["fill", "stroke", "text"] })} />);
+    expect(size()).toBe(forShape);
+
+    rerender(<PartChooser target={target({ available: ["text"], part: "text" })} />);
+    expect(size()).toBe(forShape);
   });
 
   it("moves the active part with arrow keys and wraps", () => {
@@ -156,10 +210,23 @@ describe("PartChooser", () => {
     expect(t.setPart).toHaveBeenLastCalledWith("text");
   });
 
+  it("skips unavailable parts when cycling with arrow keys", () => {
+    // available is [fill, stroke]; text is on screen but must not be a stop,
+    // or the cycle lands the picker on a write that goes nowhere. Stepping
+    // forward from the LAST live part is what proves it: text sits after
+    // stroke in canonical order, so a cycle that counted it would land there
+    // instead of wrapping to fill.
+    const t = target({ part: "stroke" });
+    render(<PartChooser target={t} />);
+    fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowRight" });
+    expect(t.setPart).toHaveBeenLastCalledWith("fill");
+  });
+
   it("keeps only the active box in the tab order", () => {
     render(<PartChooser target={target()} />);
     expect(screen.getByRole("radio", { name: /fill/i })).toHaveAttribute("tabindex", "0");
     expect(screen.getByRole("radio", { name: /stroke/i })).toHaveAttribute("tabindex", "-1");
+    expect(screen.getByRole("radio", { name: /^text/i })).toHaveAttribute("tabindex", "-1");
   });
 
   it("fires quickSet from the quartet", () => {

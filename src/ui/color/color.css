@@ -165,33 +165,25 @@
   align-items: flex-start;
 }
 
+/*
+ * One size, always. Every part renders whatever the selection exposes, so the
+ * stack spans fill's top-left to text's bottom edge unconditionally: 1.5 wide
+ * (fill + stroke's half-step) x 2.25 tall (text at 1.25 + its own 1).
+ *
+ * This replaced three sizes keyed to the part count. Those made the whole top
+ * row of the panel resize on every selection change — the saturation box beside
+ * the chooser is stretched to match its height, so a chooser that grew and
+ * shrank dragged the picker around with it.
+ */
 .flow-clr-chooser__stack {
   position: relative;
+  width: calc(1.5 * var(--flow-clr-part-size));
+  height: calc(2.25 * var(--flow-clr-part-size));
   --flow-clr-part-size: 46px;
 }
 
 .flow-clr-chooser--compact .flow-clr-chooser__stack {
   --flow-clr-part-size: 32px;
-}
-
-/* Stack extent per part count, in units of `--flow-clr-part-size`: 1x1 for a
-   lone text part, 1.5x1.5 for a shape (fill+stroke), 1.5x2.25 for a labelled
-   container (fill+stroke+text). `--parts-N` is set by PartChooser from
-   `visible.length` and does the actual sizing work here — it used to be a
-   test-only hook while an inline style carried these numbers instead. */
-.flow-clr-chooser__stack--parts-1 {
-  width: var(--flow-clr-part-size);
-  height: var(--flow-clr-part-size);
-}
-
-.flow-clr-chooser__stack--parts-2 {
-  width: calc(1.5 * var(--flow-clr-part-size));
-  height: calc(1.5 * var(--flow-clr-part-size));
-}
-
-.flow-clr-chooser__stack--parts-3 {
-  width: calc(1.5 * var(--flow-clr-part-size));
-  height: calc(2.25 * var(--flow-clr-part-size));
 }
 
 /*
@@ -218,6 +210,19 @@
 
 .flow-clr-part--active {
   z-index: 2;
+}
+
+/*
+ * A part the selection cannot address. It keeps its box and its position — the
+ * whole point is that nothing moves — and says "not applicable" by fading.
+ * `partColor` still reports a value for these (a tool default, or a property
+ * read off an element that does not really use it), so the fade is what
+ * carries the meaning, not the colour underneath it.
+ */
+.flow-clr-part--off,
+.flow-clr-chooser__swap--off {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .flow-clr-chooser__swap {
@@ -394,14 +399,34 @@
   padding: 8px;
 }
 
+/*
+ * Two sections of equal height: the chooser (part stack + quick-colour
+ * quartet) on the left, the saturation box on the right. `stretch` is what ties
+ * them together — the chooser is a fixed size, so it sets the row's height and
+ * the saturation box takes it.
+ */
 .flow-clr-panel__top {
   display: flex;
   gap: 10px;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
+/*
+ * In the panel the saturation box scales on ONE axis. Its `aspect-ratio` is
+ * dropped here — kept on the base rule for the rail popup, where the box spans
+ * the full width with nothing beside it to match — because an aspect ratio ties
+ * height to width, so widening the panel grew the box downward and pulled it
+ * out of step with the chooser.
+ *
+ * At a narrow panel this goes portrait, deliberately: fixed height wins over
+ * a pleasing ratio, and both axes stay draggable either way.
+ */
 .flow-clr-panel__top > .flow-clr-satbox {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  height: auto;
+  aspect-ratio: auto;
 }
 
 /* The rail's compact picker (Task 16): saturation box, eyedropper/preview/hue/
