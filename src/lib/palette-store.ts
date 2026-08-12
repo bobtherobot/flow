@@ -55,11 +55,12 @@ function ensureRecentPalette(current: PaletteState): PaletteState {
   const recent: ColorPalette = {
     id: RECENT_PALETTE_ID,
     name: RECENT_PALETTE_NAME,
-    // getRecentColors() already caps its output well under
-    // RECENT_PALETTE_LIMIT (see preferences.ts), so this slice can't truncate
-    // anything today — it is not a live path. It stays as defense in depth
-    // against that cap rising, or a future seed source that isn't pre-capped,
-    // so this palette can never silently exceed its own limit.
+    // getRecentColors() already caps its output at LEGACY_RECENT_LIMIT, which
+    // is the same 20 as RECENT_PALETTE_LIMIT (see preferences.ts), so this
+    // slice can't truncate anything today — it is not a live path. It stays as
+    // defense in depth against those two numbers diverging, or a future seed
+    // source that isn't pre-capped, so this palette can never silently exceed
+    // its own limit.
     colors: getRecentColors().slice(0, RECENT_PALETTE_LIMIT),
   };
   // Appended last, and never made the default — Pastel keeps that job.
