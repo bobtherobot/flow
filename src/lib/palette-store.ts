@@ -34,6 +34,10 @@ export interface PaletteState {
 const listeners = new Set<() => void>();
 let state: PaletteState = load();
 let colorsCache: { forState: PaletteState; value: string[] } | null = null;
+let recentCache: { forState: PaletteState; value: string[] } | null = null;
+
+/** Stable empty result, so an absent palette doesn't hand out a fresh []. */
+const NO_COLORS: string[] = [];
 
 /**
  * Guarantee the Recent palette exists, on every load path.
@@ -122,6 +126,7 @@ function migrateBuiltins(stored: ColorPalette[]): PaletteState {
 function commit(next: PaletteState): void {
   state = next;
   colorsCache = null;
+  recentCache = null;
   setColorPalettes(next.palettes);
   setDefaultPaletteId(next.defaultPaletteId);
   for (const l of listeners) l();
@@ -157,6 +162,16 @@ export function getDefaultPaletteColors(): string[] {
   return value;
 }
 
+/** The Recent palette's colors. Same stable-reference contract as
+ *  `getDefaultPaletteColors` — a fresh array per call loops React forever. */
+export function getRecentPaletteColors(): string[] {
+  if (recentCache && recentCache.forState === state) return recentCache.value;
+  const p = state.palettes.find((x) => x.id === RECENT_PALETTE_ID);
+  const value = p ? p.colors : NO_COLORS;
+  recentCache = { forState: state, value };
+  return value;
+}
+
 export function usePaletteState(): PaletteState {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
@@ -165,10 +180,15 @@ export function useDefaultPaletteColors(): string[] {
   return useSyncExternalStore(subscribe, getDefaultPaletteColors, getDefaultPaletteColors);
 }
 
+export function useRecentPaletteColors(): string[] {
+  return useSyncExternalStore(subscribe, getRecentPaletteColors, getRecentPaletteColors);
+}
+
 /** Re-read persisted state (primarily a test seam / cross-tab reload). */
 export function reloadPaletteStore(): void {
   state = load();
   colorsCache = null;
+  recentCache = null;
   for (const l of listeners) l();
 }
 
@@ -229,5 +249,27 @@ export function reorderSwatches(paletteId: string, from: number, to: number): vo
   commit({
     ...state,
     palettes: mapPalette(paletteId, (p) => ({ ...p, colors: moveItem(p.colors, from, to) })),
+  });
+}
+
+/**
+ * Record a color the user settled on. The **only** automatic route into the
+ * Recent palette — called once per rail-popup session, when it closes.
+ *
+ * A color already in the list is a complete no-op, not a move-to-front: this
+ * palette is a grid the user looks at and curates by hand, and re-using a
+ * color must not reshuffle it under them.
+ */
+export function recordUsedColor(color: string): void {
+  const hex = scrubHex(color);
+  if (!hex) return;
+  const palette = state.palettes.find((p) => p.id === RECENT_PALETTE_ID);
+  if (!palette || palette.colors.includes(hex)) return;
+  commit({
+    ...state,
+    palettes: mapPalette(RECENT_PALETTE_ID, (p) => ({
+      ...p,
+      colors: [hex, ...p.colors].slice(0, RECENT_PALETTE_LIMIT),
+    })),
   });
 }

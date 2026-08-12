@@ -5,6 +5,7 @@ import {
   SEED_VERSION,
   RECENT_PALETTE_ID,
   RECENT_PALETTE_NAME,
+  RECENT_PALETTE_LIMIT,
 } from "./color-palettes";
 
 // jsdom/Node's native `localStorage` global does not implement a usable
@@ -292,5 +293,89 @@ describe("the Recent palette", () => {
   it("persists itself so the next load does not re-create it", () => {
     const stored = JSON.parse(localStorage.getItem("flow.colorPalettes")!);
     expect(stored.some((p: { id: string }) => p.id === RECENT_PALETTE_ID)).toBe(true);
+  });
+});
+
+describe("recordUsedColor", () => {
+  const colors = () =>
+    store.getSnapshot().palettes.find((p) => p.id === RECENT_PALETTE_ID)!.colors;
+
+  it("unshifts a new color", () => {
+    store.recordUsedColor("#ff0000");
+    store.recordUsedColor("#00ff00");
+    expect(colors()).toEqual(["#00ff00", "#ff0000"]);
+  });
+
+  it("is a complete no-op for a color already present — no reorder", () => {
+    // Deliberately NOT move-to-front. The list is a grid the user looks at and
+    // curates by hand; re-using a color must not reshuffle their layout.
+    store.recordUsedColor("#ff0000");
+    store.recordUsedColor("#00ff00");
+    store.recordUsedColor("#ff0000");
+    expect(colors()).toEqual(["#00ff00", "#ff0000"]);
+  });
+
+  it("does not notify subscribers on a no-op", () => {
+    store.recordUsedColor("#ff0000");
+    const listener = vi.fn();
+    const unsub = store.subscribe(listener);
+    store.recordUsedColor("#ff0000");
+    expect(listener).not.toHaveBeenCalled();
+    unsub();
+  });
+
+  it("normalizes forgiving input the way swatches do", () => {
+    store.recordUsedColor("ABC");
+    expect(colors()).toEqual(["#aabbcc"]);
+  });
+
+  it("strips an alpha byte rather than storing a near-duplicate", () => {
+    store.recordUsedColor("#ff000080");
+    store.recordUsedColor("#ff0000");
+    expect(colors()).toEqual(["#ff0000"]);
+  });
+
+  it("rejects transparent and other non-hex input", () => {
+    store.recordUsedColor("transparent");
+    store.recordUsedColor("");
+    expect(colors()).toEqual([]);
+  });
+
+  it("evicts from the tail at the limit", () => {
+    for (let i = 0; i < RECENT_PALETTE_LIMIT; i++) {
+      store.recordUsedColor(`#${i.toString(16).padStart(2, "0")}0000`);
+    }
+    const oldest = colors()[RECENT_PALETTE_LIMIT - 1];
+    store.recordUsedColor("#ffffff");
+    expect(colors()).toHaveLength(RECENT_PALETTE_LIMIT);
+    expect(colors()[0]).toBe("#ffffff");
+    expect(colors()).not.toContain(oldest);
+  });
+
+  it("persists across a reload", () => {
+    store.recordUsedColor("#123456");
+    store.reloadPaletteStore();
+    expect(colors()).toContain("#123456");
+  });
+});
+
+describe("getRecentPaletteColors", () => {
+  it("returns a stable reference between commits", () => {
+    // useSyncExternalStore re-renders forever if the snapshot getter returns a
+    // fresh array each call — the same contract getDefaultPaletteColors keeps.
+    expect(store.getRecentPaletteColors()).toBe(store.getRecentPaletteColors());
+  });
+
+  it("returns a new reference after a commit", () => {
+    const before = store.getRecentPaletteColors();
+    store.recordUsedColor("#123456");
+    expect(store.getRecentPaletteColors()).not.toBe(before);
+    expect(store.getRecentPaletteColors()).toEqual(["#123456"]);
+  });
+
+  it("tracks the palette even after the user renames it", () => {
+    store.renamePalette(RECENT_PALETTE_ID, "My colors");
+    store.recordUsedColor("#123456");
+    expect(store.getRecentPaletteColors()).toEqual(["#123456"]);
   });
 });
