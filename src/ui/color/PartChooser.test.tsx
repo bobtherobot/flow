@@ -109,14 +109,42 @@ describe("PartChooser", () => {
     expect(isMixedArt(screen.getByRole("radio", { name: /stroke/i }))).toBe(false);
   });
 
-  it("gives every visible part a distinct diagonal offset", () => {
+  const posOf = (el: HTMLElement) => {
+    const s = (el as HTMLElement).style;
+    return `${s.getPropertyValue("--flow-clr-part-top")},${s.getPropertyValue("--flow-clr-part-left")}`;
+  };
+
+  it("gives every visible part a distinct position", () => {
     // stroke and text once shared right:0/bottom:0, which made whichever sat
-    // behind unclickable in the three-part case.
+    // behind completely covered and unclickable in the three-part case.
     render(<PartChooser target={target({ available: ["fill", "stroke", "text"] })} />);
-    const offsets = screen
-      .getAllByRole("radio")
-      .map((el) => (el as HTMLElement).style.getPropertyValue("--flow-clr-part-offset"));
-    expect(new Set(offsets).size).toBe(3);
+    const positions = screen.getAllByRole("radio").map(posOf);
+    expect(new Set(positions).size).toBe(3);
+  });
+
+  it("steps fill and stroke down the diagonal and drops text below fill", () => {
+    render(<PartChooser target={target({ available: ["fill", "stroke", "text"] })} />);
+    expect(posOf(screen.getByRole("radio", { name: /fill/i }))).toBe("0,0");
+    expect(posOf(screen.getByRole("radio", { name: /stroke/i }))).toBe("0.5,0.5");
+    expect(posOf(screen.getByRole("radio", { name: /^text/i }))).toBe("1.25,0");
+  });
+
+  it("puts a lone text part at the origin rather than on row two", () => {
+    // Otherwise a bare text selection renders its only box floating below an
+    // empty gap where fill and stroke would have been.
+    render(<PartChooser target={target({ available: ["text"], part: "text" })} />);
+    expect(posOf(screen.getByRole("radio", { name: /^text/i }))).toBe("0,0");
+  });
+
+  it("sizes the stack by how many parts are showing", () => {
+    const { rerender } = render(<PartChooser target={target()} />);
+    expect(screen.getByRole("radiogroup")).toHaveClass("flow-clr-chooser__stack--parts-2");
+
+    rerender(<PartChooser target={target({ available: ["fill", "stroke", "text"] })} />);
+    expect(screen.getByRole("radiogroup")).toHaveClass("flow-clr-chooser__stack--parts-3");
+
+    rerender(<PartChooser target={target({ available: ["text"], part: "text" })} />);
+    expect(screen.getByRole("radiogroup")).toHaveClass("flow-clr-chooser__stack--parts-1");
   });
 
   it("moves the active part with arrow keys and wraps", () => {

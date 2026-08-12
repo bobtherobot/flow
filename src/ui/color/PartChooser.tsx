@@ -20,6 +20,29 @@ const PART_LABEL: Record<ColorPart, string> = {
  *  independent of render order, which moves the active part last. */
 const CANONICAL_ORDER: ColorPart[] = ["fill", "stroke", "text"];
 
+/**
+ * Where each part sits, in units of `--flow-clr-part-size`. Fill and stroke
+ * step down a diagonal; text drops below fill and left-aligned with it, so it
+ * reads as "the two edges" plus "the label".
+ *
+ * Fixed positions are safe here only because these three are distinct by
+ * construction AND `availableParts` returns exactly three shapes
+ * (`src/lib/color-parts.ts:59-70`). An earlier fixed-position attempt gave
+ * stroke and text the same spot, which buried whichever sat behind.
+ */
+const POSITION: Record<ColorPart, { top: number; left: number }> = {
+  fill: { top: 0, left: 0 },
+  stroke: { top: 0.5, left: 0.5 },
+  text: { top: 1.25, left: 0 },
+};
+
+/** Stack extent per part count, in units of `--flow-clr-part-size`. */
+const STACK_SPAN: Record<number, { w: number; h: number }> = {
+  1: { w: 1, h: 1 },
+  2: { w: 1.5, h: 1.5 },
+  3: { w: 1.5, h: 2.25 },
+};
+
 const QUICK: { kind: QuickColor; label: string; hex: string }[] = [
   { kind: "none", label: "None", hex: "transparent" },
   { kind: "white", label: "White", hex: "#ffffff" },
@@ -47,11 +70,13 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
     ? [...available.filter((p) => p !== part), part]
     : available;
 
-  // Diagonal position is driven by index among the parts actually on screen,
-  // in canonical (not render) order — two parts land on the corners, three
-  // spread evenly between them.
   const visible = CANONICAL_ORDER.filter((p) => available.includes(p));
-  const offsetOf = (p: ColorPart) => (visible.length > 1 ? visible.indexOf(p) / (visible.length - 1) : 0);
+
+  // A bare text selection shows its only box at the origin, not floating on
+  // row two below an empty gap where fill and stroke would have been.
+  const soloText = visible.length === 1;
+  const positionOf = (p: ColorPart) => (soloText ? { top: 0, left: 0 } : POSITION[p]);
+  const span = STACK_SPAN[visible.length] ?? STACK_SPAN[2];
 
   const onStackKeyDown = (e: React.KeyboardEvent) => {
     const forward = e.key === "ArrowRight" || e.key === "ArrowDown";
@@ -67,10 +92,14 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
   return (
     <div className={`flow-clr-chooser${compact ? " flow-clr-chooser--compact" : ""}`}>
       <div
-        className="flow-clr-chooser__stack"
+        className={`flow-clr-chooser__stack flow-clr-chooser__stack--parts-${visible.length}`}
         role="radiogroup"
         aria-label="Color target"
         onKeyDown={onStackKeyDown}
+        style={{
+          ["--flow-clr-stack-w" as string]: span.w,
+          ["--flow-clr-stack-h" as string]: span.h,
+        }}
       >
         {ordered.map((p) => {
           const color = partColor(p);
@@ -99,7 +128,10 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
               title={PART_LABEL[p]}
               className={classes}
               tabIndex={p === part ? 0 : -1}
-              style={{ ["--flow-clr-part-offset" as string]: offsetOf(p) }}
+              style={{
+                ["--flow-clr-part-top" as string]: positionOf(p).top,
+                ["--flow-clr-part-left" as string]: positionOf(p).left,
+              }}
               onClick={() => setPart(p)}
             >
               <PartArt part={p} color={color} isMixed={mixed} />

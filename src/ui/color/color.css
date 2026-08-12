@@ -192,16 +192,18 @@
   align-items: flex-start;
 }
 
+/* Extent comes from the part count via `--flow-clr-stack-w/h`, set inline by
+   PartChooser: 1x1 for a lone text part, 1.5x1.5 for a shape, 1.5x2.25 for a
+   labelled container. The `--parts-N` class is a hook for tests and for
+   anything that needs to style by count; the sizing itself is the vars. */
 .flow-clr-chooser__stack {
   position: relative;
-  width: 74px;
-  height: 74px;
+  width: calc(var(--flow-clr-stack-w, 1.5) * var(--flow-clr-part-size));
+  height: calc(var(--flow-clr-stack-h, 1.5) * var(--flow-clr-part-size));
   --flow-clr-part-size: 46px;
 }
 
 .flow-clr-chooser--compact .flow-clr-chooser__stack {
-  width: 52px;
-  height: 52px;
   --flow-clr-part-size: 32px;
 }
 
@@ -212,8 +214,8 @@
  */
 .flow-clr-part {
   position: absolute;
-  top: calc(var(--flow-clr-part-offset, 0) * (100% - var(--flow-clr-part-size)));
-  left: calc(var(--flow-clr-part-offset, 0) * (100% - var(--flow-clr-part-size)));
+  top: calc(var(--flow-clr-part-top, 0) * var(--flow-clr-part-size));
+  left: calc(var(--flow-clr-part-left, 0) * var(--flow-clr-part-size));
   width: var(--flow-clr-part-size);
   height: var(--flow-clr-part-size);
   padding: 0;
