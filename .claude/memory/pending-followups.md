@@ -14,15 +14,22 @@ On 2026-07-08 we scrubbed `.claude/`, `CLAUDE.md`, `.superpowers/` from the enti
 the public repo is confirmed good, purge them so the old objects (which still
 contain the removed files) are dropped locally:
 
-- `git branch -D backup-pre-scrub` — stale (it was rewritten by filter-branch's
-  `--all`, so it is NOT a real backup; the real originals live in `refs/original/`).
+- ~~`git branch -D backup-pre-scrub`~~ — **DONE 2026-08-11** (see [[repo-hygiene]];
+  it was stale anyway — filter-branch's `--all` rewrote it too, so it was never a
+  real backup; the real originals live in `refs/original/`).
 - `rm -rf .git/refs/original/` (or `git for-each-ref --format='%(refname)' refs/original/ | xargs -n1 git update-ref -d`).
 - `git reflog expire --expire=now --all && git gc --prune=now --aggressive`.
 - Delete the disk backup in the session scratchpad (`…/scratchpad/claude-backup/`)
   if it still exists (scratchpad is session-scoped and may already be gone).
 
 Precondition: only after verifying the GitHub repo's history is clean and correct.
-Other rewritten local branches (`master`, `feat/*`) are local-only and harmless.
+**Precondition VERIFIED 2026-08-11** — `origin/main`'s history has zero commits
+touching `.superpowers`, `CLAUDE.md`, or any non-`memory/` `.claude` path, and
+only `.claude/memory/` is published. So the remaining steps above are cleared to
+run whenever wanted; the five `refs/original/*` refs are now the last place the
+scrubbed private files still exist inside git history. Note this step is
+irreversible — it drops the ability to rewind the July rewrite, which is the point.
+Other rewritten local branches were deleted 2026-08-11.
 
 _(Both stale e2e tests were fixed 2026-08-04: `menu-preferences.spec.ts` now
 asserts the About dialog's actual link text ("Excalidraw", `exact`), and
