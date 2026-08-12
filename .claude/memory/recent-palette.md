@@ -42,6 +42,14 @@ undone — no crash, no type error, just history quietly gone:
   that no longer exists, and `recordUsedColor` bails silently on the missing
   palette. `normalizePalettes` preserves arbitrary ids verbatim, so the fixed
   id round-trips through persistence with no special handling.
+  **The fixed id alone is not sufficient, though** — `migrateBuiltins` still
+  matches everything *else* by name, so it needed its own explicit exemption
+  (filtering Recent out of the by-name map, and back into `userMade` by id) or
+  a rename to one of the nine `BUILTIN_PALETTE_NAMES` would let a rebuilt
+  builtin steal id `flow-recent` on the next migration and silently erase the
+  user's history. Fixed in the final review pass; see
+  `src/lib/palette-store.test.ts`'s "survives being renamed to a builtin's
+  name across a migration".
 - **It is deliberately NOT in `BUILTIN_PALETTE_NAMES`.** `migrateBuiltins`
   refreshes every palette named in that list *in place, from its seed colors*.
   Registering Recent as a builtin would wipe the user's entire accumulated
@@ -118,12 +126,14 @@ active box's popup toggle in `chooserTarget.setPart`. It used to be a bare
 active box again is the most common way people close this popup. Missing it
 would have dropped the session's color in the commonest case.
 
-> `RailColorControl.tsx`'s toggle comment claims `open`'s "only writer is this
-> same handler". That is **wrong** and known (ledger, Task 3 minor): `closePopup`
-> also writes it via `ColorPopup`'s `onClose` (Escape, outside-pointerdown). The
-> correct rationale is that `chooserTarget` is rebuilt every render, so the
-> captured `open` is always the latest committed value. The conclusion holds;
-> the reason given does not.
+> `RailColorControl.tsx`'s toggle comment used to claim `open`'s "only writer is
+> this same handler". That was **wrong** and known (ledger, Task 3 minor):
+> `closePopup` also writes it via `ColorPopup`'s `onClose` (Escape,
+> outside-pointerdown). The correct rationale is that `chooserTarget` is
+> rebuilt every render, so the captured `open` is always the latest committed
+> value. The conclusion held; the reason given did not — fixed in the final
+> review pass, and the comment now states the render-rebuild rationale
+> directly instead of the false exclusivity claim.
 
 ## `setColor` and `adjustColor` merged — the distinction was recording, nothing else
 
@@ -145,6 +155,33 @@ apply on click, `+` adds the live color, trash tile and ⌘/Ctrl/Shift-click
 delete swatches, drag reorders, double-click renames. Colors can therefore
 enter it by hand as well as by capture; that is deliberate. The "popup only"
 rule governs *automatic* recording.
+
+**`addSwatch` has no cap, unlike `recordUsedColor`.** `recordUsedColor` slices
+to `RECENT_PALETTE_LIMIT` on every write, but the `+` tile's `addSwatch` just
+appends — so hand-adding swatches can push the Recent palette above 20 until
+the next capture trims it back down. Self-healing, and arguably fine for a
+palette the user edits by hand like any other, but worth knowing:
+`RECENT_PALETTE_LIMIT`'s comment describes a cap that only one of the
+palette's two writers actually enforces. Not changed; recorded here so nobody
+"fixes" `addSwatch` believing the cap was meant to be absolute.
+
+**Selecting Recent in the palette dropdown makes it the *default* palette,**
+with a real, visible consequence. In this UI "selected" and "default" are one
+field — `PaletteSection`'s `choosePalette` calls `setDefaultPalette`, and
+`ColorSwatch` (Preferences' laser color, the bottom bar's canvas background)
+reads `useDefaultPaletteColors()`, which falls back to `BUILTIN_FALLBACK`
+when the default palette is empty. So selecting Recent while it has no colors
+yet makes those preset rows fall back to the neutral/hue-wheel default. The
+mechanism itself is pre-existing — any empty user-made palette does this, it
+is not Recent-specific — but this branch ships the first palette that is
+*guaranteed present* and *empty on a fresh install*, so it is newly easy to
+hit by simply opening the dropdown. The design doc's and this memory's "it
+does not become the default palette" claim (about `ensureRecentPalette`
+appending it without changing `defaultPaletteId`) is true only of *automatic*
+creation — it says nothing about what happens once the user selects it by
+hand, which behaves like selecting any other palette. Not changed; the
+carve-out that exists (delete-palette going inert) is about deletion, not
+default-selection, and was never meant to cover this.
 
 The single exception: **delete-palette goes inert while Recent is selected**,
 in `PaletteSection` *and* in `removePalette` itself. The UI guard alone would
@@ -234,16 +271,23 @@ not covered anywhere: the `View ▸ Show Toolbar` unmount flush (unit-tested in
 Recent palette and confirming capture still lands in the renamed palette
 (the fixed-id design's whole justification, covered only by unit tests).
 
+## Deferred minors, resolved in the final review pass
+
+- `RailColorControl.test.tsx`'s "does not record twice" was renamed to "a
+  close followed by an unmount leaves the palette unchanged" — it cannot
+  observe `flushSession`'s null-before-record ordering, because
+  `recordUsedColor` dedupes anyway, so both orderings give a byte-identical
+  array. Not vacuous (it does catch the flush not firing at all), but the old
+  name promised more than it delivered. **Becomes load-bearing the moment
+  `recordUsedColor` gains ranking or append-then-trim semantics** — assert the
+  call count then, not before; no `vi.mock` partial was added over the store
+  for that today, deliberately, per reviewer ruling.
+- `RECENT_STRIP_SLOTS` is now actually imported by
+  `RailColorControl.test.tsx`'s "renders six recent slots", so its "exported
+  so tests share one number" doc comment is honest.
+
 ## Deferred minors still open (from the ledger)
 
-- `RailColorControl.test.tsx`'s "does not record twice" cannot observe
-  `flushSession`'s null-before-record ordering, because `recordUsedColor`
-  dedupes anyway — both orderings give a byte-identical array. Not vacuous, but
-  the name promises more than it delivers. **Becomes load-bearing the moment
-  `recordUsedColor` gains ranking or append-then-trim semantics**; assert the
-  call count then.
-- `RECENT_STRIP_SLOTS` is exported "so tests share one number", but nothing
-  imports it — the sibling test still hardcodes `toHaveLength(6)`.
 - `ensureRecentPalette` persists on top of `seedFresh`/`migrateBuiltins`, which
   already persist: a double localStorage write on fresh install and migration.
   Idempotent, harmless.
