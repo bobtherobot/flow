@@ -11,6 +11,7 @@ import {
   removeSwatches,
   reorderSwatches,
 } from "../../lib/palette-store";
+import { RECENT_PALETTE_ID } from "../../lib/color-palettes";
 
 interface PaletteSectionProps {
   /** The picker's live color, added by the grid's [+] tile. */
@@ -52,6 +53,7 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   // Resolve defensively: defaultPaletteId can point at a just-deleted palette
   // for one render (e.g. right after removePalette reseeds).
   const current = palettes.find((p) => p.id === defaultPaletteId) ?? palettes[0];
+  const isRecent = current.id === RECENT_PALETTE_ID;
 
   const choosePalette = (id: string) => {
     setDefaultPalette(id);
@@ -69,6 +71,7 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
       setSelected([]);
       return;
     }
+    if (isRecent) return;
     setConfirming(true);
   };
 
@@ -241,10 +244,16 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
           type="button"
           className="flow-clr-palette__icon"
           aria-label={selected.length > 0 ? "Remove selected swatches" : "Delete palette"}
+          // NOT `disabled`: Chrome delivers no mouse events to a disabled form
+          // control and this grid's tiles are HTML5 drop targets that run on
+          // them — the same trap documented on the trash tile above.
+          aria-disabled={selected.length === 0 && isRecent}
           title={
             selected.length > 0
               ? "Remove the selected swatches"
-              : `Delete the “${current.name}” palette`
+              : isRecent
+                ? `“${current.name}” updates itself as you pick colors, so it can’t be deleted`
+                : `Delete the “${current.name}” palette`
           }
           onClick={onTrash}
         >

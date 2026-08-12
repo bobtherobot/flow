@@ -205,14 +205,30 @@ describe("removePalette", () => {
     expect(after.palettes.some((p) => p.id === after.defaultPaletteId)).toBe(true);
   });
 
-  it("re-seeds a fresh Default when the last palette is deleted", () => {
-    // delete all but rely on the guard on the final removal
+  it("leaves the Recent palette as the last one standing, rather than reseeding a fresh Default", () => {
+    // Before the Recent-palette guard (Task 5), deleting every palette in turn
+    // hit zero palettes and removePalette's own reseed-a-fresh-Default branch
+    // fired. Recent's deletion is now a no-op, so it is always the floor: this
+    // loop settles on Recent alone, and that reseed branch — like
+    // getRecentPaletteColors's NO_COLORS fallback — becomes unreachable
+    // through the public API. It stays in removePalette as cheap defensive
+    // code; there is nothing left to exercise it with.
     let ids = store.getSnapshot().palettes.map((p) => p.id);
     for (const id of ids) store.removePalette(id);
     const after = store.getSnapshot();
-    expect(after.palettes).toHaveLength(1);
-    expect(after.palettes[0].name).toBe("Default");
-    expect(after.defaultPaletteId).toBe(after.palettes[0].id);
+    expect(after.palettes).toEqual([{ id: RECENT_PALETTE_ID, name: RECENT_PALETTE_NAME, colors: [] }]);
+    expect(after.defaultPaletteId).toBe(RECENT_PALETTE_ID);
+  });
+
+  it("refuses to delete the Recent palette", () => {
+    // Belt and braces behind the disabled button: the app recreates the
+    // palette on next load, so a successful delete would silently discard the
+    // user's history and hand them an empty one back.
+    store.recordUsedColor("#123456");
+    store.removePalette(RECENT_PALETTE_ID);
+    const recent = store.getSnapshot().palettes.find((p) => p.id === RECENT_PALETTE_ID);
+    expect(recent).toBeDefined();
+    expect(recent!.colors).toEqual(["#123456"]);
   });
 });
 

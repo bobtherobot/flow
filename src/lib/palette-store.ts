@@ -205,6 +205,10 @@ export function addPalette(name?: string): ColorPalette {
 }
 
 export function removePalette(id: string): void {
+  // The Recent palette is app-maintained and recreated on next load, so
+  // "deleting" it would just discard the user's history and hand back an empty
+  // one. The UI disables the button; this makes the store honest too.
+  if (id === RECENT_PALETTE_ID) return;
   const remaining = state.palettes.filter((p) => p.id !== id);
   if (remaining.length === 0) {
     const seed = makeDefaultPalette();
