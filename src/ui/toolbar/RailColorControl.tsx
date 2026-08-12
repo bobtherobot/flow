@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./toolbar.css";
 import { PartChooser } from "../color/PartChooser";
 import { useColorTarget, type ColorTarget } from "../color/useColorTarget";
 import { ColorPopup } from "./ColorPopup";
 import { RAIL_WIDTH } from "./rail-layout";
+import { recordUsedColor } from "../../lib/palette-store";
 import type { MenuPoint } from "../panels/dock/menu-position";
 import type { SelectionStyle } from "../panels/useSelectionStyle";
 
@@ -30,6 +31,53 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const arrowNavRef = useRef(false);
 
+  /**
+   * The last hex this popup session wrote, or null if it wrote nothing.
+   *
+   * One ref, not a hex plus a dirty flag: null already means "untouched", and
+   * a second field would be one more thing to leave stranded. Transient
+   * mid-drag writes simply overwrite it, which is what makes a forty-event hue
+   * drag contribute one color instead of forty.
+   */
+  const lastHex = useRef<string | null>(null);
+
+  /** Settle the session's color into the Recent palette. Idempotent: it nulls
+   *  the ref, so a close followed by an unmount records once, not twice. */
+  const flushSession = () => {
+    const hex = lastHex.current;
+    lastHex.current = null;
+    if (hex) recordUsedColor(hex);
+  };
+
+  /**
+   * The popup can be unmounted with a session in flight — `View ▸ Show
+   * Toolbar` makes `ToolBar` return null, taking this component and the popup
+   * with it. Same hazard `cancelEyeDropper` guards in ColorPopup/ColorPanel,
+   * same cleanup-effect shape. Without this the session's color is lost.
+   * `lastHex` is a ref and `recordUsedColor` a module import, so the empty
+   * dep array closes over nothing stale.
+   */
+  useEffect(() => () => flushSession(), []);
+
+  /**
+   * What the popup writes through. Recording lives here, not in
+   * `useColorTarget`, because this component owns the popup's open/close and
+   * is therefore the only place that knows when a session ended. Wrapping the
+   * target rather than threading a callback into `ColorPopup` also keeps the
+   * popup itself ignorant of recording entirely.
+   */
+  const popupTarget: ColorTarget = {
+    ...target,
+    setColor: (hex, alpha, transient) => {
+      target.setColor(hex, alpha, transient);
+      lastHex.current = hex;
+    },
+    adjustColor: (hex, alpha, transient) => {
+      target.adjustColor(hex, alpha, transient);
+      lastHex.current = hex;
+    },
+  };
+
   const anchor = (): MenuPoint => {
     const r = wrapRef.current?.getBoundingClientRect();
     return { top: r?.top ?? 0, left: (r?.right ?? RAIL_WIDTH) + POPUP_GAP };
@@ -37,6 +85,7 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
 
   const closePopup = () => {
     setOpen(false);
+    flushSession();
     // Return focus to the box that opened the popup, mirroring how a native
     // dialog hands focus back to its trigger on dismissal.
     wrapRef.current
@@ -50,7 +99,15 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
       const isArrowNav = arrowNavRef.current;
       arrowNavRef.current = false;
       if (part === target.part) {
-        if (!isArrowNav) setOpen((o) => !o);
+        // Was `setOpen((o) => !o)`. The close half has to settle the session's
+        // color, and `closePopup` is where that lives — a bare toggle would
+        // silently drop it on the popup's most-used exit. Reading `open`
+        // directly is correct in an event handler: it is this render's value,
+        // and the only writer is this same handler.
+        if (!isArrowNav) {
+          if (open) closePopup();
+          else setOpen(true);
+        }
         return;
       }
       target.setPart(part);
@@ -73,7 +130,7 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
   return (
     <div className="flow-toolbar__color" ref={wrapRef} onKeyDownCapture={onKeyDownCapture}>
       <PartChooser target={chooserTarget} compact />
-      {open && <ColorPopup target={target} anchor={anchor()} onClose={closePopup} />}
+      {open && <ColorPopup target={popupTarget} anchor={anchor()} onClose={closePopup} />}
     </div>
   );
 }
