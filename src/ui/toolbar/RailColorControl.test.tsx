@@ -25,7 +25,13 @@ vi.mock("@excalidraw/excalidraw", () => ({
 }));
 
 import { RailColorControl } from "./RailColorControl";
-import { reloadColorStore, recordRecent } from "../../lib/color-store";
+import { RECENT_STRIP_SLOTS } from "./ColorPopup";
+import { reloadColorStore } from "../../lib/color-store";
+import {
+  recordUsedColor,
+  reloadPaletteStore,
+  getRecentPaletteColors,
+} from "../../lib/palette-store";
 import type { SelectionStyle } from "../panels/useSelectionStyle";
 
 // jsdom/Node's native `localStorage` global does not implement a usable
@@ -88,6 +94,7 @@ function fakeSel(over: Partial<SelectionStyle> = {}): SelectionStyle {
 beforeEach(() => {
   localStorage.clear();
   reloadColorStore();
+  reloadPaletteStore();
   store.get.mockClear();
   store.set.mockClear();
   store.reset();
@@ -130,11 +137,13 @@ describe("RailColorControl", () => {
   it("renders six recent slots", () => {
     render(<RailColorControl sel={fakeSel()} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
-    expect(screen.getAllByRole("button", { name: /recent color slot/i })).toHaveLength(6);
+    expect(screen.getAllByRole("button", { name: /recent color slot/i })).toHaveLength(
+      RECENT_STRIP_SLOTS,
+    );
   });
 
-  it("fills slots from the store and applies one on click", () => {
-    recordRecent("#00ff00");
+  it("fills slots from the Recent palette and applies one on click", () => {
+    recordUsedColor("#00ff00");
     const sel = fakeSel();
     render(<RailColorControl sel={sel} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
@@ -264,5 +273,153 @@ describe("RailColorControl", () => {
 
     expect(store.set).toHaveBeenCalledTimes(2);
     expect(store.set).toHaveBeenLastCalledWith({ __atom: true }, null);
+  });
+});
+
+describe("recording the popup session's color", () => {
+  /**
+   * A selection whose fill is **saturated**.
+   *
+   * This matters more than it looks. The shared `rect` fixture's fill is
+   * `#eeeeee`, which has s=0 — and a hue change on an achromatic color yields
+   * the identical hex every time. Every write in a session would then be the
+   * same color, `recordUsedColor` would dedupe them, and the "exactly one
+   * color per session" test below would pass even against a broken
+   * record-on-every-write implementation. A saturated fill makes each hue step
+   * a genuinely distinct hex, so that test can actually fail.
+   */
+  const satSel = () =>
+    fakeSel({
+      elements: [{ ...rect, backgroundColor: "#ff0000" }] as unknown as SelectionStyle["elements"],
+    });
+
+  /**
+   * Nudge the hue by N arrow presses. `HueSlider` handles arrows only — it has
+   * no Home/End (see `slider-keys.ts`), so there is no jump-to-a-known-value
+   * shortcut. Each press is one write through the draft.
+   *
+   * `sel.update` is a mock, so the element never actually changes and the
+   * draft's prop stays `#ff0000` across renders. That is fine and intended:
+   * `useColorDraft` holds the live HSV itself and only re-seeds on a genuine
+   * outside change, so successive presses accumulate rather than snapping back.
+   */
+  const nudgeHue = (steps: number) => {
+    const slider = screen.getByRole("slider", { name: /hue/i });
+    for (let i = 0; i < steps; i++) fireEvent.keyDown(slider, { key: "ArrowRight" });
+  };
+
+  const openPopup = () => fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
+
+  it("records nothing when the popup is opened and closed untouched", () => {
+    render(<RailColorControl sel={satSel()} />);
+    openPopup();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(getRecentPaletteColors()).toEqual([]);
+  });
+
+  it("records nothing while the popup is still open", () => {
+    // The whole point of the deferral: a color joins the list when the session
+    // ends, not while the user is still hunting for it.
+    render(<RailColorControl sel={satSel()} />);
+    openPopup();
+    nudgeHue(30);
+    expect(getRecentPaletteColors()).toEqual([]);
+  });
+
+  it("records the color on close", () => {
+    render(<RailColorControl sel={satSel()} />);
+    openPopup();
+    nudgeHue(30);
+    fireEvent.click(screen.getByRole("button", { name: /close color picker/i }));
+    expect(getRecentPaletteColors()).toHaveLength(1);
+  });
+
+  it("records exactly one color for a session of many distinct writes", () => {
+    // 60 arrow presses, 60 distinct hexes, one entry.
+    render(<RailColorControl sel={satSel()} />);
+    openPopup();
+    nudgeHue(60);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(getRecentPaletteColors()).toHaveLength(1);
+  });
+
+  it("records the LAST color the session wrote, not an earlier one", () => {
+    // Seed an entry, then end the session ON it: hue-drag first (distinct
+    // hexes that must NOT be recorded), then click the seeded slot last. If
+    // any write but the last were recorded, the palette would grow.
+    recordUsedColor("#0000ff");
+    render(<RailColorControl sel={satSel()} />);
+    openPopup();
+    nudgeHue(40);
+    fireEvent.click(screen.getByRole("button", { name: "Recent color #0000ff" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(getRecentPaletteColors()).toEqual(["#0000ff"]);
+  });
+
+  it("records the hue color when the drag is what comes last", () => {
+    // The mirror of the test above, so neither can pass by ordering accident.
+    recordUsedColor("#0000ff");
+    render(<RailColorControl sel={satSel()} />);
+    openPopup();
+    fireEvent.click(screen.getByRole("button", { name: "Recent color #0000ff" }));
+    nudgeHue(40);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(getRecentPaletteColors()).toHaveLength(2);
+    expect(getRecentPaletteColors()[1]).toBe("#0000ff");
+  });
+
+  it("records on an unmount while the popup is still open", () => {
+    // Not the Escape/outside-click path. View ▸ Show Toolbar makes ToolBar
+    // return null, unmounting this component with the popup open — the same
+    // hazard cancelEyeDropper guards in this file. A session's color must not
+    // be lost to it.
+    const { unmount } = render(<RailColorControl sel={satSel()} />);
+    openPopup();
+    nudgeHue(45);
+    unmount();
+    expect(getRecentPaletteColors()).toHaveLength(1);
+  });
+
+  it("a close followed by an unmount leaves the palette unchanged", () => {
+    // NOT a check that flushSession's null-before-record ordering prevents a
+    // second write: recordUsedColor no-ops on a hex already present, so a
+    // "records twice" bug and a "records once" fix produce the identical
+    // array here — both orderings dedupe to the same result. What this test
+    // does verify (and would catch) is a real mutation: the close flush not
+    // firing at all. If recordUsedColor ever gains ranking or append-then-trim
+    // semantics, this stops being equivalent and should assert the call count
+    // instead.
+    const { unmount } = render(<RailColorControl sel={satSel()} />);
+    openPopup();
+    nudgeHue(45);
+    fireEvent.keyDown(window, { key: "Escape" });
+    const after = getRecentPaletteColors();
+    expect(after).toHaveLength(1);
+    unmount();
+    expect(getRecentPaletteColors()).toEqual(after);
+  });
+
+  it("records when the active box is clicked a second time to close", () => {
+    // The active box toggles `open` directly and never reaches `closePopup` —
+    // the most common way of closing the popup, and the one a flush wired only
+    // into `closePopup` would silently miss.
+    render(<RailColorControl sel={satSel()} />);
+    const box = screen.getByRole("radio", { name: /fill/i });
+    fireEvent.click(box);
+    nudgeHue(30);
+    fireEvent.pointerDown(box);
+    fireEvent.click(box);
+    expect(screen.queryByRole("dialog", { name: /color picker/i })).not.toBeInTheDocument();
+    expect(getRecentPaletteColors()).toHaveLength(1);
+  });
+
+  it("does not record a write made outside the popup", () => {
+    // The quartet chips sit on the rail, outside the popup, and already
+    // deliberately skip recording — white/grey/black have permanent chips one
+    // click away, so caching them would evict colors the user actually chose.
+    const { unmount } = render(<RailColorControl sel={satSel()} />);
+    fireEvent.click(screen.getByRole("button", { name: /^white$/i }));
+    unmount();
+    expect(getRecentPaletteColors()).toEqual([]);
   });
 });

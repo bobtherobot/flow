@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import {
-  subscribe, getSnapshot, setActivePart, recordRecent, setNumericMode, reloadColorStore,
-} from "./color-store";
+import { subscribe, getSnapshot, setActivePart, setNumericMode, reloadColorStore } from "./color-store";
 
 // Mock localStorage for test environment (same pattern as palette-store.test.ts)
 const mockStorage: Record<string, string> = {};
@@ -36,8 +34,8 @@ beforeEach(() => {
 });
 
 describe("color-store", () => {
-  it("starts on fill, empty recents, hsla", () => {
-    expect(getSnapshot()).toEqual({ activePart: "fill", recents: [], numericMode: "hsla" });
+  it("starts on fill, hsla", () => {
+    expect(getSnapshot()).toEqual({ activePart: "fill", numericMode: "hsla" });
   });
 
   it("returns a stable snapshot between mutations", () => {
@@ -67,20 +65,6 @@ describe("color-store", () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
-  it("records a recent and persists it", () => {
-    recordRecent("#ff0000");
-    expect(getSnapshot().recents).toEqual(["#ff0000"]);
-    expect(JSON.parse(localStorage.getItem("flow.recentColors")!)).toEqual(["#ff0000"]);
-  });
-
-  it("ignores a recent that changes nothing", () => {
-    recordRecent("#ff0000");
-    const fn = vi.fn();
-    subscribe(fn);
-    recordRecent("#ff0000");
-    expect(fn).not.toHaveBeenCalled();
-  });
-
   it("persists the numeric mode", () => {
     setNumericMode("hex");
     expect(getSnapshot().numericMode).toBe("hex");
@@ -88,10 +72,8 @@ describe("color-store", () => {
   });
 
   it("rehydrates from storage on reload", () => {
-    localStorage.setItem("flow.recentColors", JSON.stringify(["#00ff00"]));
     localStorage.setItem("flow.colorNumericMode", "rgba");
     reloadColorStore();
-    expect(getSnapshot().recents).toEqual(["#00ff00"]);
     expect(getSnapshot().numericMode).toBe("rgba");
   });
 

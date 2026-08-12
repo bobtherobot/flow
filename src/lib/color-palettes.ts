@@ -25,6 +25,29 @@ export const DEFAULT_SEED_PALETTE_NAME = "Pastel";
  *  version change and leaves user-created palettes alone. */
 export const SEED_VERSION = 2;
 
+/**
+ * The auto-maintained palette the rail popup appends to. Its id is **fixed**,
+ * not generated, because it is the only stable handle code has on it — the
+ * user can rename the palette like any other, and matching by name (the way
+ * builtins are matched) would lose it the moment they did.
+ *
+ * Deliberately NOT in `BUILTIN_PALETTE_NAMES`: `migrateBuiltins` refreshes
+ * everything in that list *in place from its seed colors*, which would erase
+ * the user's accumulated history on the next `SEED_VERSION` bump. Staying out
+ * of the list is what makes it get carried through as user-made instead.
+ */
+export const RECENT_PALETTE_ID = "flow-recent";
+
+/** Its name on creation; the user may rename it, the id is the handle. */
+export const RECENT_PALETTE_NAME = "Recent";
+
+/**
+ * How many colors it holds. Matches the builtins' 20 so it reads as a peer in
+ * the dropdown rather than a stub. Eviction is from the **tail**, so a
+ * hand-added swatch (which `addSwatch` appends) is the first to go once full.
+ */
+export const RECENT_PALETTE_LIMIT = 20;
+
 /** Every builtin palette: 20 colors each, ordered so the grid reads as a
  *  deliberate ramp (hue wheel, or dark → light where the theme is tonal).
  *  Insertion order is the order they appear in the panel — Pastel first, since

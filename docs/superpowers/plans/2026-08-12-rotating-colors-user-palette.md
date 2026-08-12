@@ -722,19 +722,24 @@ Add the flush to `closePopup`, before the focus restore:
   };
 ```
 
-The active box also closes the popup by toggling `open`, which does **not** go through `closePopup`. Route it through the flush too — in `chooserTarget.setPart`, replace the toggle:
+The active box also closes the popup by toggling `open`, which does **not** go through `closePopup` — and that is the most common way users close it. Route it through `closePopup` instead of a blind toggle, in `chooserTarget.setPart`:
 
 ```ts
       if (part === target.part) {
+        // Was `setOpen((o) => !o)`. The close half has to settle the session's
+        // color, and `closePopup` is where that lives — a bare toggle would
+        // silently drop it on the popup's most-used exit. Reading `open`
+        // directly is correct in an event handler: it is this render's value,
+        // and the only writer is this same handler.
         if (!isArrowNav) {
-          setOpen((o) => {
-            if (o) flushSession();
-            return !o;
-          });
+          if (open) closePopup();
+          else setOpen(true);
         }
         return;
       }
 ```
+
+`closePopup` is declared above `chooserTarget` already, so no reordering is needed. This also gives the toggle path the focus restore it never had.
 
 Finally, hand the popup the wrapped target:
 
@@ -742,7 +747,7 @@ Finally, hand the popup the wrapped target:
       {open && <ColorPopup target={popupTarget} anchor={anchor()} onClose={closePopup} />}
 ```
 
-> **Note on `setOpen`'s updater:** calling `flushSession()` inside it is a side effect in a state updater, which React may invoke twice in StrictMode. `flushSession` is idempotent — the second call sees `lastHex.current === null` and does nothing — which is exactly why it nulls the ref before recording rather than after.
+> **Why `flushSession` nulls the ref before recording:** it makes the flush idempotent, so the close-then-unmount sequence records once rather than twice. Keep that ordering.
 
 - [ ] **Step 4: Point the strip at the Recent palette in `ColorPopup.tsx`**
 

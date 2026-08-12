@@ -13,7 +13,6 @@ function target(over: Partial<ColorTarget> = {}): ColorTarget {
     isMixed: false,
     partColor: (p) => (p === "fill" ? "#eeeeee" : "#111111"),
     setColor: vi.fn(),
-    adjustColor: vi.fn(),
     swap: vi.fn(),
     quickSet: vi.fn(),
     ...over,

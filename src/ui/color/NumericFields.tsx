@@ -14,17 +14,9 @@ interface NumericFieldsProps {
   alpha: number;
   mode: NumericMode;
   onModeChange: (mode: NumericMode) => void;
-  /**
-   * A single channel moved — an H/S/L or R/G/B field, or Alpha. Never a whole
-   * new colour, so the caller must route this to a write that does NOT record
-   * a recent (see `useColorTarget.adjustColor`).
-   */
+  /** A single channel moved — an H/S/L or R/G/B field, or Alpha. */
   onChange: (next: { hsv: Hsv; alpha: number }, transient: boolean) => void;
-  /**
-   * The Hex field committed (Enter or blur) with a parseable value. This IS a
-   * whole colour — unlike `onChange`, the caller should record it as a recent
-   * (see `useColorTarget.setColor`).
-   */
+  /** The Hex field committed (Enter or blur) with a parseable value. */
   onHexCommit: (hex: string, alpha: number) => void;
 }
 

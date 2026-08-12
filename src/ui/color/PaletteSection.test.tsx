@@ -2,7 +2,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { PaletteSection } from "./PaletteSection";
-import { reloadPaletteStore, getSnapshot, removePalette } from "../../lib/palette-store";
+import {
+  reloadPaletteStore,
+  getSnapshot,
+  removePalette,
+  recordUsedColor,
+} from "../../lib/palette-store";
 
 // jsdom/Node's native `localStorage` global does not implement a usable
 // Storage in this project's vitest setup (see src/lib/palette-store.test.ts,
@@ -45,6 +50,13 @@ function setup(currentColor = "#123456") {
   const onPick = vi.fn();
   render(<PaletteSection currentColor={currentColor} onPick={onPick} />);
   return { onPick };
+}
+
+/** Drives the same `<select>` the "switches palettes" test above uses,
+ *  resolved from a palette name to its id since the select's value is the id. */
+function selectPalette(name: string) {
+  const id = getSnapshot().palettes.find((p) => p.name === name)!.id;
+  fireEvent.change(screen.getByLabelText("Palette"), { target: { value: id } });
 }
 
 describe("PaletteSection", () => {
@@ -314,5 +326,48 @@ describe("PaletteSection", () => {
     fireEvent.click(swatches()[0], { metaKey: true });
     const withSelection = screen.getByRole("button", { name: /remove selected swatches/i });
     expect(withSelection.getAttribute("title")).toMatch(/selected swatches/i);
+  });
+});
+
+describe("the Recent palette", () => {
+  it("cannot be deleted", () => {
+    setup();
+    selectPalette("Recent");
+    const trash = screen.getByRole("button", { name: "Delete palette" });
+    expect(trash).toHaveAttribute("aria-disabled", "true");
+    // NOT the native attribute: Chrome delivers no mouse events to a disabled
+    // control, and this grid's tiles are drop targets that run on them.
+    expect(trash).not.toBeDisabled();
+    fireEvent.click(trash);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("still deletes selected swatches from the same button", () => {
+    // The footer trash does double duty. Only the delete-palette branch is
+    // inert — evicting a color you are sick of must keep working.
+    recordUsedColor("#123456");
+    setup();
+    selectPalette("Recent");
+    fireEvent.click(screen.getByRole("button", { name: "Swatch #123456" }), { ctrlKey: true });
+    const trash = screen.getByRole("button", { name: "Remove selected swatches" });
+    expect(trash).not.toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(trash);
+    expect(screen.queryByRole("button", { name: "Swatch #123456" })).not.toBeInTheDocument();
+  });
+
+  it("still accepts a hand-added swatch", () => {
+    setup();
+    selectPalette("Recent");
+    fireEvent.click(screen.getByRole("button", { name: "Add current color to palette" }));
+    expect(screen.getAllByRole("button", { name: /^Swatch #/ })).toHaveLength(1);
+  });
+
+  it("leaves delete-palette live for every other palette", () => {
+    setup();
+    selectPalette("Pastel");
+    expect(screen.getByRole("button", { name: "Delete palette" })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 });

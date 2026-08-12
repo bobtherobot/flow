@@ -5,11 +5,18 @@ import "./toolbar.css";
 import { SaturationBox } from "../color/SaturationBox";
 import { PickerRow } from "../color/PickerRow";
 import { useColorDraft } from "../color/useColorDraft";
-import { useColorUiState } from "../../lib/color-store";
-import { RECENT_LIMIT } from "../../lib/recent-colors";
+import { useRecentPaletteColors } from "../../lib/palette-store";
 import { openEyeDropper, cancelEyeDropper, type EyeDropperHandle } from "../../lib/eyedropper";
 import { clampMenuPosition, type MenuPoint } from "../panels/dock/menu-position";
 import type { ColorTarget } from "../color/useColorTarget";
+
+/**
+ * Fixed-size strip: always this many slots so it never reflows as it fills,
+ * regardless of how many colors the Recent palette has accumulated (up to
+ * `RECENT_PALETTE_LIMIT`, which is much larger). Exported so tests and any
+ * future caller share one number.
+ */
+export const RECENT_STRIP_SLOTS = 6;
 
 interface ColorPopupProps {
   target: ColorTarget;
@@ -26,16 +33,17 @@ interface ColorPopupProps {
  */
 export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const { recents } = useColorUiState();
+  // The Recent palette specifically — not whichever palette the docked panel's
+  // dropdown has selected.
+  const recents = useRecentPaletteColors();
   const [pos, setPos] = useState<MenuPoint>(anchor);
 
-  // Channel-level edits only: hue/alpha/saturation drags and arrow-steps are
-  // not a whole colour on their own — see `useColorTarget.adjustColor`. The
-  // recents strip below calls `target.setColor` directly instead.
+  // Every write from the picker's channels — saturation, hue, alpha — lands
+  // through the draft so HSV survives a round trip through an achromatic hex.
   const draft = useColorDraft({
     hex: target.hex,
     alpha: target.alpha,
-    onCommit: target.adjustColor,
+    onCommit: target.setColor,
   });
 
   // This popup can be unmounted out from under an in-flight pick — not just
@@ -92,8 +100,7 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
     };
   }, [onClose]);
 
-  // Always six slots so the strip does not reflow as it fills.
-  const slots = Array.from({ length: RECENT_LIMIT }, (_, i) => recents[i] ?? null);
+  const slots = Array.from({ length: RECENT_STRIP_SLOTS }, (_, i) => recents[i] ?? null);
 
   return createPortal(
     <div

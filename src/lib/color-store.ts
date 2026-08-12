@@ -1,14 +1,7 @@
 // src/lib/color-store.ts
 import { useSyncExternalStore } from "react";
 import type { ColorPart } from "./color-parts";
-import { pushRecent } from "./recent-colors";
-import {
-  getRecentColors,
-  setRecentColors,
-  getColorNumericMode,
-  setColorNumericMode,
-  type NumericMode,
-} from "../app/preferences";
+import { getColorNumericMode, setColorNumericMode, type NumericMode } from "../app/preferences";
 
 /**
  * The color UI state that has no home on the canvas.
@@ -22,7 +15,6 @@ import {
  */
 export interface ColorUiState {
   activePart: ColorPart;
-  recents: string[];
   numericMode: NumericMode;
 }
 
@@ -32,7 +24,6 @@ let state: ColorUiState = load();
 function load(): ColorUiState {
   return {
     activePart: "fill",
-    recents: getRecentColors(),
     numericMode: getColorNumericMode(),
   };
 }
@@ -71,16 +62,6 @@ export function reloadColorStore(): void {
 export function setActivePart(activePart: ColorPart): void {
   if (state.activePart === activePart) return;
   commit({ ...state, activePart });
-}
-
-export function recordRecent(color: string): void {
-  const recents = pushRecent(state.recents, color);
-  // pushRecent returns a fresh array even for a no-op, so compare contents.
-  const unchanged =
-    recents.length === state.recents.length && recents.every((c, i) => c === state.recents[i]);
-  if (unchanged) return;
-  setRecentColors(recents);
-  commit({ ...state, recents });
 }
 
 export function setNumericMode(numericMode: NumericMode): void {

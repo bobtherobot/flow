@@ -2,7 +2,7 @@ import type { SelectionStyle } from "../panels/useSelectionStyle";
 import {
   availableParts, partSpec, normalizeActivePart, swapFillStroke, type ColorPart,
 } from "../../lib/color-parts";
-import { useColorUiState, setActivePart, recordRecent } from "../../lib/color-store";
+import { useColorUiState, setActivePart } from "../../lib/color-store";
 import { splitColorAlpha, combineColorAlpha } from "../../lib/color-alpha";
 import { MIXED, readFormValue } from "../../lib/selection-style";
 
@@ -46,21 +46,17 @@ export interface ColorTarget {
   /** Color for one part, for the chooser boxes. */
   partColor: (part: ColorPart) => string;
   /**
-   * Write a *whole colour* the user just picked: a HEX field commit, a
-   * palette swatch, an eyedropper pick, or a click on an existing recent.
-   * Also settles it into recents (see `recordRecent`).
+   * Write a color to the active part.
+   *
+   * `transient` is the only distinction that matters here: mid-drag writes
+   * pass `true` and are not committed to history as separate steps.
+   *
+   * This used to be two methods — `setColor` recorded into the recents cache
+   * and `adjustColor` did not. Recording now belongs to `RailColorControl`,
+   * which is the only place that knows when a picker session ended, so the two
+   * had nothing left to distinguish them. One method, one choice.
    */
   setColor: (hex: string, alpha: number, transient: boolean) => void;
-  /**
-   * Write one *channel* of a colour still being worked on: a hue/alpha/
-   * saturation drag or arrow-step, or an H/S/L, R/G/B, or A numeric field.
-   * Never joins recents — the user hasn't settled on a whole colour yet, so
-   * caching a mid-adjustment value would burn a slot on a colour they didn't
-   * choose. `setColor` is `adjustColor` plus `recordRecent`; this is the
-   * write half on its own, named so a new caller has to pick one on purpose
-   * instead of inheriting recording by accident.
-   */
-  adjustColor: (hex: string, alpha: number, transient: boolean) => void;
   swap: () => void;
   quickSet: (kind: QuickColor) => void;
 }
@@ -128,15 +124,11 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
    * or a first write's width bump could be clobbered by a second write that
    * only knows about color.
    *
-   * Exposed on the hook's return as `adjustColor` — the write half with no
-   * recording, for channel-level edits (hue/alpha/saturation, the numeric
-   * fields). `setColor` wraps it with `recordRecent` for whole-colour picks.
-   * `quickSet`'s white/grey/black chips also call this directly rather than
-   * `setColor`: those three colors already have permanent dedicated chips one
-   * click away, so caching them would just evict colors the user actually
-   * chose.
+   * Exposed on the hook's return as `setColor` — the single write method for
+   * every color change, whole or channel-level. Recording into the Recent
+   * palette is `RailColorControl`'s job, not this hook's.
    */
-  const applyColor = (nextHex: string, nextAlpha: number, transient: boolean) => {
+  const setColor: ColorTarget["setColor"] = (nextHex, nextAlpha, transient) => {
     const value = combineColorAlpha(nextHex, nextAlpha);
     const isStroke = part === "stroke";
 
@@ -163,14 +155,6 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
       transient,
     );
   };
-
-  const setColor: ColorTarget["setColor"] = (nextHex, nextAlpha, transient) => {
-    applyColor(nextHex, nextAlpha, transient);
-    // Mid-drag writes are noise; only a settled color joins the recents.
-    if (!transient) recordRecent(nextHex);
-  };
-
-  const adjustColor: ColorTarget["adjustColor"] = applyColor;
 
   const swap: ColorTarget["swap"] = () => {
     // The color arriving on the stroke came from the fill, so the same revival
@@ -207,10 +191,11 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
 
   const quickSet: ColorTarget["quickSet"] = (kind) => {
     if (kind !== "none") {
-      // Goes through `applyColor`, not `setColor`: white/grey/black already
-      // have permanent dedicated chips one click away, so recording them into
-      // recents would just evict colors the user actually chose.
-      applyColor(QUICK_HEX[kind], 100, false);
+      // White/grey/black never join the Recent palette. They have permanent
+      // dedicated chips one click away, and `PartChooser`'s quartet chips
+      // (shared by both the rail popup and the docked panel) sit outside the
+      // popup on both surfaces, so no session captures them either way.
+      setColor(QUICK_HEX[kind], 100, false);
       return;
     }
     // Invisible text is a footgun, not a feature.
@@ -244,7 +229,6 @@ export function useColorTarget(sel: SelectionStyle): ColorTarget {
     isMixed,
     partColor: rawColor,
     setColor,
-    adjustColor,
     swap,
     quickSet,
   };
