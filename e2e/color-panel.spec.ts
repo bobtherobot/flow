@@ -253,7 +253,9 @@ test("quickSet white/grey/black does not pollute recents", async ({ page }) => {
   await expect(page.locator(popup).getByRole("button", { name: /Recent color slot 1, empty/ })).toBeVisible();
 });
 
-test("selecting text collapses the chooser to the text part", async ({ page }) => {
+test("selecting text aims the chooser at text without dropping the other boxes", async ({
+  page,
+}) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
 
@@ -265,9 +267,49 @@ test("selecting text collapses the chooser to the text part", async ({ page }) =
   await page.keyboard.type("hello");
   await page.keyboard.press("Escape");
 
-  const radios = page.locator(panel).getByRole("radio");
-  await expect(radios).toHaveCount(1);
-  await expect(radios.first()).toHaveAccessibleName(/Text/);
+  // All three boxes stay on screen at every selection — the chooser is a fixed
+  // object, and the saturation box beside it is sized off its height. What
+  // changes is which boxes are live.
+  await expect(page.locator(panel).getByRole("radio")).toHaveCount(3);
+  await expect(
+    page.locator(panel).locator('[role="radio"][aria-checked="true"]'),
+  ).toHaveAccessibleName(/Text/);
+  await expect(
+    page.locator(panel).locator('[role="radio"][aria-disabled="true"]'),
+  ).toHaveCount(2);
+});
+
+test("the chooser and the saturation box stay the same height as the panel resizes", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+
+  const heights = async () => {
+    const chooser = (await page.locator(panel).locator(".flow-clr-chooser").boundingBox())!;
+    const sat = (await page.locator(panel).getByRole("application").boundingBox())!;
+    return { chooser: Math.round(chooser.height), sat: Math.round(sat.height), satW: Math.round(sat.width) };
+  };
+
+  const before = await heights();
+  expect(before.sat).toBe(before.chooser);
+
+  // The dock resizes from the LEFT edge of the right-docked panel, so dragging
+  // left widens it (`resizeDocked` subtracts the delta).
+  const grip = page.locator(".flow-pnl__resize--left").first();
+  const box = (await grip.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 120, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+
+  const after = await heights();
+  // The saturation box scales on one axis only: wider, same height, still
+  // locked to the chooser. Before this, its aspect-ratio grew it downward and
+  // the two sections drifted apart on every resize.
+  expect(after.satW).toBeGreaterThan(before.satW);
+  expect(after.sat).toBe(after.chooser);
+  expect(after.sat).toBe(before.sat);
 });
 
 /**
@@ -412,8 +454,10 @@ test("the rail's color control fits the rail without overflowing", async ({ page
   await page.mouse.click(400, 350);
 
   // Assert the tallest case was actually reached before measuring it, so a
-  // future regression in re-selection fails loudly here instead of silently
-  // passing while measuring the shorter two-part case.
+  // Three boxes are now the only case — the chooser renders all of them at
+  // every selection — so this no longer proves a state transition was reached.
+  // It stays as a cheap guard that the rail's chooser is mounted and whole
+  // before we measure it; the height it measures is the only height there is.
   await expect(page.locator(".flow-toolbar").getByRole("radio")).toHaveCount(3);
 
   const overflow = await page.evaluate(() => {
