@@ -6,6 +6,9 @@ import {
   BUILTIN_PALETTE_NAMES,
   DEFAULT_SEED_PALETTE_NAME,
   SEED_VERSION,
+  RECENT_PALETTE_ID,
+  RECENT_PALETTE_NAME,
+  RECENT_PALETTE_LIMIT,
   builtinColors,
   makeBuiltinPalettes,
   makeDefaultPalette,
@@ -20,6 +23,7 @@ import {
   setDefaultPaletteId,
   getPaletteSeedVersion,
   setPaletteSeedVersion,
+  getRecentColors,
 } from "../app/preferences";
 
 export interface PaletteState {
@@ -31,19 +35,43 @@ const listeners = new Set<() => void>();
 let state: PaletteState = load();
 let colorsCache: { forState: PaletteState; value: string[] } | null = null;
 
+/**
+ * Guarantee the Recent palette exists, on every load path.
+ *
+ * This is why the feature needs no `SEED_VERSION` bump: existence is asserted
+ * on load rather than seeded once, so an install at any seed version picks it
+ * up on its next boot.
+ *
+ * The legacy `flow.recentColors` key is read **only** on the run that creates
+ * the palette. Reading it again later would resurrect colors the user has
+ * since deleted, since nothing clears that key.
+ */
+function ensureRecentPalette(current: PaletteState): PaletteState {
+  if (current.palettes.some((p) => p.id === RECENT_PALETTE_ID)) return current;
+  const recent: ColorPalette = {
+    id: RECENT_PALETTE_ID,
+    name: RECENT_PALETTE_NAME,
+    colors: getRecentColors().slice(0, RECENT_PALETTE_LIMIT),
+  };
+  // Appended last, and never made the default — Pastel keeps that job.
+  return persist({ ...current, palettes: [...current.palettes, recent] });
+}
+
 /** Read persisted state, seeding builtins on first run, migrating them on a
  *  seed-version bump, and repairing a missing/empty default id. */
 function load(): PaletteState {
   const palettes = getColorPalettes();
-  if (palettes.length === 0) return seedFresh();
-  if (getPaletteSeedVersion() < SEED_VERSION) return migrateBuiltins(palettes);
+  if (palettes.length === 0) return ensureRecentPalette(seedFresh());
+  if (getPaletteSeedVersion() < SEED_VERSION) {
+    return ensureRecentPalette(migrateBuiltins(palettes));
+  }
 
   let defaultPaletteId = getDefaultPaletteId() ?? "";
   if (!palettes.some((p) => p.id === defaultPaletteId)) {
     defaultPaletteId = palettes[0].id;
     setDefaultPaletteId(defaultPaletteId);
   }
-  return { palettes, defaultPaletteId };
+  return ensureRecentPalette({ palettes, defaultPaletteId });
 }
 
 function persist(state: PaletteState): PaletteState {

@@ -1,6 +1,12 @@
 // src/lib/palette-store.test.ts
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import * as store from "./palette-store";
+import {
+  SEED_VERSION,
+  RECENT_PALETTE_ID,
+  RECENT_PALETTE_NAME,
+  RECENT_PALETTE_LIMIT,
+} from "./color-palettes";
 
 // jsdom/Node's native `localStorage` global does not implement a usable
 // Storage in this project's vitest setup (see src/app/preferences.test.ts,
@@ -41,7 +47,8 @@ beforeEach(() => {
 describe("seeding + snapshot", () => {
   it("seeds 8 builtins and defaults to Pastel on first load", () => {
     const s = store.getSnapshot();
-    expect(s.palettes).toHaveLength(8);
+    // 8 builtins + the auto-created Recent palette (Task 1).
+    expect(s.palettes).toHaveLength(9);
     const def = s.palettes.find((p) => p.id === s.defaultPaletteId);
     expect(def?.name).toBe("Pastel");
   });
@@ -206,5 +213,92 @@ describe("removePalette", () => {
     expect(after.palettes).toHaveLength(1);
     expect(after.palettes[0].name).toBe("Default");
     expect(after.defaultPaletteId).toBe(after.palettes[0].id);
+  });
+});
+
+describe("the Recent palette", () => {
+  const recent = () => store.getSnapshot().palettes.find((p) => p.id === RECENT_PALETTE_ID);
+
+  it("exists after a fresh seed", () => {
+    expect(recent()).toBeDefined();
+    expect(recent()!.name).toBe(RECENT_PALETTE_NAME);
+    expect(recent()!.colors).toEqual([]);
+  });
+
+  it("is not the default palette", () => {
+    expect(store.getSnapshot().defaultPaletteId).not.toBe(RECENT_PALETTE_ID);
+  });
+
+  it("is appended to stored palettes that predate it", () => {
+    localStorage.setItem(
+      "flow.colorPalettes",
+      JSON.stringify([{ id: "p1", name: "Mine", colors: ["#112233"] }]),
+    );
+    localStorage.setItem("flow.defaultPaletteId", "p1");
+    localStorage.setItem("flow.paletteSeedVersion", String(SEED_VERSION));
+    store.reloadPaletteStore();
+
+    const palettes = store.getSnapshot().palettes;
+    expect(palettes.map((p) => p.id)).toEqual(["p1", RECENT_PALETTE_ID]);
+    expect(store.getSnapshot().defaultPaletteId).toBe("p1");
+  });
+
+  it("seeds from the legacy flow.recentColors key on creation", () => {
+    // beforeEach's own reload already created (and persisted) an empty Recent
+    // palette, so without clearing first this reload would hit the "already
+    // exists" branch and never touch the legacy key — clearing puts us back
+    // at a true first-run state so creation-time seeding actually runs.
+    localStorage.clear();
+    localStorage.setItem("flow.recentColors", JSON.stringify(["#ff0000", "#00ff00"]));
+    store.reloadPaletteStore();
+    expect(recent()!.colors).toEqual(["#ff0000", "#00ff00"]);
+  });
+
+  it("does NOT re-seed from the legacy key once the palette exists", () => {
+    // The migration is a one-shot on creation. A stale legacy key must never
+    // resurrect colors the user has since deleted from the palette.
+    localStorage.setItem("flow.recentColors", JSON.stringify(["#ff0000"]));
+    store.reloadPaletteStore();
+    store.removeSwatches(RECENT_PALETTE_ID, [0]);
+    expect(recent()!.colors).toEqual([]);
+
+    store.reloadPaletteStore();
+    expect(recent()!.colors).toEqual([]);
+  });
+
+  it("survives a builtin migration with its colors intact", () => {
+    // migrateBuiltins runs when the stored seed version is behind. It must
+    // classify Recent as user-made and carry it through untouched — if Recent
+    // were ever added to BUILTIN_PALETTE_NAMES this test goes red.
+    localStorage.setItem(
+      "flow.colorPalettes",
+      JSON.stringify([
+        { id: "p1", name: "Mine", colors: ["#112233"] },
+        { id: RECENT_PALETTE_ID, name: "Recent", colors: ["#abcdef"] },
+      ]),
+    );
+    localStorage.setItem("flow.paletteSeedVersion", "0");
+    store.reloadPaletteStore();
+
+    expect(recent()!.colors).toEqual(["#abcdef"]);
+    expect(store.getSnapshot().palettes.filter((p) => p.id === RECENT_PALETTE_ID)).toHaveLength(1);
+  });
+
+  it("persists itself so the next load does not re-create it", () => {
+    const stored = JSON.parse(localStorage.getItem("flow.colorPalettes")!);
+    expect(stored.some((p: { id: string }) => p.id === RECENT_PALETTE_ID)).toBe(true);
+  });
+
+  it("caps the legacy seed at the palette limit", () => {
+    // Same reason as above: clear first so this reload actually creates
+    // Recent from the legacy key instead of finding the beforeEach-seeded
+    // one already in place (which would make this assertion pass vacuously).
+    localStorage.clear();
+    const many = Array.from({ length: 30 }, (_, i) =>
+      `#${i.toString(16).padStart(2, "0")}0000`,
+    );
+    localStorage.setItem("flow.recentColors", JSON.stringify(many));
+    store.reloadPaletteStore();
+    expect(recent()!.colors.length).toBeLessThanOrEqual(RECENT_PALETTE_LIMIT);
   });
 });
