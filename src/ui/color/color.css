@@ -206,14 +206,9 @@
 }
 
 /*
- * Boxes step down the diagonal by their index among the VISIBLE parts (set
- * from `--flow-clr-part-offset`, 0..1), so two parts sit at the corners and
- * three spread evenly between them. Driven by a custom property rather than
- * per-part `top`/`left`/`right`/`bottom` rules because `stroke` and `text`
- * are never both visible at once as siblings of a two-part stack, but they
- * ARE both visible in the three-part (labeled container) case — fixed
- * per-part offsets there gave them the identical position, so whichever sat
- * behind was completely covered and unclickable.
+ * Layout only. Every pixel of a part's artwork — the dark and light rules, the
+ * stroke ring, the T silhouette, none and mixed — is drawn by PartArt.tsx.
+ * Nothing here paints.
  */
 .flow-clr-part {
   position: absolute;
@@ -223,72 +218,17 @@
   height: var(--flow-clr-part-size);
   padding: 0;
   cursor: pointer;
-  background: var(--flow-clr-part-color, #fff);
-  border: 2px solid var(--flow-ink);
+  background: none;
+  border: none;
 }
 
-/*
- * The stroke box reads as a ring, not a filled square: the swatch color
- * covers the whole box, then `::after` punches a hole by painting a smaller
- * centered square in the panel surface color on top of it.
- *
- * A brief for this task specified a double inset `box-shadow` for the ring
- * instead (an outer inset shadow in the swatch color layered over an inner
- * inset shadow in white). That doesn't work: box-shadow layers paint
- * front-to-back in listing order, both on top of `background`, and both
- * insets grow inward *from the edge* — so with this box's background already
- * filled solid, the result is a color band at the edge, a thin white ring
- * just inside it, and the untouched solid-color background showing again
- * for the rest of the interior. That is a bullseye, not a ring: the center
- * stays filled instead of reading as a hole. Nothing renders this file
- * (Task 12's component isn't mounted until Task 14), so this was caught by
- * reasoning through the paint order rather than by looking at it — the
- * `::after` hole below replaces it.
- */
-.flow-clr-part--stroke::after {
-  content: "";
-  position: absolute;
-  inset: 9px;
-  background: var(--flow-panel-bg);
-}
-
-.flow-clr-chooser--compact .flow-clr-part--stroke::after {
-  inset: 6px;
+/* The SVG fills its button; `display: block` kills the inline-baseline gap. */
+.flow-clr-art {
+  display: block;
 }
 
 .flow-clr-part--active {
   z-index: 2;
-}
-
-.flow-clr-part--none {
-  background: linear-gradient(
-    to bottom right,
-    #fff calc(50% - 1.5px),
-    #e03131 calc(50% - 1.5px),
-    #e03131 calc(50% + 1.5px),
-    #fff calc(50% + 1.5px)
-  );
-}
-
-.flow-clr-part--mixed {
-  background-image: conic-gradient(#c8c8c8 0 25%, #fff 0 50%, #c8c8c8 0 75%, #fff 0);
-  background-size: 8px 8px;
-}
-
-/* A "none" or "mixed" stroke shows the same full-square treatment as fill
-   and text — the ring reading is only meaningful when a real color is
-   underneath it, so the punched hole is suppressed here. */
-.flow-clr-part--none::after,
-.flow-clr-part--mixed::after {
-  content: none;
-}
-
-.flow-clr-part__glyph {
-  font-weight: 700;
-  font-size: 20px;
-  line-height: 1;
-  color: var(--flow-ink);
-  mix-blend-mode: difference;
 }
 
 .flow-clr-chooser__swap {
@@ -317,17 +257,8 @@
   height: var(--flow-clr-chip-size, 22px);
   padding: 0;
   cursor: pointer;
+  overflow: hidden;
   border: 1px solid var(--flow-ink);
-}
-
-.flow-clr-chip--none {
-  background: linear-gradient(
-    to bottom right,
-    #fff calc(50% - 1px),
-    #e03131 calc(50% - 1px),
-    #e03131 calc(50% + 1px),
-    #fff calc(50% + 1px)
-  );
 }
 
 /* Palette section: tile density and control sizing carried forward from the

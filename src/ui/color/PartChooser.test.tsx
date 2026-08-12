@@ -20,6 +20,10 @@ function target(over: Partial<ColorTarget> = {}): ColorTarget {
   };
 }
 
+/** State now lives in the SVG, not in a modifier class on the button. */
+const isNoneArt = (el: HTMLElement) => el.querySelector("line") !== null;
+const isMixedArt = (el: HTMLElement) => el.querySelector("pattern") !== null;
+
 describe("PartChooser", () => {
   it("renders a box per available part", () => {
     render(<PartChooser target={target()} />);
@@ -77,33 +81,32 @@ describe("PartChooser", () => {
     expect(screen.queryByRole("button", { name: /swap/i })).not.toBeInTheDocument();
   });
 
-  it("marks a transparent part as none", () => {
+  it("draws a transparent part as none", () => {
     render(<PartChooser target={target({ partColor: () => "transparent" })} />);
-    expect(screen.getByRole("radio", { name: /fill/i })).toHaveClass("flow-clr-part--none");
+    expect(isNoneArt(screen.getByRole("radio", { name: /fill/i }))).toBe(true);
   });
 
-  it("does not mark an opaque part as none", () => {
-    // Would still pass if `--none` were applied unconditionally.
+  it("does not draw an opaque part as none", () => {
+    // Would still pass if the slash were drawn unconditionally.
     render(<PartChooser target={target()} />);
-    expect(screen.getByRole("radio", { name: /fill/i })).not.toHaveClass("flow-clr-part--none");
+    expect(isNoneArt(screen.getByRole("radio", { name: /fill/i }))).toBe(false);
   });
 
-  it("marks a mixed active part", () => {
+  it("draws a mixed active part as mixed", () => {
     render(<PartChooser target={target({ isMixed: true })} />);
-    expect(screen.getByRole("radio", { name: /fill/i })).toHaveClass("flow-clr-part--mixed");
+    expect(isMixedArt(screen.getByRole("radio", { name: /fill/i }))).toBe(true);
   });
 
-  it("does not mark a non-mixed active part as mixed", () => {
-    // Would still pass if `--mixed` were applied unconditionally.
+  it("does not draw a non-mixed active part as mixed", () => {
     render(<PartChooser target={target({ isMixed: false })} />);
-    expect(screen.getByRole("radio", { name: /fill/i })).not.toHaveClass("flow-clr-part--mixed");
+    expect(isMixedArt(screen.getByRole("radio", { name: /fill/i }))).toBe(false);
   });
 
-  it("does not mark an inactive part as mixed even when isMixed is true", () => {
+  it("does not draw an inactive part as mixed even when isMixed is true", () => {
     // isMixed describes only the active part's read; the back box has no
-    // opinion on mixedness and must not borrow the active part's class.
+    // opinion on mixedness and must not borrow the active part's state.
     render(<PartChooser target={target({ isMixed: true })} />);
-    expect(screen.getByRole("radio", { name: /stroke/i })).not.toHaveClass("flow-clr-part--mixed");
+    expect(isMixedArt(screen.getByRole("radio", { name: /stroke/i }))).toBe(false);
   });
 
   it("gives every visible part a distinct diagonal offset", () => {

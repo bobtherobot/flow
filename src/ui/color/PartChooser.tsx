@@ -2,6 +2,7 @@ import { useRef } from "react";
 import "./color.css";
 import type { ColorPart } from "../../lib/color-parts";
 import type { ColorTarget, QuickColor } from "./useColorTarget";
+import { PartArt, NoneSwatch } from "./PartArt";
 
 interface PartChooserProps {
   target: ColorTarget;
@@ -81,8 +82,6 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
             "flow-clr-part",
             `flow-clr-part--${p}`,
             p === part ? "flow-clr-part--active" : "",
-            none ? "flow-clr-part--none" : "",
-            mixed ? "flow-clr-part--mixed" : "",
           ]
             .filter(Boolean)
             .join(" ");
@@ -100,17 +99,10 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
               title={PART_LABEL[p]}
               className={classes}
               tabIndex={p === part ? 0 : -1}
-              style={{
-                ["--flow-clr-part-offset" as string]: offsetOf(p),
-                ...(none || mixed ? {} : { ["--flow-clr-part-color" as string]: color }),
-              }}
+              style={{ ["--flow-clr-part-offset" as string]: offsetOf(p) }}
               onClick={() => setPart(p)}
             >
-              {p === "text" && (
-                <span className="flow-clr-part__glyph" aria-hidden="true">
-                  T
-                </span>
-              )}
+              <PartArt part={p} color={color} isMixed={mixed} />
             </button>
           );
         })}
@@ -147,12 +139,14 @@ export function PartChooser({ target, compact = false }: PartChooserProps) {
           <button
             key={q.kind}
             type="button"
-            className={`flow-clr-chip${q.kind === "none" ? " flow-clr-chip--none" : ""}`}
+            className="flow-clr-chip"
             style={q.kind === "none" ? undefined : { background: q.hex }}
             aria-label={q.label}
             title={q.label}
             onClick={() => quickSet(q.kind)}
-          />
+          >
+            {q.kind === "none" && <NoneSwatch />}
+          </button>
         ))}
       </div>
     </div>
