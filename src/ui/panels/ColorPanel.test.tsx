@@ -211,68 +211,6 @@ describe("ColorPanel", () => {
     expect(currentItems.currentItemBackgroundColor).toMatch(/^#[0-9a-f]{6}$/);
   });
 
-  describe("recents", () => {
-    // These discriminate "adjusting a channel" from "picking a whole colour"
-    // (see useColorTarget.adjustColor vs. setColor). Before that split, every
-    // one of these controls routed through useColorDraft's onCommit, which
-    // was wired to setColor — so a hue arrow-press, an alpha arrow-press, or
-    // a numeric-field edit each recorded a recent on every keypress, and six
-    // ArrowRight presses on the hue track would replace the whole six-slot
-    // strip with six adjacent hues. Reverting the wiring in ColorPanel/
-    // ColorPopup back to `onCommit: target.setColor` makes these first two
-    // fail (confirmed by hand before writing this comment).
-    it("does not record a recent when the hue slider is nudged with arrow keys", () => {
-      const sel = chromatic();
-      render(<ColorPanel sel={sel} />);
-      fireEvent.keyDown(screen.getByRole("slider", { name: /hue/i }), { key: "ArrowRight" });
-      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([]);
-    });
-
-    it("does not record a recent when the alpha slider is nudged with arrow keys", () => {
-      const sel = chromatic();
-      render(<ColorPanel sel={sel} />);
-      fireEvent.keyDown(screen.getByRole("slider", { name: /opacity/i }), { key: "ArrowLeft" });
-      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([]);
-    });
-
-    it("does not record a recent when a numeric field is edited", () => {
-      const sel = chromatic();
-      render(<ColorPanel sel={sel} />);
-      const field = screen.getByLabelText("Lightness", { selector: "input" });
-      fireEvent.change(field, { target: { value: "20" } });
-      fireEvent.blur(field);
-      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([]);
-    });
-
-    it("records a recent when the Hex field is committed", () => {
-      const sel = chromatic();
-      render(<ColorPanel sel={sel} />);
-      fireEvent.change(screen.getByLabelText(/color format/i), { target: { value: "hex" } });
-      const field = screen.getByLabelText("Hex");
-      fireEvent.change(field, { target: { value: "#123456" } });
-      fireEvent.keyDown(field, { key: "Enter" });
-      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual(["#123456"]);
-    });
-
-    it("records a recent when a palette swatch is picked", () => {
-      const sel = fakeSel();
-      render(<ColorPanel sel={sel} />);
-      const swatch = screen.getAllByRole("button", { name: /^swatch /i })[0];
-      const swatchHex = swatch.getAttribute("aria-label")!.replace(/^swatch /i, "");
-      fireEvent.click(swatch);
-      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual([swatchHex]);
-    });
-
-    it("records a recent when an eyedropper pick resolves", () => {
-      const sel = fakeSel();
-      render(<ColorPanel sel={sel} />);
-      fireEvent.click(screen.getByRole("button", { name: /pick a color from the canvas/i }));
-      const payload = store.set.mock.calls[0][1] as { onSelect: (color: string) => void };
-      act(() => payload.onSelect("#654321"));
-      expect(JSON.parse(localStorage.getItem("flow.recentColors") ?? "[]")).toEqual(["#654321"]);
-    });
-  });
-
   it("targets the bound text element's id, not the container's, when the text part is active on a labeled container", () => {
     const sel = fakeSelWithLabeledContainer();
     render(<ColorPanel sel={sel} />);

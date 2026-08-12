@@ -12,7 +12,6 @@ import {
   getDefaultPaletteId,
   setDefaultPaletteId,
   getRecentColors,
-  setRecentColors,
   getColorNumericMode,
   setColorNumericMode,
 } from "./preferences";
@@ -243,8 +242,8 @@ describe("recent colors", () => {
     expect(getRecentColors()).toEqual([]);
   });
 
-  it("round-trips a list", () => {
-    setRecentColors(["#111111", "#222222"]);
+  it("reads a stored list", () => {
+    localStorage.setItem("flow.recentColors", JSON.stringify(["#111111", "#222222"]));
     expect(getRecentColors()).toEqual(["#111111", "#222222"]);
   });
 

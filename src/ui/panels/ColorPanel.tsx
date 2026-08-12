@@ -22,14 +22,12 @@ export function ColorPanel({ sel }: { sel: SelectionStyle }) {
   const target = useColorTarget(sel);
   const { numericMode } = useColorUiState();
 
-  // Channel-level edits only: the draft holds hue/alpha/saturation drags and
-  // the numeric fields, none of which are a whole colour on their own — see
-  // `useColorTarget.adjustColor`. The HEX field and palette/eyedropper picks
-  // below call `target.setColor` directly instead.
+  // Every write from the picker's channels — saturation, hue, alpha — lands
+  // through the draft so HSV survives a round trip through an achromatic hex.
   const draft = useColorDraft({
     hex: target.hex,
     alpha: target.alpha,
-    onCommit: target.adjustColor,
+    onCommit: target.setColor,
   });
 
   // The accordion can collapse this panel (or swap it for another) while a

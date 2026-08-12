@@ -72,10 +72,6 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
       target.setColor(hex, alpha, transient);
       lastHex.current = hex;
     },
-    adjustColor: (hex, alpha, transient) => {
-      target.adjustColor(hex, alpha, transient);
-      lastHex.current = hex;
-    },
   };
 
   const anchor = (): MenuPoint => {

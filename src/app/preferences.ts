@@ -11,8 +11,7 @@ import {
   type SelectionMode,
 } from "../lib/selection-mode";
 import { clampGridSize, isGridSize, DEFAULT_GRID_SIZE } from "../lib/grid";
-import { normalizePalettes, type ColorPalette } from "../lib/color-palettes";
-import { normalizeRecents } from "../lib/recent-colors";
+import { normalizePalettes, scrubHex, type ColorPalette } from "../lib/color-palettes";
 
 const SLOPPINESS_KEY = "flow.sloppiness";
 const UNITS_KEY = "flow.units";
@@ -260,14 +259,36 @@ export function setDefaultPaletteId(value: string): void {
 
 const RECENT_COLORS_KEY = "flow.recentColors";
 
-/** Read the recent-colors MRU, normalized (empty on miss/parse error). */
-export function getRecentColors(): string[] {
-  return normalizeRecents(readJson(RECENT_COLORS_KEY));
+/** How many legacy entries are worth carrying forward. */
+const LEGACY_RECENT_LIMIT = 20;
+
+/**
+ * Coerce the legacy recents blob into clean hexes.
+ *
+ * Lives here rather than in a module of its own because this key has exactly
+ * one reader left: `palette-store`'s one-time migration into the Recent
+ * palette. Nothing writes it anymore.
+ */
+function normalizeRecentColors(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const hex = scrubHex(item);
+    if (hex && !out.includes(hex)) out.push(hex);
+    if (out.length === LEGACY_RECENT_LIMIT) break;
+  }
+  return out;
 }
 
-/** Persist the recent-colors MRU. */
-export function setRecentColors(value: string[]): void {
-  writeJson(RECENT_COLORS_KEY, value);
+/**
+ * The legacy recent-colors MRU, normalized. **Read once**, by
+ * `palette-store.ensureRecentPalette`, to seed the Recent palette on the run
+ * that creates it. Nothing writes this key; it is left in place rather than
+ * cleared, which costs nothing and removes a failure mode from the migration.
+ */
+export function getRecentColors(): string[] {
+  return normalizeRecentColors(readJson(RECENT_COLORS_KEY));
 }
 
 const COLOR_NUMERIC_MODE_KEY = "flow.colorNumericMode";
