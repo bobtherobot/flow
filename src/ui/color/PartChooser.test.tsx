@@ -175,4 +175,17 @@ describe("PartChooser", () => {
     render(<PartChooser target={target()} compact />);
     expect(screen.getByRole("button", { name: /^black$/i })).toBeInTheDocument();
   });
+
+  it("lays the quartet out in reading order so a 2x2 grid stays predictable", () => {
+    render(<PartChooser target={target()} />);
+    const chips = screen
+      .getAllByRole("button")
+      .filter((b) => b.className.split(" ").includes("flow-clr-chip"));
+    expect(chips.map((c) => c.getAttribute("aria-label"))).toEqual([
+      "None",
+      "White",
+      "Grey",
+      "Black",
+    ]);
+  });
 });

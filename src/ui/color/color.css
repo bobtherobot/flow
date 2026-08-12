@@ -249,17 +249,20 @@
   border: none;
 }
 
+/* Two columns, filled in reading order: none, white / grey, black. */
 .flow-clr-quartet {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, var(--flow-clr-chip-size));
   gap: 4px;
+  --flow-clr-chip-size: 20px;
 }
 
 .flow-clr-chip {
-  width: var(--flow-clr-chip-size, 22px);
-  height: var(--flow-clr-chip-size, 22px);
+  width: var(--flow-clr-chip-size);
+  height: var(--flow-clr-chip-size);
   padding: 0;
-  cursor: pointer;
   overflow: hidden;
+  cursor: pointer;
   border: 1px solid var(--flow-ink);
 }
 
@@ -439,17 +442,8 @@
   cursor: default;
 }
 
-/* The quartet at its default 22px chip doesn't fit the rail's compact chooser
-   (88px rail − 1px border − 8px padding = 79px usable; 4×22 + 3×4 gaps = 100px).
-   Same technique as `--flow-clr-part-size` (Task 12): a custom property on the
-   chooser, overridden under `--compact`. 16px chips at a 3px gap measure 73px
-   in the running rail (getBoundingClientRect, Chromium) — 6px of headroom
-   against the 79px usable width. */
-.flow-clr-quartet {
-  --flow-clr-chip-size: 22px;
-}
-
+/* flow is desktop-only: these are mouse targets, sized for density. */
 .flow-clr-chooser--compact .flow-clr-quartet {
-  --flow-clr-chip-size: 16px;
+  --flow-clr-chip-size: 14px;
   gap: 3px;
 }
