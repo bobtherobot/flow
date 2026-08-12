@@ -292,8 +292,11 @@
    retired Swatches panel (`SwatchGrid`/`SwatchesPanel`, both deleted), under
    the `flow-clr-*` naming this panel uses throughout. */
 
+/* No `position: relative` here any more: it existed solely to be the
+   containing block for the inset delete-confirm overlay, which the gear menu's
+   PaletteDialog replaced. Both the menu and the dialog are fixed-position
+   portals to <body>, so nothing inside this box is positioned against it. */
 .flow-clr-palette {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -305,13 +308,23 @@
   gap: 6px;
 }
 
-.flow-clr-palette__select,
-.flow-clr-palette__name {
+/* Takes the footer row's leftover width beside the gear. */
+.flow-clr-palette__select {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.flow-clr-palette__icon {
+/* The name field no longer shares that row — it lives in the rename/add
+   dialog, whose body is a flex column that stretches it to the dialog width.
+   All it needs here is permission to shrink below its intrinsic size. */
+.flow-clr-palette__name {
+  min-width: 0;
+}
+
+/* The one control left in the footer row, carrying forward the 24px sizing and
+   hover of the `+`/`🗑` pair it replaced. Nothing here goes inert: the gear
+   always opens, and it is the menu's own items that grey out. */
+.flow-clr-palette__gear {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -325,17 +338,8 @@
   border-radius: var(--flow-radius-sm);
 }
 
-.flow-clr-palette__icon:hover {
+.flow-clr-palette__gear:hover {
   background: var(--flow-hover);
-}
-
-/* Same treatment as the grid's __trash[aria-disabled="true"] below: the
-   inert footer trash (Recent palette, nothing selected) must not still look
-   like a working hover/click target. Placed after :hover so equal-
-   specificity source order — not a specificity bump — is what wins here. */
-.flow-clr-palette__icon[aria-disabled="true"] {
-  color: var(--flow-ink-disabled);
-  cursor: default;
 }
 
 /* flow is desktop-only: these are mouse targets, sized for density. */
@@ -400,27 +404,6 @@
 .flow-clr-palette__tile[aria-pressed="true"] {
   outline: 2px solid var(--flow-accent);
   outline-offset: 1px;
-}
-
-.flow-clr-palette__confirm {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  text-align: center;
-  padding: 12px;
-  border-radius: var(--flow-radius-md);
-  background: var(--flow-panel-bg);
-  border: 1px solid var(--flow-border);
-  color: var(--flow-ink);
-}
-
-.flow-clr-palette__confirm-actions {
-  display: flex;
-  gap: 8px;
 }
 
 /* The panel assembly (Task 14): part chooser + saturation box on top, then

@@ -154,4 +154,21 @@ describe("PaletteDialog", () => {
     fireEvent.keyDown(input, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(okButton);
   });
+
+  it("wraps Shift+Tab from the container itself to the last focusable element", () => {
+    // The delete-confirm dialog's body is a single <p>, so open focus lands on
+    // the container. The container is in neither boundary position, so a trap
+    // that only compares against first/last no-ops on the very first keystroke
+    // and lets Shift+Tab walk backward out into the page behind the backdrop —
+    // exactly what aria-modal="true" promises cannot happen.
+    render(
+      <PaletteDialog title="Delete palette" confirmLabel="Delete" onConfirm={vi.fn()} onCancel={vi.fn()}>
+        <p>This will permanently delete the palette.</p>
+      </PaletteDialog>,
+    );
+    const dialog = screen.getByRole("dialog", { name: "Delete palette" });
+    expect(document.activeElement).toBe(dialog);
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Delete" }));
+  });
 });

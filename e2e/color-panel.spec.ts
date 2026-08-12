@@ -54,11 +54,22 @@ const popup = '[role="dialog"][aria-label="Color picker"]';
  * Drive the docked panel's palette dropdown by the option label the user reads.
  *
  * `exact: true` is load-bearing: `getByLabel("Palette")` also substring-matches
- * the "Add palette" and "Delete palette" buttons sitting beside the select, and
- * Playwright rejects the ambiguity under strict mode.
+ * the "Palette actions" gear sitting beside the select, and Playwright rejects
+ * the ambiguity under strict mode.
  */
 async function selectPalette(page: Page, name: string) {
   await page.locator(panel).getByLabel("Palette", { exact: true }).selectOption({ label: name });
+}
+
+/**
+ * Open the palette gear's dropdown.
+ *
+ * Only the trigger is scoped to the panel — the menu itself portals to
+ * `<body>`, so every item lookup below is page-level on purpose.
+ */
+async function openPaletteMenu(page: Page) {
+  await page.locator(panel).getByRole("button", { name: "Palette actions" }).click();
+  await expect(page.getByRole("menu", { name: "Palette actions" })).toBeVisible();
 }
 
 /** The swatch tiles of whichever palette the docked panel currently shows.
@@ -382,12 +393,13 @@ test("the chooser and the saturation box stay the same height as the panel resiz
 });
 
 /**
- * Carry-forward from the plan: jsdom never fires `blur` on unmount, so
- * `PaletteSection`'s `abandonRename` guard (color.tsx / PaletteSection.tsx)
- * has no unit test that can fail — Escape sets the flag, the input unmounts,
- * and jsdom simply never raises the blur that would (wrongly) commit the
- * edit if the flag were ignored. Real Chromium does fire it, so this is the
- * only place this behaviour can actually be exercised.
+ * Renaming is a dialog off the gear menu now — double-clicking the select
+ * does nothing. Escape has to discard the edit, and only a real browser can
+ * show the whole path: the dialog portals out of the docked panel, the key is
+ * caught by a window listener rather than by the field being typed into, and
+ * the field is a real focused input that a browser (unlike jsdom) blurs on
+ * the way out. A blur that committed would look exactly like a working
+ * Escape until it didn't.
  */
 test("Escape abandons an in-progress palette rename", async ({ page }) => {
   await page.goto("/");
@@ -396,13 +408,14 @@ test("Escape abandons an in-progress palette rename", async ({ page }) => {
   const select = page.locator(panel).getByLabel("Palette", { exact: true });
   const originalName = (await select.locator("option:checked").textContent()) ?? "";
 
-  await select.dblclick();
-  const nameInput = page.locator(panel).getByLabel("Palette name");
+  await openPaletteMenu(page);
+  await page.getByRole("menuitem", { name: "Rename palette…" }).click();
+  const nameInput = page.getByLabel("Palette name");
   await expect(nameInput).toBeVisible();
   await nameInput.fill("Changed Name XYZ");
   await page.keyboard.press("Escape");
 
-  await expect(select).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Rename palette" })).toHaveCount(0);
   await expect(select.locator("option:checked")).toHaveText(originalName);
 });
 
@@ -626,14 +639,14 @@ test("the Recent palette cannot be deleted", async ({ page }) => {
   await page.waitForSelector(".flow-pnl");
   await selectPalette(page, RECENT_PALETTE_NAME);
 
-  // `aria-disabled`, never the native `disabled` attribute: Chrome delivers no
-  // mouse events to a disabled form control, and this grid's tiles are HTML5
-  // drop targets that run on them. jsdom models none of that, so a unit test
-  // keeps passing with `disabled` swapped back in — this is the only place the
-  // distinction can be asserted.
-  const trash = page.locator(panel).getByRole("button", { name: "Delete palette" });
-  await expect(trash).toHaveAttribute("aria-disabled", "true");
-  await expect(trash).not.toHaveAttribute("disabled", /.*/);
+  // `aria-disabled`, never the native `disabled` attribute: a disabled button
+  // cannot take focus, so a keyboard user could never land on the item to find
+  // out why it is unavailable. jsdom cannot tell the two apart at the level
+  // that matters, so a unit test keeps passing with `disabled` swapped back in.
+  await openPaletteMenu(page);
+  const del = page.getByRole("menuitem", { name: "Delete palette…" });
+  await expect(del).toHaveAttribute("aria-disabled", "true");
+  await expect(del).not.toHaveAttribute("disabled", /.*/);
 
   // `force: true` is required, and is the point rather than a workaround:
   // Playwright's actionability check honours `aria-disabled` and would sit
@@ -642,19 +655,33 @@ test("the Recent palette cannot be deleted", async ({ page }) => {
   // which Chrome *does* deliver, because the element is not natively disabled —
   // so what this asserts is that the handler itself declines, not that the
   // browser swallowed the event.
-  await trash.click({ force: true });
-  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await del.click({ force: true });
+  await expect(page.getByRole("dialog", { name: "Delete palette" })).toHaveCount(0);
   await expect(page.locator(panel).getByLabel("Palette", { exact: true }))
     .toHaveValue(RECENT_PALETTE_ID);
 
-  // Control, so the assertions above can't pass against a trash that had
+  // Control, so the assertions above can't pass against a menu item that had
   // quietly stopped working for every palette: a palette that CAN be deleted
-  // still opens the confirmation from the same button. A new empty palette
+  // still opens the confirmation from the same item. A new empty palette
   // rather than a named builtin — which palettes ship is a product decision.
-  await page.locator(panel).getByRole("button", { name: "Add palette" }).click();
-  await expect(trash).toHaveAttribute("aria-disabled", "false");
-  await trash.click();
-  await expect(page.getByRole("alertdialog")).toBeVisible();
+  //
+  // Escape first rather than clicking the gear again: a guarded item leaves
+  // the menu open, and toggling a still-open menu would close it.
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu", { name: "Palette actions" })).toHaveCount(0);
+
+  await openPaletteMenu(page);
+  await page.getByRole("menuitem", { name: "Add palette…" }).click();
+  // Scoped and exact: an unqualified "OK" substring-matches accessible names
+  // like "Swap fill and stroke" and "Close Stroke" elsewhere on the page.
+  const addDialog = page.getByRole("dialog", { name: "Add palette" });
+  await addDialog.getByRole("button", { name: "OK", exact: true }).click(); // prefilled name
+  await expect(addDialog).toHaveCount(0);
+
+  await openPaletteMenu(page);
+  await expect(del).toHaveAttribute("aria-disabled", "false");
+  await del.click();
+  await expect(page.getByRole("dialog", { name: "Delete palette" })).toBeVisible();
 });
 
 test("the Recent palette survives a reload", async ({ page }) => {

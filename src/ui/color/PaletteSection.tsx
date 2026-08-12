@@ -11,7 +11,10 @@ import {
   removeSwatches,
   reorderSwatches,
 } from "../../lib/palette-store";
-import { RECENT_PALETTE_ID } from "../../lib/color-palettes";
+import { RECENT_PALETTE_ID, nextSetName } from "../../lib/color-palettes";
+import type { MenuPoint } from "../panels/dock/menu-position";
+import { PaletteMenu } from "./PaletteMenu";
+import { PaletteDialog } from "./PaletteDialog";
 
 interface PaletteSectionProps {
   /** The picker's live color, added by the grid's [+] tile. */
@@ -36,43 +39,49 @@ interface PaletteSectionProps {
  * one click, and the destructive one (queue for deletion) deliberate.
  *
  * The grid's leading trash tile is the discoverable route to the same thing:
- * drag a swatch onto it, or select swatches and click it. The footer trash
- * keeps both of its jobs (remove the selected swatches / delete the whole
- * palette) and now says which one it will do via `title`.
+ * drag a swatch onto it, or select swatches and click it. Everything that acts
+ * on the palette as a whole — rename, add, delete, copy-to — sits behind the
+ * gear beside the dropdown, replacing a `+` and a `🗑` whose meaning changed
+ * underneath the user depending on whether swatches happened to be selected.
  */
 export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   const { palettes, defaultPaletteId } = usePaletteState();
   const [selected, setSelected] = useState<number[]>([]);
-  const [confirming, setConfirming] = useState(false);
-  const [renaming, setRenaming] = useState(false);
   const [overTrash, setOverTrash] = useState(false);
   const dragFrom = useRef<number | null>(null);
-  /** Set by Escape so the input's blur-on-unmount does not commit the edit. */
-  const abandonRename = useRef(false);
+
+  /** Which dialog is open. One field, not four booleans — they are mutually
+   *  exclusive by construction, and four flags admit states like "renaming and
+   *  deleting at once" that have no meaning. */
+  type Dialog = null | { kind: "rename" | "add" | "delete" | "copy" };
+  const [dialog, setDialog] = useState<Dialog>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const gearRef = useRef<HTMLButtonElement>(null);
 
   // Resolve defensively: defaultPaletteId can point at a just-deleted palette
   // for one render (e.g. right after removePalette reseeds).
   const current = palettes.find((p) => p.id === defaultPaletteId) ?? palettes[0];
-  const isRecent = current.id === RECENT_PALETTE_ID;
 
   const choosePalette = (id: string) => {
     setDefaultPalette(id);
-    // Every piece of transient state tied to "which palette is current" resets
-    // together — leaving `renaming` set would edit the new palette's name in an
-    // input seeded from the old one's.
+    // A selection is a list of indices into THIS palette's colors, so it cannot
+    // survive a switch — the same indices would point at unrelated swatches.
     setSelected([]);
-    setConfirming(false);
-    setRenaming(false);
   };
 
-  const onTrash = () => {
-    if (selected.length > 0) {
-      removeSwatches(current.id, selected);
-      setSelected([]);
-      return;
-    }
-    if (isRecent) return;
-    setConfirming(true);
+  /** Closes the menu and opens the dialog in one step, so no action can leave
+   *  both on screen at once. */
+  const openDialog = (kind: "rename" | "add" | "delete" | "copy") => {
+    setMenuOpen(false);
+    setDialog({ kind });
+  };
+
+  /** Mirrors RailColorControl's anchor helper: the menu hangs off the gear's
+   *  bottom-left and clamps itself on-screen from there. */
+  const anchorFromGear = (): MenuPoint => {
+    const r = gearRef.current?.getBoundingClientRect();
+    return { top: r?.bottom ?? 0, left: r?.left ?? 0 };
   };
 
   const onSwatchClick = (index: number, e: React.MouseEvent) => {
@@ -87,8 +96,10 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   };
 
   const onGridKeyDown = (e: React.KeyboardEvent) => {
-    // Ignore keys typed into the name field / palette select — only act on
-    // the grid itself. Copied from SwatchGrid's/SwatchesPanel's handling.
+    // Ignore keys typed into the palette select — only act on the grid
+    // itself. Copied from SwatchGrid's/SwatchesPanel's handling. (The rename
+    // field is no longer in here at all: its dialog portals to <body>, so its
+    // keystrokes never reach this handler.)
     const tag = (e.target as HTMLElement).tagName;
     if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
     if ((e.key === "Delete" || e.key === "Backspace") && selected.length > 0) {
@@ -179,108 +190,123 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
       </div>
 
       <div className="flow-clr-palette__row">
-        {renaming ? (
-          <input
-            // Keyed so switching palettes rebuilds the field from the new name
-            // instead of carrying the old one's text across.
-            key={current.id}
-            className="flow-clr-palette__name"
-            aria-label="Palette name"
-            autoFocus
-            defaultValue={current.name}
-            // Cleared on the input's OWN mount rather than by whichever handler
-            // happens to open rename mode: a ref callback can't be skipped by a
-            // future second entry point the way a reset tucked into
-            // onDoubleClick could be, so the flag can never strand at `true`.
-            ref={(el) => {
-              if (el) abandonRename.current = false;
-            }}
-            onBlur={(e) => {
-              // Escape sets this first. Unmounting a focused input can fire a
-              // blur on the way out, which would commit the very edit Escape
-              // was meant to discard — so abandonment is an explicit flag, not
-              // an assumption about event ordering.
-              if (abandonRename.current) {
-                abandonRename.current = false;
-                setRenaming(false);
-                return;
-              }
-              renamePalette(current.id, e.target.value);
-              setRenaming(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-              if (e.key === "Escape") {
-                abandonRename.current = true;
-                setRenaming(false);
-              }
-            }}
-          />
-        ) : (
-          <select
-            className="flow-clr-palette__select"
-            aria-label="Palette"
-            value={current.id}
-            title="Double-click to rename"
-            onChange={(e) => choosePalette(e.target.value)}
-            onDoubleClick={() => setRenaming(true)}
-          >
-            {palettes.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <select
+          className="flow-clr-palette__select"
+          aria-label="Palette"
+          value={current.id}
+          onChange={(e) => choosePalette(e.target.value)}
+        >
+          {palettes.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
-          className="flow-clr-palette__icon"
-          aria-label="Add palette"
-          onClick={() => choosePalette(addPalette().id)}
+          ref={gearRef}
+          // The class is load-bearing, not decoration: PaletteMenu's outside-
+          // press guard looks for exactly it, and without the match a press on
+          // the gear would close the menu on pointerdown and the click that
+          // follows would reopen it — making this toggle's close branch
+          // unreachable.
+          className="flow-clr-palette__gear"
+          aria-label="Palette actions"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((o) => !o)}
         >
-          +
-        </button>
-        <button
-          type="button"
-          className="flow-clr-palette__icon"
-          aria-label={selected.length > 0 ? "Remove selected swatches" : "Delete palette"}
-          // NOT `disabled`: Chrome delivers no mouse events to a disabled form
-          // control and this grid's tiles are HTML5 drop targets that run on
-          // them — the same trap documented on the trash tile above.
-          aria-disabled={selected.length === 0 && isRecent}
-          title={
-            selected.length > 0
-              ? "Remove the selected swatches"
-              : isRecent
-                ? `“${current.name}” updates itself as you pick colors, so it can’t be deleted`
-                : `Delete the “${current.name}” palette`
-          }
-          onClick={onTrash}
-        >
-          🗑
+          ⚙
         </button>
       </div>
 
-      {confirming && (
-        <div className="flow-clr-palette__confirm" role="alertdialog" aria-label="Delete palette">
+      {menuOpen && (
+        <PaletteMenu
+          anchor={anchorFromGear()}
+          hasSelection={selected.length > 0}
+          canDeletePalette={current.id !== RECENT_PALETTE_ID}
+          canCopy={palettes.length > 1}
+          onRename={() => {
+            setDraftName(current.name);
+            openDialog("rename");
+          }}
+          onAdd={() => {
+            setDraftName(nextSetName(palettes));
+            openDialog("add");
+          }}
+          onDeletePalette={() => openDialog("delete")}
+          // The only action that needs no dialog: it is undoable by re-adding
+          // the color, and the selection itself is the confirmation.
+          onDeleteSwatches={() => {
+            removeSwatches(current.id, selected);
+            setSelected([]);
+            setMenuOpen(false);
+          }}
+          onCopy={() => openDialog("copy")}
+          onClose={() => setMenuOpen(false)}
+        />
+      )}
+
+      {dialog?.kind === "rename" && (
+        <PaletteDialog
+          title="Rename palette"
+          confirmLabel="OK"
+          confirmDisabled={draftName.trim() === ""}
+          onConfirm={() => {
+            renamePalette(current.id, draftName.trim());
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        >
+          <input
+            className="flow-clr-palette__name"
+            aria-label="Palette name"
+            autoFocus
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+          />
+        </PaletteDialog>
+      )}
+
+      {dialog?.kind === "add" && (
+        <PaletteDialog
+          title="Add palette"
+          confirmLabel="OK"
+          confirmDisabled={draftName.trim() === ""}
+          // Creating AND switching is what the `+` button did; a new palette is
+          // empty, so creating without switching looks like nothing happened.
+          onConfirm={() => {
+            choosePalette(addPalette(draftName.trim()).id);
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        >
+          <input
+            className="flow-clr-palette__name"
+            aria-label="Palette name"
+            autoFocus
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            // The prefilled "color set N" is a placeholder, not a suggestion
+            // worth preserving — select it so typing replaces it outright.
+            onFocus={(e) => e.target.select()}
+          />
+        </PaletteDialog>
+      )}
+
+      {dialog?.kind === "delete" && (
+        <PaletteDialog
+          title="Delete palette"
+          confirmLabel="Delete"
+          onConfirm={() => {
+            removePalette(current.id);
+            setSelected([]);
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        >
           <p>Delete the &ldquo;{current.name}&rdquo; palette?</p>
-          <div className="flow-clr-palette__confirm-actions">
-            <button type="button" onClick={() => setConfirming(false)}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              aria-label="Confirm delete"
-              onClick={() => {
-                removePalette(current.id);
-                setConfirming(false);
-                setSelected([]);
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
+        </PaletteDialog>
       )}
     </div>
   );
