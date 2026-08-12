@@ -117,7 +117,6 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
       <PickerRow
         hsv={draft.hsv}
         alpha={draft.alpha}
-        isNone={draft.isNone}
         onHue={draft.setHue}
         onAlpha={draft.setAlpha}
         onPick={() => {
