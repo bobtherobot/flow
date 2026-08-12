@@ -230,9 +230,14 @@ it needed no retuning for the wider rail, despite the spec predicting it would.
 - `src/lib/color-parts.ts` — which parts a selection exposes and where each
   writes; bare text exposes `["text"]` alone, a labeled container exposes
   `["fill", "stroke", "text"]` via `resolveTextTargetIds`/`boundElements`
-- `src/lib/color-store.ts`, `src/lib/recent-colors.ts` — active part, 6
-  recents (`flow.recentColors`, cross-document, no scene scan), numeric
-  display mode (HSLA/RGBA/HEX)
+- `src/lib/color-store.ts` — active part and numeric display mode
+  (HSLA/RGBA/HEX), and nothing else. **`src/lib/recent-colors.ts` no longer
+  exists** and `color-store.ts` no longer holds recents: on 2026-08-12 the
+  six-slot cache became the Recent palette, a real editable palette living in
+  `palette-store.ts` under the fixed id `flow-recent`, written only by
+  `recordUsedColor` when a rail-popup session closes. See [[recent-palette]].
+  `flow.recentColors` survives as a write-nobody legacy key, read exactly once
+  to seed that palette on the run that creates it.
 - `src/ui/color/` — every picker primitive (`SaturationBox`, `HueSlider`,
   `AlphaSlider`, `NumericFields`, `PartChooser`, `PartArt`, `PaletteSection`,
   `PickerRow`), `useColorDraft`, `useAreaDrag`. `PartArt` owns all part
