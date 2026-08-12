@@ -112,4 +112,20 @@ describe("PaletteMenu", () => {
     fireEvent.pointerDown(screen.getByRole("menu"));
     expect(h.onClose).not.toHaveBeenCalled();
   });
+
+  it("ignores a press on the gear trigger, so the toggle's close branch stays reachable", () => {
+    // The gear lives outside this portal. Without the `.closest` guard in the
+    // pointerdown handler, a press on it would close the menu here, and the
+    // click that follows would immediately reopen it — the toggle's close
+    // branch would never be reachable.
+    const h = handlers();
+    render(
+      <>
+        <button className="flow-clr-palette__gear">gear</button>
+        <PaletteMenu anchor={{ top: 0, left: 0 }} hasSelection canDeletePalette canCopy {...h} />
+      </>,
+    );
+    fireEvent.pointerDown(screen.getByRole("button", { name: "gear" }));
+    expect(h.onClose).not.toHaveBeenCalled();
+  });
 });
