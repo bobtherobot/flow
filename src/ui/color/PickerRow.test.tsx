@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { EyeDropperButton } from "./EyeDropperButton";
 import { PickerRow } from "./PickerRow";
 
 describe("PickerRow", () => {
@@ -29,5 +30,19 @@ describe("PickerRow", () => {
     expect(onHue).toHaveBeenCalledWith(201, false);
     fireEvent.keyDown(screen.getByRole("slider", { name: /opacity/i }), { key: "ArrowLeft" });
     expect(onAlpha).toHaveBeenCalledWith(99, false);
+  });
+});
+
+describe("EyeDropperButton", () => {
+  it("is disabled with no handler", () => {
+    render(<EyeDropperButton />);
+    expect(screen.getByRole("button", { name: /pick a color/i })).toBeDisabled();
+  });
+
+  it("calls the handler when clicked", () => {
+    const onPick = vi.fn();
+    render(<EyeDropperButton onPick={onPick} />);
+    fireEvent.click(screen.getByRole("button", { name: /pick a color/i }));
+    expect(onPick).toHaveBeenCalledTimes(1);
   });
 });
