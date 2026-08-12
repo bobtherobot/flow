@@ -410,38 +410,40 @@ even with `disabled` swapped back in. Only `e2e/color-panel.spec.ts`'s
 HTML5 DnD via Playwright's `dragAndDrop` in actual Chromium, is a genuine
 regression guard for this.
 
-### The rail vertical-fit e2e test doesn't reach the case it's named for
+### The rail vertical-fit e2e test needs an explicit re-select, and asserts it got one
 
-Task 7 added `"the rail's color control fits the rail without overflowing"`,
-built — per its own task brief — around drawing a rectangle and giving it
-bound text via `Enter` → type → `Escape`, on the premise that a labelled
-container (3 parts: fill/stroke/text) is the tallest case the compact chooser
-renders. **Verified during Task 7: it does not actually reach that case.**
-Tool-lock stays on the Rectangle tool after drawing (flow forces it
-permanently on — see [[tool-override]]), and `Escape` out of the bound-text
-edit clears `selectedElementIds` to `{}` rather than restoring the container
-as selected. This is the same selection loss this file already documents as
-pre-existing and out of scope for `e2e/text-panel.spec.ts:201`/`:225` — the
+Task 7's first draft of `"the rail's color control fits the rail without
+overflowing"` (`e2e/color-panel.spec.ts`) drew a rectangle and gave it bound
+text via `Enter` → type → `Escape`, on the premise that a labelled container
+(3 parts: fill/stroke/text) is the tallest case the compact chooser renders.
+**That sequence alone does not reach the 3-part case.** Tool-lock stays on
+the Rectangle tool after drawing (flow forces it permanently on — see
+[[tool-override]]), and `Escape` out of the bound-text edit clears
+`selectedElementIds` to `{}` rather than restoring the container as selected.
+This is the same selection loss this file already documents as pre-existing
+and out of scope for `e2e/text-panel.spec.ts:201`/`:225` — the
 `addLabelledBox` helper those tests use is the identical
 `Enter`/type/`Escape` sequence, and they fail on the very next line for the
 same reason (the container reads as unselected, so the labelled-container-only
 UI stays disabled). A plain click on the canvas right after `Escape` does not
 reselect the container either: the active tool is still a drawing tool, not
 the selection tool, and Excalidraw only treats a plain click as a
-selection-click while the selection tool is active.
+selection-click while the selection tool is active. A first-draft version of
+this test that stopped at `Escape` would pass while silently measuring the
+shorter `parts-2` case (1.5 part-sizes tall) instead of the `parts-3` case
+(2.25 part-sizes tall, stacked above the quartet) — passing for the wrong
+reason, with nothing in the test's output to reveal it.
 
-Net effect: the new test's chooser stack renders the `parts-2` case
-(fill+stroke, 1.5 part-sizes tall), not the `parts-3` labelled-container case
-the brief predicted (2.25 part-sizes tall, stacked above the quartet). **The
-test still passes and is not vacuous** — the 2-part case was genuinely
-uncovered before this — **but it does not close the risk the plan flagged.**
-Manually forcing the 3-part case (click the Selection tool, then click the
-container's stroke edge — its interior doesn't hit-test, because the default
-fill is transparent) confirms the actual answer: **the rail does not overflow
-even at 3 parts.** `rail.scrollHeight - rail.clientHeight` measured `0` in
-both the 2-part and 3-part cases at a 1440×900 viewport. The product risk the
-plan flagged is resolved; the automated test just doesn't prove it. Any
-future session strengthening this coverage needs to route around the
-Escape-selection-loss bug — e.g. click the Selection tool and re-click the
-container body before asserting overflow — rather than trust that
-`Enter`/type/`Escape` alone leaves a labelled container selected.
+**The committed test routes around this explicitly**: after `Escape`, it
+clicks the Selection tool, then clicks the container's stroke edge (the
+interior doesn't hit-test — a fresh rectangle's fill is transparent) to force
+a genuine re-select, then asserts
+`page.locator(".flow-toolbar").getByRole("radio")` has count `3` **before**
+reading `scrollHeight`/`scrollWidth`. That count assertion is the durable
+part: if a future change breaks this re-selection trick (or the underlying
+Escape-selection-loss bug ever gets fixed and changes the interaction), the
+test fails loudly on the count instead of quietly reverting to measuring the
+2-part case again. Confirmed at the time of writing: `rail.scrollHeight -
+rail.clientHeight` is `0` for the real 3-part case at a 1440×900 viewport —
+the product risk the plan flagged is resolved, and now the test that says so
+actually proves it.

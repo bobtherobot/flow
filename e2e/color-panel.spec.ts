@@ -400,6 +400,22 @@ test("the rail's color control fits the rail without overflowing", async ({ page
   await page.keyboard.type("hi");
   await page.keyboard.press("Escape");
 
+  // NOT proven yet: tool-lock keeps the Rectangle tool active after drawing,
+  // and Escape out of the bound-text edit clears selectedElementIds entirely
+  // rather than leaving the container selected (the same selection loss
+  // e2e/text-panel.spec.ts's addLabelledBox-based tests hit). A plain click
+  // on the canvas right after Escape does not reselect anything either,
+  // because clicks only select while the Selection tool is active. Switch
+  // tools explicitly, then click the container's stroke edge — its interior
+  // doesn't hit-test, since a fresh rectangle's fill is transparent.
+  await page.getByRole("button", { name: "Selection" }).click();
+  await page.mouse.click(400, 350);
+
+  // Assert the tallest case was actually reached before measuring it, so a
+  // future regression in re-selection fails loudly here instead of silently
+  // passing while measuring the shorter two-part case.
+  await expect(page.locator(".flow-toolbar").getByRole("radio")).toHaveCount(3);
+
   const overflow = await page.evaluate(() => {
     const rail = document.querySelector(".flow-toolbar") as HTMLElement;
     return {
