@@ -93,4 +93,65 @@ describe("PaletteDialog", () => {
     fireEvent.submit(screen.getByTestId("palette-dialog-form"));
     expect(onConfirm).not.toHaveBeenCalled();
   });
+
+  it("returns focus to whatever was focused when it opened", () => {
+    render(<button>opener</button>);
+    const opener = screen.getByRole("button", { name: "opener" });
+    opener.focus();
+
+    const { unmount } = render(
+      <PaletteDialog title="T" confirmLabel="OK" onConfirm={vi.fn()} onCancel={vi.fn()}>
+        <span>body</span>
+      </PaletteDialog>,
+    );
+    unmount();
+
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it("focuses the first focusable element in the body on open", () => {
+    setup();
+    expect(document.activeElement).toBe(screen.getByLabelText("Palette name"));
+  });
+
+  it("focuses the dialog container when the body has no focusable element", () => {
+    // Task 4's delete-confirm dialog body is a bare <p> — nothing in it can
+    // take focus, so the dialog itself (tabIndex=-1) is the fallback target
+    // rather than skipping straight to the footer's Cancel/OK buttons.
+    render(
+      <PaletteDialog title="Delete palette" confirmLabel="Delete" onConfirm={vi.fn()} onCancel={vi.fn()}>
+        <p>This will permanently delete the palette.</p>
+      </PaletteDialog>,
+    );
+    expect(document.activeElement).toBe(screen.getByRole("dialog", { name: "Delete palette" }));
+  });
+
+  it("does not steal focus from an autoFocus child in the body", () => {
+    render(
+      <PaletteDialog title="Copy to" confirmLabel="Copy" onConfirm={vi.fn()} onCancel={vi.fn()}>
+        <select aria-label="Target palette" autoFocus>
+          <option>Pastel</option>
+        </select>
+      </PaletteDialog>,
+    );
+    expect(document.activeElement).toBe(screen.getByLabelText("Target palette"));
+  });
+
+  it("wraps Tab from the last focusable element to the first", () => {
+    setup();
+    const input = screen.getByLabelText("Palette name");
+    const okButton = screen.getByRole("button", { name: "OK" });
+    okButton.focus();
+    fireEvent.keyDown(okButton, { key: "Tab" });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("wraps Shift+Tab from the first focusable element to the last", () => {
+    setup();
+    const input = screen.getByLabelText("Palette name");
+    const okButton = screen.getByRole("button", { name: "OK" });
+    input.focus();
+    fireEvent.keyDown(input, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(okButton);
+  });
 });
