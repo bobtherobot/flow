@@ -1015,15 +1015,29 @@ const anchorFromGear = (): MenuPoint => {
 
 In `color.css`: add a `.flow-clr-palette__gear` rule matching the retired `.flow-clr-palette__icon`'s sizing and hover, and **delete** `.flow-clr-palette__confirm` and `.flow-clr-palette__confirm-actions`. If `.flow-clr-palette__icon` now has no users, delete it too — confirm with `grep -rn "flow-clr-palette__icon" src/ e2e/` first.
 
-- [ ] **Step 5: Run tests, full suite, typecheck**
+- [ ] **Step 5: Rewrite the two e2e tests this task breaks — do not defer them**
 
-Run: `npx vitest run src/ui/color/ && npx vitest run && npm run typecheck`
-Expected: green. `e2e/color-panel.spec.ts` will now have failing tests — that is expected and Task 6 fixes them. **Do not run e2e in this task.**
+Retiring the gestures in Step 3 breaks two existing tests in `e2e/color-panel.spec.ts`. **Fix them here, in the task that breaks them**, not in Task 6.
 
-- [ ] **Step 6: Commit**
+> Why this step exists: on the immediately preceding feature, an e2e test broke in one task and stayed red for two more, because task reviews are unit-scoped and nothing ran e2e in between. It was found only at the very end. A task that retires a user-facing gesture owns the e2e tests that drive it.
+
+- `"Escape abandons an in-progress palette rename"` — double-click rename is gone. Rewrite against the gear: open the menu, choose `Rename palette…`, type, press Escape, assert the palette name is unchanged.
+- `"the Recent palette cannot be deleted"` — it `force`-clicks the footer trash, which no longer exists. Rewrite: with Recent current, open the gear and assert `Delete palette…` carries `aria-disabled="true"`; then `click({ force: true })` it and assert no dialog opened. **Keep the forced click** — Playwright will not dispatch to an `aria-disabled` element otherwise, and without a real dispatch the test can only detect a missing attribute, not a missing handler guard.
+
+- [ ] **Step 6: Run tests, full suite, typecheck, and the e2e spec you touched**
 
 ```bash
-git add src/ui/color/PaletteSection.tsx src/ui/color/PaletteSection.test.tsx src/ui/color/color.css
+npx vitest run && npm run typecheck
+pkill -f vite
+npx playwright test e2e/color-panel.spec.ts
+```
+
+Expected: unit green, typecheck exit 0, and `color-panel.spec.ts` fully green. A full e2e run is not required here — Task 6 does that — but this spec must not be left red.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/ui/color/PaletteSection.tsx src/ui/color/PaletteSection.test.tsx src/ui/color/color.css e2e/color-panel.spec.ts
 git commit -m "feat(color): the palette gear menu replaces the add/delete buttons"
 ```
 
@@ -1174,11 +1188,9 @@ git commit -m "feat(color): copy selected swatches into another palette"
 - Modify: `e2e/color-panel.spec.ts`
 - Modify: `.claude/memory/recent-palette.md`, `.claude/memory/MEMORY.md`
 
-- [ ] **Step 1: Rewrite the e2e tests pinned to retired gestures**
+- [ ] **Step 1: Confirm the retired-gesture e2e tests are already fixed**
 
-Two existing tests drive gestures that no longer exist:
-- `"Escape abandons an in-progress palette rename"` — double-click rename is gone. Rewrite against the gear: open the menu, choose `Rename palette…`, type, press Escape, assert the name is unchanged.
-- `"the Recent palette cannot be deleted"` — it `force`-clicks the footer trash. Rewrite: open the gear with Recent current and assert `Delete palette…` has `aria-disabled="true"`; then `click({ force: true })` it (Playwright will not dispatch to an `aria-disabled` element otherwise) and assert no dialog opened. **Keep the forced click** — without it the test cannot detect a missing handler guard, only a missing attribute.
+Task 4 rewrote `"Escape abandons an in-progress palette rename"` and `"the Recent palette cannot be deleted"` against the gear menu, in the task that broke them. Confirm both exist in their rewritten form and pass; if either is still driving a retired gesture, fix it here and note that Task 4's step was missed.
 
 - [ ] **Step 2: Add the new e2e tests**
 
