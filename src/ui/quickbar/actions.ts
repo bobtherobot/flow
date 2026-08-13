@@ -1,7 +1,7 @@
 /** The quick-actions bar's item registry — the single source of truth for what
  *  the bar can contain, in render order. Kept free of vendor imports (mirrors
  *  toolbar/tools.ts); the reactive bridge maps these to Excalidraw calls. */
-import { TOOLS, type ToolId } from "../toolbar/tools";
+import { ALL_TOOLS, type ToolId } from "../toolbar/tools";
 
 /** How an item behaves. `action` = fire-and-forget; `toggle` = reflects an
  *  on/off state; `tool` = selects a drawing tool (opt-in, hidden by default). */
@@ -31,8 +31,9 @@ export interface QuickItem {
 /** Membership id for the specially-handled arrow-binding toggle. */
 export const BINDING_ID = "binding";
 
-/** Tool items derived from the rail's TOOLS (DRY) — same ids/labels/shortcuts. */
-const TOOL_ITEMS: readonly QuickItem[] = TOOLS.map((t) => ({
+/** Tool items derived from the rails' ALL_TOOLS (DRY) — same ids/labels/
+ *  shortcuts, spanning the toolbar and the shapebar. */
+const TOOL_ITEMS: readonly QuickItem[] = ALL_TOOLS.map((t) => ({
   id: t.id,
   label: t.label,
   kind: "tool" as const,

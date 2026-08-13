@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { QUICK_ITEMS, TOOL_ITEM_IDS, quickItem, BINDING_ID } from "./actions";
-import { TOOLS } from "../toolbar/tools";
+import { ALL_TOOLS } from "../toolbar/tools";
 
 describe("QUICK_ITEMS registry", () => {
   it("has no duplicate ids", () => {
@@ -24,8 +24,8 @@ describe("QUICK_ITEMS registry", () => {
     }
   });
 
-  it("derives tool items from TOOLS (same ids), hidden-by-default set matches", () => {
-    expect(TOOL_ITEM_IDS).toEqual(TOOLS.map((t) => t.id));
+  it("derives tool items from ALL_TOOLS (same ids), hidden-by-default set matches", () => {
+    expect(TOOL_ITEM_IDS).toEqual(ALL_TOOLS.map((t) => t.id));
     for (const id of TOOL_ITEM_IDS) {
       expect(quickItem(id)?.kind).toBe("tool");
     }
@@ -49,4 +49,8 @@ describe("QUICK_ITEMS registry", () => {
   it("returns undefined for an unknown id", () => {
     expect(quickItem("nope")).toBeUndefined();
   });
+});
+
+it("offers every tool from both rails as a quickbar item", () => {
+  expect([...TOOL_ITEM_IDS].sort()).toEqual([...ALL_TOOLS.map((t) => t.id)].sort());
 });

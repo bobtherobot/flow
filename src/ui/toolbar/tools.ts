@@ -36,25 +36,37 @@ export interface ToolDef {
   arrowType?: ArrowType;
 }
 
-/** The rail's tools, in Excalidraw's native left-to-right order (rendered
- *  top-to-bottom). Shortcuts mirror Excalidraw's defaults. The arrow tool is
- *  split into three shape variants (sharp / curved / elbow); all share the
- *  underlying `"arrow"` tool and set the new-arrow default when selected.
- *  Pressing `A` repeatedly cycles them (native Excalidraw behaviour). */
+/** The toolbar's tools, rendered top-to-bottom. Everything that isn't a shape:
+ *  pointers, text, freehand, line, frame, image and the two transient tools.
+ *  Shortcuts mirror Excalidraw's defaults. */
 export const TOOLS: readonly ToolDef[] = [
   { id: "selection", label: "Selection", shortcut: "V" },
   { id: "hand", label: "Hand (pan)", shortcut: "H" },
-  { id: "rectangle", label: "Rectangle", shortcut: "R" },
-  { id: "diamond", label: "Diamond", shortcut: "D" },
-  { id: "ellipse", label: "Ellipse", shortcut: "O" },
+  { id: "text", label: "Text", shortcut: "T" },
+  { id: "freedraw", label: "Draw", shortcut: "P" },
+  { id: "line", label: "Line", shortcut: "L" },
+  { id: "frame", label: "Frame", shortcut: "F" },
+  { id: "image", label: "Image", shortcut: "9" },
+  { id: "eraser", label: "Eraser", shortcut: "E" },
+  { id: "laser", label: "Laser pointer", shortcut: "K" },
+];
+
+/** The shapebar's tools, rendered top-to-bottom in a two-column grid. The arrow
+ *  tool is split into three shape variants (sharp / curved / elbow); all three
+ *  share Excalidraw's underlying `"arrow"` tool and differ only in the
+ *  `currentItemArrowType` default they set, so new arrows are drawn with that
+ *  shape. Pressing `A` repeatedly cycles them (native Excalidraw behaviour),
+ *  which is why curved and elbow carry no shortcut of their own. */
+export const SHAPES: readonly ToolDef[] = [
   { id: "arrow", label: "Arrow", shortcut: "A", arrowType: "sharp" },
   { id: "arrow-curved", label: "Curved arrow", shortcut: "", toolType: "arrow", arrowType: "round" },
   { id: "arrow-elbow", label: "Elbow arrow", shortcut: "", toolType: "arrow", arrowType: "elbow" },
-  { id: "line", label: "Line", shortcut: "L" },
-  { id: "freedraw", label: "Draw", shortcut: "P" },
-  { id: "text", label: "Text", shortcut: "T" },
-  { id: "image", label: "Image", shortcut: "9" },
-  { id: "eraser", label: "Eraser", shortcut: "E" },
-  { id: "frame", label: "Frame", shortcut: "F" },
-  { id: "laser", label: "Laser pointer", shortcut: "K" },
+  { id: "rectangle", label: "Rectangle", shortcut: "R" },
+  { id: "diamond", label: "Diamond", shortcut: "D" },
+  { id: "ellipse", label: "Ellipse", shortcut: "O" },
 ];
+
+/** Every tool flow surfaces, both rails. Consumers that care about the whole
+ *  set rather than about one rail — the quick-actions bar's tool items — read
+ *  this, so a tool moving between rails never silently drops out of them. */
+export const ALL_TOOLS: readonly ToolDef[] = [...TOOLS, ...SHAPES];

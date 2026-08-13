@@ -4,7 +4,9 @@ import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { MenuPoint } from "../panels/dock/menu-position";
 import { useSelectionStyle } from "../panels/useSelectionStyle";
 import { useDrag } from "../panels/dock/useDrag";
-import { TOOLS } from "./tools";
+// TEMPORARY (Task 2 → removed in Task 7): the rail still renders every tool so
+// this commit changes no UI. Task 7 hands each rail its own list as a prop.
+import { ALL_TOOLS } from "./tools";
 import { TOOL_ICONS } from "./icons";
 import { ToolButton } from "./ToolButton";
 import { ToolbarConfigMenu } from "./ToolbarConfigMenu";
@@ -119,7 +121,7 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
       </div>
 
       <div className="flow-toolbar__tools">
-        {TOOLS.filter((t) => !state.hiddenTools.includes(t.id)).map((t) => {
+        {ALL_TOOLS.filter((t) => !state.hiddenTools.includes(t.id)).map((t) => {
           const toolType = t.toolType ?? t.id;
           // Arrow variants share activeType "arrow"; disambiguate on the shape.
           const active =

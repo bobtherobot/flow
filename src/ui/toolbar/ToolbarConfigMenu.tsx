@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { clampMenuPosition, type MenuPoint } from "../panels/dock/menu-position";
-import { TOOLS } from "./tools";
+import { ALL_TOOLS } from "./tools";
 
 interface ToolbarConfigMenuProps {
   floating: boolean;
@@ -43,7 +43,7 @@ export function ToolbarConfigMenu({
     );
   }, [anchor]);
 
-  const rows = TOOLS.map((t) => ({ id: t.id as string, label: t.label }));
+  const rows = ALL_TOOLS.map((t) => ({ id: t.id as string, label: t.label }));
 
   return (
     <div
