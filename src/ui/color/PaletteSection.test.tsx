@@ -8,6 +8,7 @@ import {
   removePalette,
   recordUsedColor,
 } from "../../lib/palette-store";
+import { RECENT_PALETTE_NAME } from "../../lib/color-palettes";
 
 // jsdom/Node's native `localStorage` global does not implement a usable
 // Storage in this project's vitest setup (see src/lib/palette-store.test.ts,
@@ -59,6 +60,19 @@ function selectPalette(name: string) {
   fireEvent.change(screen.getByLabelText("Palette"), { target: { value: id } });
 }
 
+/** The name shown in the `<select>` — i.e. the palette the panel is on. */
+const currentPaletteName = () =>
+  (screen.getByLabelText("Palette") as HTMLSelectElement).selectedOptions[0].textContent;
+
+/** Everything the gear can do now lives behind this one button. */
+const openMenu = () => fireEvent.click(screen.getByRole("button", { name: "Palette actions" }));
+
+const trash = () => screen.getByRole("button", { name: "Delete swatches" });
+const swatches = () => screen.getAllByRole("button", { name: /^swatch /i });
+/** The tile's `title` is the bare hex; its aria-label is `Swatch <hex>`. */
+const firstSwatchHex = () => swatches()[0].getAttribute("title")!;
+const selectFirstSwatch = () => fireEvent.click(swatches()[0], { metaKey: true });
+
 describe("PaletteSection", () => {
   it("lists the seeded palettes and selects the default", () => {
     setup();
@@ -101,21 +115,16 @@ describe("PaletteSection", () => {
     expect(localStorage.getItem("flow.defaultPaletteId")).toBe(vibrant.value);
   });
 
-  it("adds a palette", () => {
-    setup();
-    const before = (screen.getByLabelText("Palette") as HTMLSelectElement).options.length;
-    fireEvent.click(screen.getByRole("button", { name: /add palette/i }));
-    expect((screen.getByLabelText("Palette") as HTMLSelectElement).options).toHaveLength(before + 1);
-  });
-
   it("selects a swatch for deletion with a modifier click and removes it", () => {
     setup();
-    const first = screen.getAllByRole("button", { name: /^swatch /i })[0];
-    const before = screen.getAllByRole("button", { name: /^swatch /i }).length;
+    const first = swatches()[0];
+    const before = swatches().length;
     fireEvent.click(first, { metaKey: true });
     expect(first).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(screen.getByRole("button", { name: /remove selected swatches/i }));
-    expect(screen.getAllByRole("button", { name: /^swatch /i })).toHaveLength(before - 1);
+    act(() => {
+      fireEvent.click(trash());
+    });
+    expect(swatches()).toHaveLength(before - 1);
   });
 
   it("does not apply a color on a modifier click", () => {
@@ -146,21 +155,6 @@ describe("PaletteSection", () => {
     expect(screen.getAllByRole("button", { name: /^swatch /i })).toHaveLength(before - 1);
   });
 
-  it("asks before deleting a palette when nothing is selected", () => {
-    setup();
-    fireEvent.click(screen.getByRole("button", { name: /delete palette/i }));
-    expect(screen.getByRole("alertdialog", { name: /delete palette/i })).toBeInTheDocument();
-  });
-
-  it("deletes the palette only after confirming", () => {
-    setup();
-    const before = getSnapshot().palettes.length;
-    fireEvent.click(screen.getByRole("button", { name: /delete palette/i }));
-    expect(getSnapshot().palettes.length).toBe(before); // not yet deleted
-    fireEvent.click(screen.getByRole("button", { name: /confirm delete/i }));
-    expect(getSnapshot().palettes.length).toBe(before - 1);
-  });
-
   it("reseeds a fresh palette after deleting the last one", () => {
     setup();
     // Whittle the store down to a single palette directly, then delete that
@@ -169,8 +163,9 @@ describe("PaletteSection", () => {
     act(() => {
       for (const id of ids.slice(1)) removePalette(id);
     });
-    fireEvent.click(screen.getByRole("button", { name: /delete palette/i }));
-    fireEvent.click(screen.getByRole("button", { name: /confirm delete/i }));
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete palette…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(getSnapshot().palettes).toHaveLength(1);
     // The select still resolves to a real, selected option — no crash, no
     // dangling reference to the palette that was just removed.
@@ -179,67 +174,10 @@ describe("PaletteSection", () => {
     expect(select.selectedOptions).toHaveLength(1);
   });
 
-  it("renames in place on double-click", () => {
-    setup();
-    fireEvent.doubleClick(screen.getByLabelText("Palette"));
-    const input = screen.getByLabelText("Palette name");
-    fireEvent.change(input, { target: { value: "Mine" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    expect((screen.getByLabelText("Palette") as HTMLSelectElement).selectedOptions[0].textContent)
-      .toBe("Mine");
-  });
-
-  it("abandons a rename on Escape", () => {
-    // Unmounting a focused input can fire blur on the way out; without an
-    // explicit abandon flag that blur commits the edit Escape just cancelled.
-    setup();
-    fireEvent.doubleClick(screen.getByLabelText("Palette"));
-    const input = screen.getByLabelText("Palette name");
-    fireEvent.change(input, { target: { value: "Discarded" } });
-    fireEvent.keyDown(input, { key: "Escape" });
-    expect((screen.getByLabelText("Palette") as HTMLSelectElement).selectedOptions[0].textContent)
-      .toBe("Pastel");
-  });
-
-  it("leaves rename mode when a palette is switched via Add palette mid-rename", () => {
-    // The select is hidden while renaming, so the only way to invoke
-    // choosePalette() without going through Escape first is the "Add
-    // palette" button — it stays mounted in the same row throughout. This is
-    // the actual regression path for whether choosePalette itself resets
-    // rename mode: a variant of this test that triggers Escape before
-    // switching can't tell, because Escape already clears `renaming` on its
-    // own before the switch ever happens.
-    setup();
-    fireEvent.doubleClick(screen.getByLabelText("Palette"));
-    expect(screen.getByLabelText("Palette name")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /add palette/i }));
-    expect(screen.queryByLabelText("Palette name")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Palette")).toBeInTheDocument();
-  });
-
-  it("still commits a rename after an earlier Escape", () => {
-    // The abandon flag must not survive the session it was set in: Escape
-    // unmounts without a blur in jsdom, so a flag cleared only in onBlur
-    // strands and eats the next real rename.
-    setup();
-    fireEvent.doubleClick(screen.getByLabelText("Palette"));
-    fireEvent.keyDown(screen.getByLabelText("Palette name"), { key: "Escape" });
-
-    fireEvent.doubleClick(screen.getByLabelText("Palette"));
-    const input = screen.getByLabelText("Palette name");
-    fireEvent.change(input, { target: { value: "Kept" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    expect((screen.getByLabelText("Palette") as HTMLSelectElement).selectedOptions[0].textContent)
-      .toBe("Kept");
-  });
-
   it("has no set-as-default control", () => {
     setup();
     expect(screen.queryByRole("button", { name: /default/i })).not.toBeInTheDocument();
   });
-
-  const trash = () => screen.getByRole("button", { name: "Delete swatches" });
-  const swatches = () => screen.getAllByRole("button", { name: /^swatch /i });
 
   /** HTML5 DnD in jsdom: dragStart on the source, then drop on the target.
    *  PaletteSection tracks the source index in a ref, so no dataTransfer
@@ -317,47 +255,253 @@ describe("PaletteSection", () => {
     expect(trash().getAttribute("title")).toMatch(/drag/i);
     expect(trash().getAttribute("title")).toMatch(/click/i);
   });
+});
 
-  it("says which of its two jobs the footer trash will do", () => {
+describe("the palette gear menu", () => {
+  it("replaces the add and delete buttons", () => {
     setup();
-    const footer = () => screen.getByRole("button", { name: /delete palette/i });
-    expect(footer().getAttribute("title")).toMatch(/palette/i);
+    expect(screen.queryByRole("button", { name: "Add palette" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete palette" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Palette actions" })).toBeInTheDocument();
+  });
 
-    fireEvent.click(swatches()[0], { metaKey: true });
-    const withSelection = screen.getByRole("button", { name: /remove selected swatches/i });
-    expect(withSelection.getAttribute("title")).toMatch(/selected swatches/i);
+  it("renames through the dialog", () => {
+    setup();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename palette…" }));
+    fireEvent.change(screen.getByLabelText("Palette name"), { target: { value: "Renamed" } });
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    expect(screen.getByRole("option", { name: "Renamed" })).toBeInTheDocument();
+  });
+
+  it("discards a rename on Cancel", () => {
+    setup();
+    const before = currentPaletteName();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename palette…" }));
+    fireEvent.change(screen.getByLabelText("Palette name"), { target: { value: "Nope" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(currentPaletteName()).toBe(before);
+    expect(screen.queryByRole("option", { name: "Nope" })).not.toBeInTheDocument();
+  });
+
+  it("blocks OK on an all-whitespace name", () => {
+    setup();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename palette…" }));
+    fireEvent.change(screen.getByLabelText("Palette name"), { target: { value: "   " } });
+    expect(screen.getByRole("button", { name: "OK" })).toBeDisabled();
+  });
+
+  it("adds a palette AND switches to it", () => {
+    // The `+` it replaces did both; adding without switching would be a
+    // silent regression, since the new palette is empty and invisible.
+    setup();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add palette…" }));
+    fireEvent.change(screen.getByLabelText("Palette name"), { target: { value: "Fresh" } });
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    expect(currentPaletteName()).toBe("Fresh");
+  });
+
+  it("prefills Add with the next auto-name", () => {
+    setup();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add palette…" }));
+    expect(screen.getByLabelText("Palette name")).toHaveValue("color set 1");
+  });
+
+  it("deletes the palette only after confirming", () => {
+    setup();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add palette…" }));
+    fireEvent.change(screen.getByLabelText("Palette name"), { target: { value: "Doomed" } });
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete palette…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("option", { name: "Doomed" })).toBeInTheDocument();
+
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete palette…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(screen.queryByRole("option", { name: "Doomed" })).not.toBeInTheDocument();
+  });
+
+  it("deletes the selected swatches from the menu", () => {
+    setup();
+    selectFirstSwatch();
+    const hex = firstSwatchHex();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete selected swatches" }));
+    expect(screen.queryByRole("button", { name: `Swatch ${hex}` })).not.toBeInTheDocument();
+  });
+
+  it("closes the menu after an action", () => {
+    setup();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename palette…" }));
+    expect(screen.queryByRole("menu", { name: "Palette actions" })).not.toBeInTheDocument();
+  });
+
+  it("marks Delete palette inert for the Recent palette", () => {
+    setup();
+    selectPalette(RECENT_PALETTE_NAME);
+    openMenu();
+    expect(screen.getByRole("menuitem", { name: "Delete palette…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("still lets the Recent palette be renamed", () => {
+    // Only deletion is special. Rename must keep working — RECENT_PALETTE_ID
+    // is fixed and migrateBuiltins exempts it, so a rename is safe.
+    setup();
+    selectPalette(RECENT_PALETTE_NAME);
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename palette…" }));
+    fireEvent.change(screen.getByLabelText("Palette name"), { target: { value: "My colors" } });
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    expect(screen.getByRole("option", { name: "My colors" })).toBeInTheDocument();
+  });
+
+  it("hands focus back to the gear when a dialog closes", () => {
+    // The menu item that opened the dialog unmounts in the very commit that
+    // mounts it — `openDialog` clears `menuOpen` and sets `dialog` in one
+    // batch. So a shell that restores focus to "whatever was focused when I
+    // opened" restores it to a detached node, which silently drops focus to
+    // <body> and leaves a keyboard user tabbing back in from the top of the
+    // document. The gear is the durable anchor and is what they pressed.
+    //
+    // Every `.focus()` here is explicit and load-bearing: jsdom's
+    // `fireEvent.click` does not move focus, so a click-only version of this
+    // test captures <body>, restores <body>, and passes against the bug.
+    setup();
+    const gear = screen.getByRole("button", { name: "Palette actions" });
+    gear.focus();
+    fireEvent.click(gear);
+
+    const item = screen.getByRole("menuitem", { name: "Rename palette…" });
+    item.focus();
+    fireEvent.click(item);
+    expect(document.activeElement).toBe(screen.getByLabelText("Palette name"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(document.activeElement).toBe(gear);
+  });
+
+  it("moves focus into the menu when it opens", () => {
+    // The menu portals to <body>, so its items come after every other
+    // focusable element in the document. Leaving focus on the gear makes them
+    // reachable only by tabbing through the whole application.
+    setup();
+    openMenu();
+    expect(document.activeElement).toBe(
+      screen.getByRole("menuitem", { name: "Rename palette…" }),
+    );
+  });
+
+  it("hands focus back to the gear when the menu is dismissed with Escape", () => {
+    setup();
+    const gear = screen.getByRole("button", { name: "Palette actions" });
+    gear.focus();
+    fireEvent.click(gear);
+    // Explicit, so this test still fails if only the return path breaks: with
+    // focus left sitting on the gear, "focus is on the gear afterwards" is
+    // true for free.
+    screen.getByRole("menuitem", { name: "Add palette…" }).focus();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(document.activeElement).toBe(gear);
+  });
+
+  it("hands focus back to the gear after deleting the selected swatches", () => {
+    // The one action with no dialog, so nothing else mounts to claim focus —
+    // and the item that was focused is unmounted by the same click.
+    setup();
+    selectFirstSwatch();
+    const gear = screen.getByRole("button", { name: "Palette actions" });
+    gear.focus();
+    fireEvent.click(gear);
+    const item = screen.getByRole("menuitem", { name: "Delete selected swatches" });
+    item.focus(); // load-bearing: fireEvent.click does not move focus in jsdom
+    fireEvent.click(item);
+    expect(document.activeElement).toBe(gear);
+  });
+
+  it("does not delete the selected swatches when a key is pressed inside a dialog", () => {
+    // React synthetic events bubble along the REACT tree, not the DOM tree, so
+    // every keystroke inside the portaled dialog still reaches the section
+    // root's onKeyDown. Without a guard there, Backspace on the delete-confirm
+    // dialog — whose container is its own initial focus target — deletes the
+    // swatches the dialog is sitting on top of. Palettes have no undo.
+    //
+    // This can only be seen in the composition: PaletteDialog's own suite has
+    // no grid handler above it, exactly like the focus-return bug.
+    setup();
+    selectFirstSwatch();
+    const before = swatches().length;
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete palette…" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete palette" });
+    expect(document.activeElement).toBe(dialog);
+    fireEvent.keyDown(dialog, { key: "Backspace" });
+    expect(swatches()).toHaveLength(before);
+  });
+
+  it("does not delete the selected swatches when a key is pressed on an open menu item", () => {
+    // Same mechanism as the dialog case: the menu portals to <body> but is a
+    // React child of the section, so its keystrokes bubble to the grid handler.
+    setup();
+    selectFirstSwatch();
+    const before = swatches().length;
+    openMenu();
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: "Rename palette…" }), {
+      key: "Backspace",
+    });
+    expect(swatches()).toHaveLength(before);
+  });
+
+  it("no longer renames on double-click", () => {
+    setup();
+    fireEvent.doubleClick(screen.getByLabelText("Palette"));
+    expect(screen.queryByLabelText("Palette name")).not.toBeInTheDocument();
   });
 });
 
 describe("the Recent palette", () => {
   it("cannot be deleted", () => {
     setup();
-    selectPalette("Recent");
-    const trash = screen.getByRole("button", { name: "Delete palette" });
-    expect(trash).toHaveAttribute("aria-disabled", "true");
-    // NOT the native attribute: Chrome delivers no mouse events to a disabled
-    // control, and this grid's tiles are drop targets that run on them.
-    expect(trash).not.toBeDisabled();
-    fireEvent.click(trash);
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    selectPalette(RECENT_PALETTE_NAME);
+    openMenu();
+    const item = screen.getByRole("menuitem", { name: "Delete palette…" });
+    // NOT the native attribute: a disabled button cannot take focus, so a
+    // keyboard user could never land on the item to learn why it is inert.
+    // That makes the attribute advisory, which is why the click below has to
+    // be answered by a handler guard rather than by the browser.
+    expect(item).not.toBeDisabled();
+    fireEvent.click(item);
+    expect(screen.queryByRole("dialog", { name: "Delete palette" })).not.toBeInTheDocument();
   });
 
-  it("still deletes selected swatches from the same button", () => {
-    // The footer trash does double duty. Only the delete-palette branch is
-    // inert — evicting a color you are sick of must keep working.
+  it("still deletes selected swatches from the menu", () => {
+    // Only the delete-palette item is inert — evicting a color you are sick
+    // of must keep working on Recent like on any other palette.
     recordUsedColor("#123456");
     setup();
-    selectPalette("Recent");
+    selectPalette(RECENT_PALETTE_NAME);
     fireEvent.click(screen.getByRole("button", { name: "Swatch #123456" }), { ctrlKey: true });
-    const trash = screen.getByRole("button", { name: "Remove selected swatches" });
-    expect(trash).not.toHaveAttribute("aria-disabled", "true");
-    fireEvent.click(trash);
+    openMenu();
+    const item = screen.getByRole("menuitem", { name: "Delete selected swatches" });
+    expect(item).toHaveAttribute("aria-disabled", "false");
+    fireEvent.click(item);
     expect(screen.queryByRole("button", { name: "Swatch #123456" })).not.toBeInTheDocument();
   });
 
   it("still accepts a hand-added swatch", () => {
     setup();
-    selectPalette("Recent");
+    selectPalette(RECENT_PALETTE_NAME);
     fireEvent.click(screen.getByRole("button", { name: "Add current color to palette" }));
     expect(screen.getAllByRole("button", { name: /^Swatch #/ })).toHaveLength(1);
   });
@@ -365,9 +509,102 @@ describe("the Recent palette", () => {
   it("leaves delete-palette live for every other palette", () => {
     setup();
     selectPalette("Pastel");
-    expect(screen.getByRole("button", { name: "Delete palette" })).not.toHaveAttribute(
+    openMenu();
+    expect(screen.getByRole("menuitem", { name: "Delete palette…" })).toHaveAttribute(
       "aria-disabled",
-      "true",
+      "false",
     );
+  });
+});
+
+describe("copying swatches between palettes", () => {
+  // The seeded default palette (see "selects the default" above) — the
+  // fixed starting point every test in this block copies swatches out of.
+  const SOURCE_NAME = "Pastel";
+
+  /** Drives the Add-palette dialog end to end, mirroring "adds a palette AND
+   *  switches to it" above. */
+  function addPaletteNamed(name: string) {
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add palette…" }));
+    fireEvent.change(screen.getByLabelText("Palette name"), { target: { value: name } });
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+  }
+
+  /** The id of the "Target" palette every test in this block adds, resolved
+   *  the same way `selectPalette` resolves a name to an id. */
+  function targetId() {
+    return getSnapshot().palettes.find((p) => p.name === "Target")!.id;
+  }
+
+  /** Drives the copy dialog end to end: open it, choose `name` in the
+   *  target `<select>`, confirm. */
+  function copySelectedTo(name: string) {
+    const id = getSnapshot().palettes.find((p) => p.name === name)!.id;
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy selected swatches to…" }));
+    fireEvent.change(screen.getByLabelText("Target palette"), { target: { value: id } });
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+  }
+
+  it("copies the selected swatches into the chosen palette", () => {
+    setup();
+    addPaletteNamed("Target");
+    selectPalette(SOURCE_NAME);
+    selectFirstSwatch();
+    const hex = firstSwatchHex();
+
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy selected swatches to…" }));
+    fireEvent.change(screen.getByLabelText("Target palette"), { target: { value: targetId() } });
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+    selectPalette("Target");
+    expect(screen.getByRole("button", { name: `Swatch ${hex}` })).toBeInTheDocument();
+  });
+
+  it("leaves the source palette untouched", () => {
+    // Copy, not move. A "move" regression is invisible unless the source is
+    // re-checked after switching away and back.
+    setup();
+    addPaletteNamed("Target");
+    selectPalette(SOURCE_NAME);
+    selectFirstSwatch();
+    const hex = firstSwatchHex();
+    copySelectedTo("Target");
+    selectPalette(SOURCE_NAME);
+    expect(screen.getByRole("button", { name: `Swatch ${hex}` })).toBeInTheDocument();
+  });
+
+  it("keeps the selection after copying", () => {
+    setup();
+    addPaletteNamed("Target");
+    selectPalette(SOURCE_NAME);
+    selectFirstSwatch();
+    copySelectedTo("Target");
+    expect(screen.getAllByRole("button", { pressed: true }).length).toBe(1);
+  });
+
+  it("excludes the current palette from the target list", () => {
+    setup();
+    selectFirstSwatch();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy selected swatches to…" }));
+    const options = Array.from(
+      screen.getByLabelText("Target palette").querySelectorAll("option"),
+    ).map((o) => o.textContent);
+    expect(options).not.toContain(currentPaletteName());
+  });
+
+  it("copies nothing on Cancel", () => {
+    setup();
+    addPaletteNamed("Target");
+    selectPalette(SOURCE_NAME);
+    selectFirstSwatch();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy selected swatches to…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    selectPalette("Target");
+    expect(screen.queryAllByRole("button", { name: /^Swatch #/ })).toHaveLength(0);
   });
 });

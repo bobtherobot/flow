@@ -292,8 +292,11 @@
    retired Swatches panel (`SwatchGrid`/`SwatchesPanel`, both deleted), under
    the `flow-clr-*` naming this panel uses throughout. */
 
+/* No `position: relative` here any more: it existed solely to be the
+   containing block for the inset delete-confirm overlay, which the gear menu's
+   PaletteDialog replaced. Both the menu and the dialog are fixed-position
+   portals to <body>, so nothing inside this box is positioned against it. */
 .flow-clr-palette {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -305,13 +308,26 @@
   gap: 6px;
 }
 
-.flow-clr-palette__select,
-.flow-clr-palette__name {
+/* Two `<select>`s wear this: the footer row's palette picker, where it takes
+   the leftover width beside the gear, and the copy dialog's target picker,
+   where the dialog body is a flex column and the same rule instead lets it
+   stretch to the dialog width without forcing it wider than the dialog. */
+.flow-clr-palette__select {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.flow-clr-palette__icon {
+/* The name field no longer shares that row — it lives in the rename/add
+   dialog, whose body is a flex column that stretches it to the dialog width.
+   All it needs here is permission to shrink below its intrinsic size. */
+.flow-clr-palette__name {
+  min-width: 0;
+}
+
+/* The one control left in the footer row, carrying forward the 24px sizing and
+   hover of the `+`/`🗑` pair it replaced. Nothing here goes inert: the gear
+   always opens, and it is the menu's own items that grey out. */
+.flow-clr-palette__gear {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -325,17 +341,8 @@
   border-radius: var(--flow-radius-sm);
 }
 
-.flow-clr-palette__icon:hover {
+.flow-clr-palette__gear:hover {
   background: var(--flow-hover);
-}
-
-/* Same treatment as the grid's __trash[aria-disabled="true"] below: the
-   inert footer trash (Recent palette, nothing selected) must not still look
-   like a working hover/click target. Placed after :hover so equal-
-   specificity source order — not a specificity bump — is what wins here. */
-.flow-clr-palette__icon[aria-disabled="true"] {
-  color: var(--flow-ink-disabled);
-  cursor: default;
 }
 
 /* flow is desktop-only: these are mouse targets, sized for density. */
@@ -400,27 +407,6 @@
 .flow-clr-palette__tile[aria-pressed="true"] {
   outline: 2px solid var(--flow-accent);
   outline-offset: 1px;
-}
-
-.flow-clr-palette__confirm {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  text-align: center;
-  padding: 12px;
-  border-radius: var(--flow-radius-md);
-  background: var(--flow-panel-bg);
-  border: 1px solid var(--flow-border);
-  color: var(--flow-ink);
-}
-
-.flow-clr-palette__confirm-actions {
-  display: flex;
-  gap: 8px;
 }
 
 /* The panel assembly (Task 14): part chooser + saturation box on top, then
@@ -523,6 +509,68 @@
   cursor: default;
   border: 1px solid var(--flow-border);
   box-shadow: none;
+}
+
+/* The palette gear's dropdown (Task 3): five actions, three of which can be
+   inert depending on selection/palette state. Tokens follow this file's
+   existing names — `--flow-panel-border`/`--flow-panel-ink`/`--flow-panel-hover`
+   from the brief don't exist here, so `--flow-border`/`--flow-ink`/`--flow-hover`
+   stand in for them, same as every other control in this file. */
+
+.flow-clr-palette__menu {
+  position: fixed;
+  /* Matched to `.flow-pnl-config` (panels.css) rather than invented: the gear
+     that opens this menu lives inside the docked `.flow-pnl` (z-index 90), so
+     the anchor point is necessarily inside the panel's bounding box. Both are
+     `position: fixed` with explicit z-indexes, so paint order is decided
+     purely by the numbers regardless of DOM order — anything below 90 here
+     renders invisible (or clipped) behind the panel the moment it opens.
+     `.flow-clr-popup` carries the same 130 for the same reason. */
+  z-index: 130;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 4px;
+  background: var(--flow-panel-bg);
+  border: 1px solid var(--flow-border);
+  border-radius: var(--flow-radius-md);
+  /* The remaining three complete the match with `.flow-pnl-config`, whose
+     look this menu is meant to be indistinguishable from. Without the shadow
+     it is the only overlay in the app floating flat over the canvas, and
+     without the font it inherits nothing useful — a portal to <body> means
+     the panel's typography never reaches it. */
+  box-shadow: var(--flow-shadow);
+  font-family: var(--flow-font);
+  font-size: 12px;
+}
+
+.flow-clr-palette__menuitem {
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  /* `<button>` does not inherit font from its ancestors — without this the
+     five items render in the browser's default control font inside a menu
+     that has just set the app's. Same rule `.flow-pnl-config__action` has. */
+  font: inherit;
+  text-align: left;
+  color: var(--flow-ink);
+  cursor: pointer;
+  border-radius: var(--flow-radius-sm);
+}
+
+.flow-clr-palette__menuitem:hover {
+  background: var(--flow-hover);
+}
+
+/* Placed after :hover — equal specificity, source order decides — so an
+   inert item that happens to be under the pointer doesn't still look live. */
+.flow-clr-palette__menuitem[aria-disabled="true"] {
+  color: var(--flow-ink-disabled);
+  cursor: default;
+}
+
+.flow-clr-palette__menuitem[aria-disabled="true"]:hover {
+  background: none;
 }
 
 /* flow is desktop-only: these are mouse targets, sized for density. */

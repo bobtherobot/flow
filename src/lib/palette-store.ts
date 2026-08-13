@@ -273,6 +273,45 @@ export function reorderSwatches(paletteId: string, from: number, to: number): vo
 }
 
 /**
+ * Copy colors into `targetId`, skipping any the target already has.
+ *
+ * A single `commit()` for the whole batch, deliberately: looping `addSwatch`
+ * would fire one subscriber notification and one localStorage write per
+ * swatch for what the user experiences as one action.
+ *
+ * Duplicates are dropped rather than appended so a target can never end up
+ * with two identical tiles — the same rule `recordUsedColor` applies, for the
+ * same reason (these grids are looked at, and two identical swatches are
+ * indistinguishable).
+ */
+export function copySwatchesTo(targetId: string, colors: string[]): void {
+  const target = state.palettes.find((p) => p.id === targetId);
+  if (!target) return;
+
+  const seen = new Set(target.colors);
+  const additions: string[] = [];
+  for (const color of colors) {
+    // Not dead defensiveness despite the `string[]` signature: callers build
+    // this array by indexing a live palette with a held selection
+    // (`selected.map((i) => current.colors[i])`), and the Recent palette
+    // truncates itself to RECENT_PALETTE_LIMIT — the one path that can SHRINK
+    // a palette under a selection. A stale index then yields `undefined`, and
+    // `scrubHex` would throw on `.trim()` and take the app down.
+    if (typeof color !== "string") continue;
+    const hex = scrubHex(color);
+    if (!hex || seen.has(hex)) continue;
+    seen.add(hex);
+    additions.push(hex);
+  }
+  if (additions.length === 0) return;
+
+  commit({
+    ...state,
+    palettes: mapPalette(targetId, (p) => ({ ...p, colors: [...p.colors, ...additions] })),
+  });
+}
+
+/**
  * Record a color the user settled on. The **only** automatic route into the
  * Recent palette — called once per rail-popup session, when it closes.
  *
