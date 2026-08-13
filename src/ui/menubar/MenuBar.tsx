@@ -32,6 +32,14 @@ export interface MenuBarProps {
   isToolbarFloating?: boolean;
   /** Re-dock the tool rail to the left edge. */
   onDockToolbar?: () => void;
+  /** Whether the shapebar is shown (View ▸ Show Shapebar checkbox state). */
+  isShapebarVisible?: boolean;
+  /** Toggle the shapebar's visibility. */
+  onToggleShapebar?: () => void;
+  /** Whether the shapebar is torn off (enables View ▸ Dock Shapebar). */
+  isShapebarFloating?: boolean;
+  /** Re-dock the floating shapebar. */
+  onDockShapebar?: () => void;
   /** Whether the quick-actions bar is currently shown (drives the View checkbox). */
   isQuickbarVisible?: boolean;
   /** Toggle the quick-actions bar's visibility. */
@@ -245,6 +253,16 @@ export function MenuBar(props: MenuBarProps) {
             </Menubar.CheckboxItem>
             <Menubar.CheckboxItem
               className="flow-menu__item flow-menu__item--check"
+              checked={props.isShapebarVisible ?? true}
+              onCheckedChange={() => props.onToggleShapebar?.()}
+            >
+              <Menubar.ItemIndicator className="flow-menu__check" aria-hidden="true">
+                ✓
+              </Menubar.ItemIndicator>
+              Show Shapebar
+            </Menubar.CheckboxItem>
+            <Menubar.CheckboxItem
+              className="flow-menu__item flow-menu__item--check"
               checked={props.isQuickbarVisible ?? true}
               onCheckedChange={() => props.onToggleQuickbar?.()}
             >
@@ -270,6 +288,13 @@ export function MenuBar(props: MenuBarProps) {
               onSelect={() => props.onDockToolbar?.()}
             >
               Dock Toolbar
+            </Menubar.Item>
+            <Menubar.Item
+              className="flow-menu__item"
+              disabled={!props.isShapebarFloating}
+              onSelect={() => props.onDockShapebar?.()}
+            >
+              Dock Shapebar
             </Menubar.Item>
             <Menubar.Item
               className="flow-menu__item"

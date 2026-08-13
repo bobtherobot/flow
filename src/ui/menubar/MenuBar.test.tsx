@@ -205,4 +205,22 @@ describe("MenuBar", () => {
     await user.click(await screen.findByRole("menuitemcheckbox", { name: "Arrow Binding" }));
     expect(onToggleArrowBinding).toHaveBeenCalledOnce();
   });
+
+  it("toggles the shapebar from the View menu", async () => {
+    const user = userEvent.setup();
+    const onToggleShapebar = vi.fn();
+    render(<MenuBar {...props} isShapebarVisible onToggleShapebar={onToggleShapebar} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Show Shapebar" }));
+    expect(onToggleShapebar).toHaveBeenCalled();
+  });
+
+  it("offers Dock Shapebar only while the shapebar floats", async () => {
+    const user = userEvent.setup();
+    render(<MenuBar {...props} isShapebarFloating={false} />);
+    await user.click(screen.getByRole("menuitem", { name: "View" }));
+    expect(screen.getByRole("menuitem", { name: "Dock Shapebar" })).toHaveAttribute(
+      "data-disabled",
+    );
+  });
 });

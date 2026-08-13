@@ -23,7 +23,7 @@ function fakeApi() {
 
 function renderRails(
   toolbar = DEFAULT_TOOLBAR_STATE,
-  shapebar = { ...DEFAULT_SHAPEBAR_STATE, visible: false },
+  shapebar = DEFAULT_SHAPEBAR_STATE,
 ) {
   return render(
     <ToolRails
@@ -48,13 +48,16 @@ describe("ToolRails", () => {
   });
 
   it("reserves the gutter for the docked rails", () => {
-    renderRails();
+    renderRails(DEFAULT_TOOLBAR_STATE, { ...DEFAULT_SHAPEBAR_STATE, visible: false });
     expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
       .toBe("44px");
   });
 
   it("reserves nothing when the toolbar is floating", () => {
-    renderRails({ ...DEFAULT_TOOLBAR_STATE, floating: true });
+    renderRails(
+      { ...DEFAULT_TOOLBAR_STATE, floating: true },
+      { ...DEFAULT_SHAPEBAR_STATE, visible: false },
+    );
     expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
       .toBe("0px");
   });
@@ -69,5 +72,40 @@ describe("ToolRails", () => {
     const color = content.querySelector(".flow-toolbar__color");
     expect(color).toBeInTheDocument();
     expect(tools.compareDocumentPosition(color!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe("two rails", () => {
+  it("mounts the shapebar with the shape tools and no color control", () => {
+    renderRails();
+    const shapes = screen.getByRole("toolbar", { name: "Shapes" });
+    expect(shapes.querySelector(".flow-toolbar__color")).toBeNull();
+    expect(
+      screen.getByRole("toolbar", { name: "Shapes" }).querySelector(".flow-toolbar__tools"),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the shape tools out of the toolbar", () => {
+    renderRails();
+    const tools = screen.getByRole("toolbar", { name: "Tools" });
+    expect(tools.textContent).not.toContain("Rectangle");
+  });
+
+  it("reserves both widths when both are docked", () => {
+    renderRails();
+    expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
+      .toBe("124px");
+  });
+
+  it("docks the shapebar clear of the toolbar", () => {
+    const { container } = renderRails();
+    const shapes = container.querySelectorAll<HTMLElement>(".flow-toolbar")[1];
+    expect(shapes.style.left).toBe("44px");
+  });
+
+  it("slides the shapebar to the edge when the toolbar is hidden", () => {
+    const { container } = renderRails({ ...DEFAULT_TOOLBAR_STATE, visible: false });
+    const shapes = container.querySelector<HTMLElement>(".flow-toolbar")!;
+    expect(shapes.style.left).toBe("0px");
   });
 });

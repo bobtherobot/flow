@@ -13,6 +13,7 @@ import { loadConfig } from "./app/config";
 import {
   getSloppiness, setSloppiness, getUnits, setUnits,
   getToolbarState, setToolbarState,
+  getShapebarState, setShapebarState,
   getQuickbarState, setQuickbarState,
   getBottombarState, setBottombarState,
   getBindingMode, setBindingMode,
@@ -51,7 +52,7 @@ import { MenuBar } from "./ui/menubar/MenuBar";
 import { PanelsRoot } from "./ui/panels/PanelsRoot";
 import { ToolRails } from "./ui/toolbar/ToolRails";
 import { railGutter } from "./ui/toolbar/rail-layout";
-import { DEFAULT_TOOLBAR_STATE, type ToolbarState } from "./ui/toolbar/toolbar-state";
+import { DEFAULT_TOOLBAR_STATE, DEFAULT_SHAPEBAR_STATE, type ToolbarState } from "./ui/toolbar/toolbar-state";
 import { QuickBar } from "./ui/quickbar/QuickBar";
 import { DEFAULT_QUICKBAR_STATE, type QuickbarState } from "./ui/quickbar/quickbar-state";
 import { BottomBar } from "./ui/bottombar/BottomBar";
@@ -67,11 +68,6 @@ import { useStyleMemory } from "./ui/useStyleMemory";
 import { useToolOverride } from "./ui/toolbar/useToolOverride";
 
 const AUTOSAVE_DELAY_MS = 800;
-
-/** Placeholder for the not-yet-wired shapebar (Task 7 replaces it with real
- *  state). Absent, so `railGutter` reserves the toolbar's width alone —
- *  exactly what App reserved before. */
-const NO_SHAPEBAR: ToolbarState = { ...DEFAULT_TOOLBAR_STATE, visible: false };
 
 /** The element list Excalidraw hands `onChange` on every scene update. */
 type SceneChangeElements = Parameters<
@@ -121,6 +117,13 @@ export default function App() {
     setToolbarState(toolbar);
   }, [toolbar]);
 
+  // Shapebar layout/config. Same ownership pattern as the tool rail: App owns it
+  // so the View menu can read visibility. Persisted to flow.shapebar.
+  const [shapebar, setShapebar] = useState<ToolbarState>(() => getShapebarState());
+  useEffect(() => {
+    setShapebarState(shapebar);
+  }, [shapebar]);
+
   // Quick-actions-bar layout/config. Same ownership pattern as the tool rail:
   // App owns it so the View menu can read visibility. Persisted to flow.quickbar.
   const [quickbar, setQuickbar] = useState<QuickbarState>(() => getQuickbarState());
@@ -140,6 +143,7 @@ export default function App() {
   // default spot rather than wherever it was last dragged).
   const handleResetLayout = () => {
     setToolbar({ ...DEFAULT_TOOLBAR_STATE, hiddenTools: [...DEFAULT_TOOLBAR_STATE.hiddenTools] });
+    setShapebar({ ...DEFAULT_SHAPEBAR_STATE, hiddenTools: [...DEFAULT_SHAPEBAR_STATE.hiddenTools] });
     setQuickbar({ ...DEFAULT_QUICKBAR_STATE, hiddenItems: [...DEFAULT_QUICKBAR_STATE.hiddenItems] });
     setBottombar({ ...DEFAULT_BOTTOMBAR_STATE, hiddenItems: [...DEFAULT_BOTTOMBAR_STATE.hiddenItems] });
   };
@@ -407,6 +411,10 @@ export default function App() {
         onToggleToolbar={() => setToolbar((s) => ({ ...s, visible: !s.visible }))}
         isToolbarFloating={toolbar.floating}
         onDockToolbar={() => setToolbar((s) => ({ ...s, floating: false }))}
+        isShapebarVisible={shapebar.visible}
+        onToggleShapebar={() => setShapebar((s) => ({ ...s, visible: !s.visible }))}
+        isShapebarFloating={shapebar.floating}
+        onDockShapebar={() => setShapebar((s) => ({ ...s, floating: false }))}
         isQuickbarVisible={quickbar.visible}
         onToggleQuickbar={() => setQuickbar((s) => ({ ...s, visible: !s.visible }))}
         isQuickbarFloating={quickbar.floating}
@@ -452,14 +460,12 @@ export default function App() {
         <PanelsRoot api={excalidrawApi} units={units} search={search} />
       </div>
 
-      {/* Task 5 scaffold: the shapebar is not wired until Task 7, so it is
-          passed as absent and its onChange is a no-op. */}
       <ToolRails
         api={excalidrawApi}
         toolbar={toolbar}
         onToolbarChange={setToolbar}
-        shapebar={NO_SHAPEBAR}
-        onShapebarChange={() => {}}
+        shapebar={shapebar}
+        onShapebarChange={setShapebar}
       />
 
       <QuickBar
@@ -475,7 +481,7 @@ export default function App() {
         state={bottombar}
         onChange={setBottombar}
         onSearch={runSearch}
-        toolbarReserved={railGutter(toolbar, NO_SHAPEBAR)}
+        toolbarReserved={railGutter(toolbar, shapebar)}
       />
 
       {saveOpen && (
