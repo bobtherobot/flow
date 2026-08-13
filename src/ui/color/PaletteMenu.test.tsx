@@ -113,6 +113,53 @@ describe("PaletteMenu", () => {
     expect(h.onClose).not.toHaveBeenCalled();
   });
 
+  it("focuses its first item on open", () => {
+    // The menu portals to <body>, so its items are last in document order and
+    // Tab will not reach them without walking the whole application first.
+    setup();
+    expect(document.activeElement).toBe(screen.getByRole("menuitem", { name: ITEMS[0] }));
+  });
+
+  it("cycles focus with the arrow keys, inert items included", () => {
+    // Landing on an inert item is the point of aria-disabled over `disabled`:
+    // skipping it would leave the user unable to discover why it is inert.
+    setup({ hasSelection: false });
+    const menu = screen.getByRole("menu");
+    const item = (label: string) => screen.getByRole("menuitem", { name: label });
+
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(item(ITEMS[1]));
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(item(ITEMS[0]));
+    // Up from the first item wraps to the last, which is inert here.
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(item(ITEMS[4]));
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(item(ITEMS[0]));
+    fireEvent.keyDown(menu, { key: "End" });
+    expect(document.activeElement).toBe(item(ITEMS[4]));
+    fireEvent.keyDown(menu, { key: "Home" });
+    expect(document.activeElement).toBe(item(ITEMS[0]));
+  });
+
+  it("returns focus to returnFocusTo on Escape", () => {
+    const gear = document.createElement("button");
+    document.body.appendChild(gear);
+    setup({ returnFocusTo: { current: gear } });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(document.activeElement).toBe(gear);
+    gear.remove();
+  });
+
+  it("returns focus to returnFocusTo on an outside press", () => {
+    const gear = document.createElement("button");
+    document.body.appendChild(gear);
+    setup({ returnFocusTo: { current: gear } });
+    fireEvent.pointerDown(document.body);
+    expect(document.activeElement).toBe(gear);
+    gear.remove();
+  });
+
   it("ignores a press on the gear trigger, so the toggle's close branch stays reachable", () => {
     // The gear lives outside this portal. Without the `.closest` guard in the
     // pointerdown handler, a press on it would close the menu here, and the

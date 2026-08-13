@@ -119,9 +119,11 @@ export function PaletteDialog({
     const last = focusable[focusable.length - 1];
     // The container counts as the first boundary. When the body has nothing
     // focusable the container is what holds focus on open (see above), and it
-    // is in the focusable list at neither end — so comparing against `first`
-    // alone leaves Shift+Tab as the very first keystroke unhandled, and focus
-    // walks backward out of the dialog into the page behind the backdrop.
+    // is not in `focusable` at all — `querySelectorAll` only returns
+    // descendants, and `[tabindex="-1"]` is excluded regardless — so comparing
+    // against `first` alone leaves Shift+Tab as the very first keystroke
+    // unhandled, and focus walks backward out of the dialog into the page
+    // behind the backdrop.
     // Forward Tab needs no equivalent: the container precedes its own children
     // in DOM order, so the browser already lands on `first`.
     const atFirst = document.activeElement === first || document.activeElement === container;

@@ -392,6 +392,77 @@ describe("the palette gear menu", () => {
     expect(document.activeElement).toBe(gear);
   });
 
+  it("moves focus into the menu when it opens", () => {
+    // The menu portals to <body>, so its items come after every other
+    // focusable element in the document. Leaving focus on the gear makes them
+    // reachable only by tabbing through the whole application.
+    setup();
+    openMenu();
+    expect(document.activeElement).toBe(
+      screen.getByRole("menuitem", { name: "Rename palette…" }),
+    );
+  });
+
+  it("hands focus back to the gear when the menu is dismissed with Escape", () => {
+    setup();
+    const gear = screen.getByRole("button", { name: "Palette actions" });
+    gear.focus();
+    fireEvent.click(gear);
+    // Explicit, so this test still fails if only the return path breaks: with
+    // focus left sitting on the gear, "focus is on the gear afterwards" is
+    // true for free.
+    screen.getByRole("menuitem", { name: "Add palette…" }).focus();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(document.activeElement).toBe(gear);
+  });
+
+  it("hands focus back to the gear after deleting the selected swatches", () => {
+    // The one action with no dialog, so nothing else mounts to claim focus —
+    // and the item that was focused is unmounted by the same click.
+    setup();
+    selectFirstSwatch();
+    const gear = screen.getByRole("button", { name: "Palette actions" });
+    gear.focus();
+    fireEvent.click(gear);
+    const item = screen.getByRole("menuitem", { name: "Delete selected swatches" });
+    item.focus(); // load-bearing: fireEvent.click does not move focus in jsdom
+    fireEvent.click(item);
+    expect(document.activeElement).toBe(gear);
+  });
+
+  it("does not delete the selected swatches when a key is pressed inside a dialog", () => {
+    // React synthetic events bubble along the REACT tree, not the DOM tree, so
+    // every keystroke inside the portaled dialog still reaches the section
+    // root's onKeyDown. Without a guard there, Backspace on the delete-confirm
+    // dialog — whose container is its own initial focus target — deletes the
+    // swatches the dialog is sitting on top of. Palettes have no undo.
+    //
+    // This can only be seen in the composition: PaletteDialog's own suite has
+    // no grid handler above it, exactly like the focus-return bug.
+    setup();
+    selectFirstSwatch();
+    const before = swatches().length;
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete palette…" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete palette" });
+    expect(document.activeElement).toBe(dialog);
+    fireEvent.keyDown(dialog, { key: "Backspace" });
+    expect(swatches()).toHaveLength(before);
+  });
+
+  it("does not delete the selected swatches when a key is pressed on an open menu item", () => {
+    // Same mechanism as the dialog case: the menu portals to <body> but is a
+    // React child of the section, so its keystrokes bubble to the grid handler.
+    setup();
+    selectFirstSwatch();
+    const before = swatches().length;
+    openMenu();
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: "Rename palette…" }), {
+      key: "Backspace",
+    });
+    expect(swatches()).toHaveLength(before);
+  });
+
   it("no longer renames on double-click", () => {
     setup();
     fireEvent.doubleClick(screen.getByLabelText("Palette"));

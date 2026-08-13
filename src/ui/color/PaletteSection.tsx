@@ -17,6 +17,13 @@ import type { MenuPoint } from "../panels/dock/menu-position";
 import { PaletteMenu } from "./PaletteMenu";
 import { PaletteDialog } from "./PaletteDialog";
 
+type DialogKind = "rename" | "add" | "delete" | "copy";
+
+/** Which dialog is open. One field, not four booleans — they are mutually
+ *  exclusive by construction, and four flags admit states like "renaming and
+ *  deleting at once" that have no meaning. */
+type Dialog = null | { kind: DialogKind };
+
 interface PaletteSectionProps {
   /** The picker's live color, added by the grid's [+] tile. */
   currentColor: string;
@@ -51,10 +58,6 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   const [overTrash, setOverTrash] = useState(false);
   const dragFrom = useRef<number | null>(null);
 
-  /** Which dialog is open. One field, not four booleans — they are mutually
-   *  exclusive by construction, and four flags admit states like "renaming and
-   *  deleting at once" that have no meaning. */
-  type Dialog = null | { kind: "rename" | "add" | "delete" | "copy" };
   const [dialog, setDialog] = useState<Dialog>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -78,7 +81,7 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
 
   /** Closes the menu and opens the dialog in one step, so no action can leave
    *  both on screen at once. */
-  const openDialog = (kind: "rename" | "add" | "delete" | "copy") => {
+  const openDialog = (kind: DialogKind) => {
     setMenuOpen(false);
     setDialog({ kind });
   };
@@ -102,10 +105,19 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   };
 
   const onGridKeyDown = (e: React.KeyboardEvent) => {
+    // The menu and all four dialogs portal to <body>, but a portal only moves
+    // the DOM node — React synthetic events bubble along the REACT tree, so
+    // every keystroke inside them still arrives here. Without this guard,
+    // Backspace on a dialog's Cancel button (or on the delete-confirm
+    // dialog's own container, which is where its focus starts) deletes the
+    // swatches the dialog is sitting on top of, and palettes have no undo.
+    if (menuOpen || dialog) return;
     // Ignore keys typed into the palette select — only act on the grid
-    // itself. Copied from SwatchGrid's/SwatchesPanel's handling. (The rename
-    // field is no longer in here at all: its dialog portals to <body>, so its
-    // keystrokes never reach this handler.)
+    // itself. Copied from SwatchGrid's/SwatchesPanel's handling. Kept as
+    // defence in depth behind the guard above, and still load-bearing on its
+    // own terms: INPUT fires on every keystroke in the rename and add
+    // dialogs' name field, SELECT on the copy dialog's target picker and on
+    // this section's own palette dropdown, which is NOT behind any guard.
     const tag = (e.target as HTMLElement).tagName;
     if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
     if ((e.key === "Delete" || e.key === "Backspace") && selected.length > 0) {
@@ -232,6 +244,9 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
           hasSelection={selected.length > 0}
           canDeletePalette={current.id !== RECENT_PALETTE_ID}
           canCopy={palettes.length > 1}
+          // The menu portals to <body>, so focus opened inside it has nowhere
+          // sane to fall back to. Escape and an outside press send it here.
+          returnFocusTo={gearRef}
           onRename={() => {
             setDraftName(current.name);
             openDialog("rename");
@@ -242,11 +257,15 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
           }}
           onDeletePalette={() => openDialog("delete")}
           // The only action that needs no dialog: it is undoable by re-adding
-          // the color, and the selection itself is the confirmation.
+          // the color, and the selection itself is the confirmation. Being
+          // the one path that does not go through `openDialog`, it is also the
+          // one that has to return focus itself — no dialog mounts to take it,
+          // and the item holding focus is about to be unmounted.
           onDeleteSwatches={() => {
             removeSwatches(current.id, selected);
             setSelected([]);
             setMenuOpen(false);
+            gearRef.current?.focus();
           }}
           onCopy={() => {
             setCopyTarget(others[0]?.id ?? "");
@@ -275,7 +294,7 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
           onCancel={() => setDialog(null)}
         >
           <input
-            className="flow-clr-palette__name"
+            className="flow-input flow-clr-palette__name"
             aria-label="Palette name"
             autoFocus
             value={draftName}
@@ -299,7 +318,7 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
           onCancel={() => setDialog(null)}
         >
           <input
-            className="flow-clr-palette__name"
+            className="flow-input flow-clr-palette__name"
             aria-label="Palette name"
             autoFocus
             value={draftName}
@@ -343,7 +362,7 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
           onCancel={() => setDialog(null)}
         >
           <select
-            className="flow-clr-palette__select"
+            className="flow-input flow-clr-palette__select"
             aria-label="Target palette"
             autoFocus
             value={copyTarget}

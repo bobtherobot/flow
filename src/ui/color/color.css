@@ -308,7 +308,10 @@
   gap: 6px;
 }
 
-/* Takes the footer row's leftover width beside the gear. */
+/* Two `<select>`s wear this: the footer row's palette picker, where it takes
+   the leftover width beside the gear, and the copy dialog's target picker,
+   where the dialog body is a flex column and the same rule instead lets it
+   stretch to the dialog width without forcing it wider than the dialog. */
 .flow-clr-palette__select {
   flex: 1 1 auto;
   min-width: 0;
@@ -531,12 +534,24 @@
   background: var(--flow-panel-bg);
   border: 1px solid var(--flow-border);
   border-radius: var(--flow-radius-md);
+  /* The remaining three complete the match with `.flow-pnl-config`, whose
+     look this menu is meant to be indistinguishable from. Without the shadow
+     it is the only overlay in the app floating flat over the canvas, and
+     without the font it inherits nothing useful — a portal to <body> means
+     the panel's typography never reaches it. */
+  box-shadow: var(--flow-shadow);
+  font-family: var(--flow-font);
+  font-size: 12px;
 }
 
 .flow-clr-palette__menuitem {
   padding: 6px 10px;
   border: 0;
   background: none;
+  /* `<button>` does not inherit font from its ancestors — without this the
+     five items render in the browser's default control font inside a menu
+     that has just set the app's. Same rule `.flow-pnl-config__action` has. */
+  font: inherit;
   text-align: left;
   color: var(--flow-ink);
   cursor: pointer;

@@ -74,7 +74,7 @@ describe("PaletteDialog", () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
-  it("submits on Enter inside the body", () => {
+  it("confirms on form submit", () => {
     const { onConfirm } = setup();
     fireEvent.submit(screen.getByTestId("palette-dialog-form"));
     expect(onConfirm).toHaveBeenCalledTimes(1);
@@ -157,8 +157,9 @@ describe("PaletteDialog", () => {
 
   it("wraps Shift+Tab from the container itself to the last focusable element", () => {
     // The delete-confirm dialog's body is a single <p>, so open focus lands on
-    // the container. The container is in neither boundary position, so a trap
-    // that only compares against first/last no-ops on the very first keystroke
+    // the container. The container is not in the focusable list at all — it is
+    // the element being queried, and tabindex="-1" is excluded anyway — so a
+    // trap that only compares against first/last no-ops on the very first keystroke
     // and lets Shift+Tab walk backward out into the page behind the backdrop —
     // exactly what aria-modal="true" promises cannot happen.
     render(
