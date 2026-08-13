@@ -3,7 +3,6 @@ import "./toolbar.css";
 import { PartChooser } from "../color/PartChooser";
 import { useColorTarget, type ColorTarget } from "../color/useColorTarget";
 import { ColorPopup } from "./ColorPopup";
-import { TOOL_RAIL_WIDTH } from "./rail-layout";
 import { recordUsedColor } from "../../lib/palette-store";
 import type { MenuPoint } from "../panels/dock/menu-position";
 import type { SelectionStyle } from "../panels/useSelectionStyle";
@@ -25,7 +24,22 @@ const POPUP_GAP = 8;
  * identical `setPart(part)` call and `PartChooser` cannot be changed to tell
  * them apart itself.
  */
-export function RailColorControl({ sel }: { sel: SelectionStyle }) {
+interface RailColorControlProps {
+  sel: SelectionStyle;
+  /**
+   * Where the popup's left edge should land when the toolbar is docked: the
+   * full rail gutter (`railGutter(toolbar, shapebar)`), not this control's
+   * own right edge. Docked, `.flow-toolbar__color` is a stretched child of a
+   * ~43px-wide box, so anchoring off its own edge lands the 280px-wide popup
+   * squarely on top of the docked shapebar (x≈44..124), leaving only a
+   * sliver of it clickable. `null` when the toolbar is floating — there the
+   * popup should stay visually attached to the rail the user is holding, so
+   * the old own-edge anchor is correct and unchanged.
+   */
+  dockedPopupLeft: number | null;
+}
+
+export function RailColorControl({ sel, dockedPopupLeft }: RailColorControlProps) {
   const target = useColorTarget(sel);
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -76,7 +90,13 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
 
   const anchor = (): MenuPoint => {
     const r = wrapRef.current?.getBoundingClientRect();
-    return { top: r?.top ?? 0, left: (r?.right ?? TOOL_RAIL_WIDTH) + POPUP_GAP };
+    if (dockedPopupLeft !== null) {
+      // Docked: clear the outermost docked rail (the gutter) rather than
+      // this control's own right edge, so the popup never lands on top of a
+      // docked shapebar.
+      return { top: r?.top ?? 0, left: dockedPopupLeft };
+    }
+    return { top: r?.top ?? 0, left: (r?.right ?? 0) + POPUP_GAP };
   };
 
   const closePopup = () => {

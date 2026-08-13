@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { railButton, dragGrip } from "./helpers/rails";
 
 test.describe("vertical tool bar", () => {
   test("renders docked on the left, below the menu bar", async ({ page }) => {
@@ -199,5 +200,21 @@ test.describe("vertical tool bar", () => {
     expect(
       Math.abs((floatColor.y - floatRail.y) - (dockedColor.y - dockedRail.y)),
     ).toBeLessThanOrEqual(1);
+  });
+
+  test("the rail color popup does not blanket the docked shapebar", async ({ page }) => {
+    // Regression test: the popup used to anchor off the color control's own
+    // (~43px) right edge, which docked put its 280px-wide body squarely over
+    // the docked shapebar's entire x=44..124 span, leaving only a ~4px sliver
+    // of it clickable. Prove a shape tool is actually reachable through it —
+    // a click landing "successfully" by luck of hit-testing order would not
+    // catch this, so assert the tool actually activates.
+    await page.goto("/");
+    await page.locator(".flow-toolbar__color").getByRole("radio", { name: /Fill/ }).click();
+    await expect(page.locator(".flow-clr-popup")).toBeVisible();
+
+    const rect = railButton(page, "Rectangle");
+    await rect.click();
+    await expect(rect).toHaveAttribute("aria-pressed", "true");
   });
 });

@@ -102,30 +102,50 @@ beforeEach(() => {
 
 describe("RailColorControl", () => {
   it("renders the compact part chooser", () => {
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     expect(screen.getByRole("radiogroup", { name: /color target/i })).toBeInTheDocument();
   });
 
   it("keeps the popup closed initially", () => {
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     expect(screen.queryByRole("dialog", { name: /color picker/i })).not.toBeInTheDocument();
   });
 
+  it("anchors the popup at the rail gutter when docked, clear of the shapebar", () => {
+    // Regression test for the popup blanketing the docked shapebar: docked,
+    // the popup must not anchor off this control's own (~43px) right edge —
+    // it must clear the full gutter (both docked rails) instead.
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={124} />);
+    fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
+    const dialog = screen.getByRole("dialog", { name: /color picker/i });
+    expect(dialog.style.left).toBe("124px");
+  });
+
+  it("anchors the popup off its own right edge when floating", () => {
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
+    fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
+    const dialog = screen.getByRole("dialog", { name: /color picker/i });
+    // jsdom reports a zero-size bounding rect, so the own-edge anchor
+    // collapses to exactly the popup gap — distinctly not the docked gutter
+    // value above, proving the two branches are actually different code paths.
+    expect(dialog.style.left).toBe("8px");
+  });
+
   it("opens the popup from the active box", () => {
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
     expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
   });
 
   it("switches part rather than opening when a back box is clicked", () => {
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     fireEvent.click(screen.getByRole("radio", { name: /stroke/i }));
     expect(screen.queryByRole("dialog", { name: /color picker/i })).not.toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /stroke/i })).toBeChecked();
   });
 
   it("shows the picker controls but no palette dropdown", () => {
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
     expect(screen.getByRole("application", { name: /saturation/i })).toBeInTheDocument();
     expect(screen.getByRole("slider", { name: /hue/i })).toBeInTheDocument();
@@ -135,7 +155,7 @@ describe("RailColorControl", () => {
   });
 
   it("renders six recent slots", () => {
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
     expect(screen.getAllByRole("button", { name: /recent color slot/i })).toHaveLength(
       RECENT_STRIP_SLOTS,
@@ -145,7 +165,7 @@ describe("RailColorControl", () => {
   it("fills slots from the Recent palette and applies one on click", () => {
     recordUsedColor("#00ff00");
     const sel = fakeSel();
-    render(<RailColorControl sel={sel} />);
+    render(<RailColorControl sel={sel} dockedPopupLeft={null} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
     fireEvent.click(screen.getByRole("button", { name: "Recent color #00ff00" }));
     // Asserting only `toHaveBeenCalled()` would pass even if the wrong recent
@@ -159,14 +179,14 @@ describe("RailColorControl", () => {
   });
 
   it("closes on Escape", () => {
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: /color picker/i })).not.toBeInTheDocument();
   });
 
   it("returns focus to the active box after Escape", () => {
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     const fillBox = screen.getByRole("radio", { name: /fill/i });
     fireEvent.click(fillBox);
     fireEvent.keyDown(window, { key: "Escape" });
@@ -177,7 +197,7 @@ describe("RailColorControl", () => {
     render(
       <>
         <button>outside</button>
-        <RailColorControl sel={fakeSel()} />
+        <RailColorControl sel={fakeSel()} dockedPopupLeft={null} />
       </>,
     );
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
@@ -186,7 +206,7 @@ describe("RailColorControl", () => {
   });
 
   it("closes from the X button", () => {
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
     fireEvent.click(screen.getByRole("button", { name: /close color picker/i }));
     expect(screen.queryByRole("dialog", { name: /color picker/i })).not.toBeInTheDocument();
@@ -201,7 +221,7 @@ describe("RailColorControl", () => {
       elements: [textEl] as unknown as SelectionStyle["elements"],
       selectedIds: { t1: true },
     });
-    render(<RailColorControl sel={sel} />);
+    render(<RailColorControl sel={sel} dockedPopupLeft={null} />);
     const radio = screen.getByRole("radio", { name: /text/i });
     radio.focus();
     fireEvent.keyDown(radio, { key: "ArrowRight" });
@@ -209,7 +229,7 @@ describe("RailColorControl", () => {
   });
 
   it("still switches part on arrow-key navigation among multiple parts", () => {
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     const fillBox = screen.getByRole("radio", { name: /fill/i });
     fillBox.focus();
     fireEvent.keyDown(fillBox, { key: "ArrowRight" });
@@ -222,7 +242,7 @@ describe("RailColorControl", () => {
     // invisible to a click-only test: the popup's outside-press handler closes
     // on pointerdown (the trigger box lives outside the portal) and the click
     // that follows then reopens it, making the toggle's close branch dead.
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     const box = screen.getByRole("radio", { name: /fill/i });
     fireEvent.click(box);
     expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
@@ -235,7 +255,7 @@ describe("RailColorControl", () => {
     // The chips sit outside the radiogroup, so an arrow key pressed there has
     // no setPart call to consume the arrow-nav flag; if it latched, the next
     // click on the active box would be silently eaten.
-    render(<RailColorControl sel={fakeSel()} />);
+    render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     fireEvent.keyDown(screen.getByRole("button", { name: /^white$/i }), { key: "ArrowRight" });
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
     expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
@@ -245,7 +265,7 @@ describe("RailColorControl", () => {
     // Opening the popup itself does not open a pick — only its eyedropper
     // button does. Unmounting without ever clicking it must not touch the
     // shared atom at all.
-    const { unmount } = render(<RailColorControl sel={fakeSel()} />);
+    const { unmount } = render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
     expect(screen.getByRole("dialog", { name: /color picker/i })).toBeInTheDocument();
     expect(store.set).not.toHaveBeenCalled();
@@ -260,7 +280,7 @@ describe("RailColorControl", () => {
     // vendor's own handlers. This is the case those don't cover: something
     // else (View ▸ Show Toolbar hiding the whole rail, a selection change that
     // tears down the tree) unmounts the popup out from under a pending pick.
-    const { unmount } = render(<RailColorControl sel={fakeSel()} />);
+    const { unmount } = render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
     fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
     const dialog = screen.getByRole("dialog", { name: /color picker/i });
 
@@ -311,7 +331,7 @@ describe("recording the popup session's color", () => {
   const openPopup = () => fireEvent.click(screen.getByRole("radio", { name: /fill/i }));
 
   it("records nothing when the popup is opened and closed untouched", () => {
-    render(<RailColorControl sel={satSel()} />);
+    render(<RailColorControl sel={satSel()} dockedPopupLeft={null} />);
     openPopup();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(getRecentPaletteColors()).toEqual([]);
@@ -320,14 +340,14 @@ describe("recording the popup session's color", () => {
   it("records nothing while the popup is still open", () => {
     // The whole point of the deferral: a color joins the list when the session
     // ends, not while the user is still hunting for it.
-    render(<RailColorControl sel={satSel()} />);
+    render(<RailColorControl sel={satSel()} dockedPopupLeft={null} />);
     openPopup();
     nudgeHue(30);
     expect(getRecentPaletteColors()).toEqual([]);
   });
 
   it("records the color on close", () => {
-    render(<RailColorControl sel={satSel()} />);
+    render(<RailColorControl sel={satSel()} dockedPopupLeft={null} />);
     openPopup();
     nudgeHue(30);
     fireEvent.click(screen.getByRole("button", { name: /close color picker/i }));
@@ -336,7 +356,7 @@ describe("recording the popup session's color", () => {
 
   it("records exactly one color for a session of many distinct writes", () => {
     // 60 arrow presses, 60 distinct hexes, one entry.
-    render(<RailColorControl sel={satSel()} />);
+    render(<RailColorControl sel={satSel()} dockedPopupLeft={null} />);
     openPopup();
     nudgeHue(60);
     fireEvent.keyDown(window, { key: "Escape" });
@@ -348,7 +368,7 @@ describe("recording the popup session's color", () => {
     // hexes that must NOT be recorded), then click the seeded slot last. If
     // any write but the last were recorded, the palette would grow.
     recordUsedColor("#0000ff");
-    render(<RailColorControl sel={satSel()} />);
+    render(<RailColorControl sel={satSel()} dockedPopupLeft={null} />);
     openPopup();
     nudgeHue(40);
     fireEvent.click(screen.getByRole("button", { name: "Recent color #0000ff" }));
@@ -359,7 +379,7 @@ describe("recording the popup session's color", () => {
   it("records the hue color when the drag is what comes last", () => {
     // The mirror of the test above, so neither can pass by ordering accident.
     recordUsedColor("#0000ff");
-    render(<RailColorControl sel={satSel()} />);
+    render(<RailColorControl sel={satSel()} dockedPopupLeft={null} />);
     openPopup();
     fireEvent.click(screen.getByRole("button", { name: "Recent color #0000ff" }));
     nudgeHue(40);
@@ -369,11 +389,11 @@ describe("recording the popup session's color", () => {
   });
 
   it("records on an unmount while the popup is still open", () => {
-    // Not the Escape/outside-click path. View ▸ Show Toolbar makes ToolBar
+    // Not the Escape/outside-click path. View ▸ Show Toolbar makes ToolRail
     // return null, unmounting this component with the popup open — the same
     // hazard cancelEyeDropper guards in this file. A session's color must not
     // be lost to it.
-    const { unmount } = render(<RailColorControl sel={satSel()} />);
+    const { unmount } = render(<RailColorControl sel={satSel()} dockedPopupLeft={null} />);
     openPopup();
     nudgeHue(45);
     unmount();
@@ -389,7 +409,7 @@ describe("recording the popup session's color", () => {
     // firing at all. If recordUsedColor ever gains ranking or append-then-trim
     // semantics, this stops being equivalent and should assert the call count
     // instead.
-    const { unmount } = render(<RailColorControl sel={satSel()} />);
+    const { unmount } = render(<RailColorControl sel={satSel()} dockedPopupLeft={null} />);
     openPopup();
     nudgeHue(45);
     fireEvent.keyDown(window, { key: "Escape" });
@@ -403,7 +423,7 @@ describe("recording the popup session's color", () => {
     // The active box toggles `open` directly and never reaches `closePopup` —
     // the most common way of closing the popup, and the one a flush wired only
     // into `closePopup` would silently miss.
-    render(<RailColorControl sel={satSel()} />);
+    render(<RailColorControl sel={satSel()} dockedPopupLeft={null} />);
     const box = screen.getByRole("radio", { name: /fill/i });
     fireEvent.click(box);
     nudgeHue(30);
@@ -417,7 +437,7 @@ describe("recording the popup session's color", () => {
     // The quartet chips sit on the rail, outside the popup, and already
     // deliberately skip recording — white/grey/black have permanent chips one
     // click away, so caching them would evict colors the user actually chose.
-    const { unmount } = render(<RailColorControl sel={satSel()} />);
+    const { unmount } = render(<RailColorControl sel={satSel()} dockedPopupLeft={null} />);
     fireEvent.click(screen.getByRole("button", { name: /^white$/i }));
     unmount();
     expect(getRecentPaletteColors()).toEqual([]);

@@ -95,7 +95,7 @@ beforeEach(() => {
 describe("eyedropper ownership across the two picker surfaces", () => {
   it("the rail popup's unmount does not clobber a pick the Color panel opened", () => {
     const panel = render(<ColorPanel sel={fakeSel()} />);
-    const rail = render(<RailColorControl sel={fakeSel()} />);
+    const rail = render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
 
     fireEvent.click(within(panel.container).getByRole("button", pickBtn));
     expect(store.set).toHaveBeenCalledTimes(1);
@@ -130,7 +130,7 @@ describe("eyedropper ownership across the two picker surfaces", () => {
 
   it("the Color panel's unmount does not clobber a pick the rail popup opened", () => {
     const panel = render(<ColorPanel sel={fakeSel()} />);
-    const rail = render(<RailColorControl sel={fakeSel()} />);
+    const rail = render(<RailColorControl sel={fakeSel()} dockedPopupLeft={null} />);
 
     // Open the rail popup, then its eyedropper. The popup itself renders via
     // a portal to document.body (see ColorPopup.tsx), not inside

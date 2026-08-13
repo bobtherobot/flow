@@ -40,17 +40,24 @@ export function ToolRails({
   onShapebarChange,
 }: ToolRailsProps) {
   const sel = useSelectionStyle(api);
+  const gutter = railGutter(toolbar, shapebar);
 
   // Reserve the left gutter so the canvas insets around the docked rails
   // (keeping Excalidraw's bottom-left zoom/undo controls clear). Single writer:
   // ToolRail is mounted twice and would otherwise race over this one variable.
+  //
+  // Depends on the computed `gutter` number, not `[toolbar, shapebar]`: a
+  // floating rail's `onMove` mints a new state object on every pointermove,
+  // so depending on the whole objects reran this effect's
+  // removeProperty+setProperty pair every frame of a drag even though the
+  // gutter (unaffected by x/y while floating) never changed.
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--flow-toolbar-reserved", `${railGutter(toolbar, shapebar)}px`);
+    root.style.setProperty("--flow-toolbar-reserved", `${gutter}px`);
     return () => {
       root.style.removeProperty("--flow-toolbar-reserved");
     };
-  }, [toolbar, shapebar]);
+  }, [gutter]);
 
   return (
     <>
@@ -64,7 +71,9 @@ export function ToolRails({
         dockLeft={0}
         state={toolbar}
         onChange={onToolbarChange}
-        footer={<RailColorControl sel={sel} />}
+        footer={
+          <RailColorControl sel={sel} dockedPopupLeft={toolbar.floating ? null : gutter} />
+        }
       />
       <ToolRail
         api={api}

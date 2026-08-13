@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { ToolRails } from "./ToolRails";
 import { DEFAULT_TOOLBAR_STATE, DEFAULT_SHAPEBAR_STATE } from "./toolbar-state";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
@@ -60,6 +61,17 @@ describe("ToolRails", () => {
     );
     expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
       .toBe("0px");
+  });
+
+  it("anchors the color popup at the full gutter when both rails are docked", () => {
+    // Regression test for the popup blanketing the docked shapebar: with both
+    // rails docked the gutter is 124 (44 + 80), and that — not the color
+    // control's own ~43px-wide right edge — must be what the popup anchors
+    // against.
+    const { container } = renderRails();
+    fireEvent.click(container.querySelector('[role="radio"][aria-checked="true"]')!);
+    const dialog = screen.getByRole("dialog", { name: /color picker/i });
+    expect(dialog.style.left).toBe("124px");
   });
 
   it("puts the color control inside the content box, after the tool grid", () => {
