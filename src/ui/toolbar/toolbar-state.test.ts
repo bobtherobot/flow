@@ -4,6 +4,7 @@ import {
   normalizeToolbarState,
   withHiddenToggled,
   shouldRedock,
+  type ToolbarState,
 } from "./toolbar-state";
 
 describe("normalizeToolbarState", () => {
@@ -22,6 +23,40 @@ describe("normalizeToolbarState", () => {
     expect(normalizeToolbarState({ hiddenTools: ["frame", 5, "image"] }).hiddenTools)
       .toEqual(["frame", "image"]);
     expect(normalizeToolbarState({ hiddenTools: "frame" }).hiddenTools).toEqual([]);
+  });
+
+  describe("with a caller-supplied defaults object", () => {
+    // Deliberately distinguishable from DEFAULT_TOOLBAR_STATE on every field,
+    // so a version of `normalizeToolbarState` that silently fell back to the
+    // hardcoded toolbar default (the bug this parameter exists to prevent)
+    // would fail every assertion below rather than passing by coincidence —
+    // unlike `getShapebarState`'s own junk-payload test, whose default
+    // happens to be structurally identical to the toolbar's.
+    const otherDefaults: ToolbarState = {
+      visible: false,
+      floating: true,
+      x: 77,
+      y: 88,
+      hiddenTools: ["laser"],
+    };
+
+    it("returns the supplied defaults, not DEFAULT_TOOLBAR_STATE, for null/garbage", () => {
+      expect(normalizeToolbarState(undefined, otherDefaults)).toEqual(otherDefaults);
+      expect(normalizeToolbarState("nope", otherDefaults)).toEqual(otherDefaults);
+    });
+
+    it("fills missing fields from the supplied defaults, not the toolbar's", () => {
+      expect(normalizeToolbarState({ x: 5 }, otherDefaults)).toEqual({
+        ...otherDefaults,
+        x: 5,
+      });
+    });
+
+    it("falls back to the supplied defaults' hiddenTools when the field is invalid", () => {
+      expect(normalizeToolbarState({ hiddenTools: "nope" }, otherDefaults).hiddenTools).toEqual([
+        "laser",
+      ]);
+    });
   });
 });
 

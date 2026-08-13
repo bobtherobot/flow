@@ -1,6 +1,10 @@
 import { DEFAULT_SLOPPINESS, isSloppiness, type Sloppiness } from "../lib/roughness";
 import { DEFAULT_UNIT, isUnit, type Unit } from "../lib/units";
-import { normalizeToolbarState, type ToolbarState } from "../ui/toolbar/toolbar-state";
+import {
+  normalizeToolbarState,
+  DEFAULT_SHAPEBAR_STATE,
+  type ToolbarState,
+} from "../ui/toolbar/toolbar-state";
 import { normalizeQuickbarState, type QuickbarState } from "../ui/quickbar/quickbar-state";
 import { normalizeBottombarState, type BottombarState } from "../ui/bottombar/bottombar-state";
 import { DEFAULT_BINDING_MODE, isBindingMode, type BindingMode } from "../lib/binding-mode";
@@ -97,9 +101,12 @@ const SHAPEBAR_KEY = "flow.shapebar";
 
 /** Read the persisted shapebar state, normalized (default on miss/parse error).
  *  Same shape and normaliser as the toolbar's — the two rails differ in what
- *  they contain, not in what they persist. */
+ *  they contain, not in what they persist. Passes `DEFAULT_SHAPEBAR_STATE`
+ *  explicitly: `normalizeToolbarState`'s own default parameter is the
+ *  toolbar's, and a partial/corrupt `flow.shapebar` payload must fall back to
+ *  the shapebar's factory state, not silently inherit the toolbar's. */
 export function getShapebarState(): ToolbarState {
-  return normalizeToolbarState(readJson(SHAPEBAR_KEY));
+  return normalizeToolbarState(readJson(SHAPEBAR_KEY), DEFAULT_SHAPEBAR_STATE);
 }
 
 /** Persist the shapebar state. */

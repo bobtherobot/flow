@@ -35,19 +35,31 @@ export const DEFAULT_SHAPEBAR_STATE: ToolbarState = {
  *  re-docks. Tight on purpose — only a near-flush drop should snap back. */
 const REDOCK_MARGIN = 10;
 
-/** Coerce an unknown persisted blob into a valid ToolbarState, filling any
- *  missing/invalid field from the default. Never throws. */
-export function normalizeToolbarState(raw: unknown): ToolbarState {
-  if (typeof raw !== "object" || raw === null) return DEFAULT_TOOLBAR_STATE;
+/**
+ * Coerce an unknown persisted blob into a valid ToolbarState, filling any
+ * missing/invalid field from `defaults`. Never throws.
+ *
+ * `defaults` is a parameter, not a hardcoded `DEFAULT_TOOLBAR_STATE` read, so
+ * this stays correct for the shapebar too: `DEFAULT_SHAPEBAR_STATE` is a
+ * separate object specifically so the two are free to diverge later, and a
+ * hardcoded toolbar default here would have silently defeated that the
+ * moment they did — a partial `flow.shapebar` payload would inherit the
+ * *toolbar's* defaults instead of its own.
+ */
+export function normalizeToolbarState(
+  raw: unknown,
+  defaults: ToolbarState = DEFAULT_TOOLBAR_STATE,
+): ToolbarState {
+  if (typeof raw !== "object" || raw === null) return defaults;
   const r = raw as Record<string, unknown>;
   return {
-    visible: typeof r.visible === "boolean" ? r.visible : DEFAULT_TOOLBAR_STATE.visible,
-    floating: typeof r.floating === "boolean" ? r.floating : DEFAULT_TOOLBAR_STATE.floating,
-    x: typeof r.x === "number" ? r.x : DEFAULT_TOOLBAR_STATE.x,
-    y: typeof r.y === "number" ? r.y : DEFAULT_TOOLBAR_STATE.y,
+    visible: typeof r.visible === "boolean" ? r.visible : defaults.visible,
+    floating: typeof r.floating === "boolean" ? r.floating : defaults.floating,
+    x: typeof r.x === "number" ? r.x : defaults.x,
+    y: typeof r.y === "number" ? r.y : defaults.y,
     hiddenTools: Array.isArray(r.hiddenTools)
       ? r.hiddenTools.filter((t): t is string => typeof t === "string")
-      : [],
+      : defaults.hiddenTools,
   };
 }
 
