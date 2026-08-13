@@ -97,8 +97,11 @@ Fixed with a `returnFocusTo?: RefObject<HTMLElement|null>` prop that
   pass `returnFocusTo` and not lean on that.
 
 The lesson worth keeping: **both components' unit suites were green while the
-feature was broken.** The regression test that matters is the composed one, in
-`PaletteSection.test.tsx` ("focus returns to the gear").
+feature was broken.** The regression test that matters is the composed one:
+`PaletteSection.test.tsx`'s `"hands focus back to the gear when a dialog
+closes"`. Note its every `.focus()` call is load-bearing — jsdom's
+`fireEvent.click` does not move focus, so a click-only version of that test
+captures `<body>`, restores `<body>`, and passes against the bug.
 
 ## `.flow-clr-palette__menu` is `z-index: 130`, sandwiched deliberately
 
@@ -136,8 +139,13 @@ Rename is the gear's first item.
 target's existing colors, builds an `additions` array, bails if it is empty,
 and then makes **one** `commit`. A loop of `addSwatch` per color is the
 regression: it would fire N store notifications, N localStorage writes, and N
-undo-relevant states for one user action. The e2e test asserts the copied
-palette holds exactly one tile partly to pin this.
+undo-relevant states for one user action.
+
+**The guard is `palette-store.test.ts`'s `"commits ONCE for a multi-swatch
+copy"`** — it copies three colors and asserts `toHaveBeenCalledTimes(1)` on a
+store subscriber. **The e2e test does not cover this and cannot**: it copies a
+single swatch, and an `addSwatch` loop over one color produces byte-identical
+DOM. Do not weaken that unit test believing e2e backs it up.
 
 Two product decisions inside the same flow, both deliberate:
 
@@ -251,7 +259,8 @@ list in substance. **Not covered anywhere:**
 - The parallel-load flake family from [[recent-palette]] still applies
   (`new-document:60`, `style-memory`, `selection-mode:57`, plus the four more
   the previous branch's Task 6 measured). Re-run a spec alone before believing
-  a third failure; `--workers=2` settles it. **Task 6's full default-worker run
-  on this branch produced no flakes at all** — a clean 137/2 first time.
-</content>
-</invoke>
+  a third failure; `--workers=2` settles it. Task 6's single full
+  default-worker run on this branch happened to come back clean at 137/2 first
+  time — **one sample, not a property of the branch.** These specs are
+  load-dependent and intermittent by definition, so a flake reappearing later
+  is not a regression signal.
