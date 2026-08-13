@@ -143,14 +143,21 @@ right. Docked and floating layouts are identical for both. Spec/plan:
 - **The permanent 1px docked-vs-floating delta, and why it must stay**:
   `.flow-toolbar--docked` carries only a `border-right`; `.flow-toolbar--floating`
   carries a full 1px border on all four sides (a torn-off panel legitimately
-  gets a complete border). The shell is `box-sizing: border-box`, so a
-  floating rail's content box ends up 1px narrower and 1px lower than the
-  docked one — measured docked `43×348` at y-offset 47 vs. floating `42×348`
-  at y-offset 48. This is correct and must not be "fixed" by equalising the
-  borders: the docked rail's single border is exactly what makes its outer box
-  agree with `--flow-toolbar-reserved`, which `color-panel.spec.ts`'s "the
-  rail's outer edge meets the canvas" test asserts. `toolbar.spec.ts`'s "lays
-  its tools out identically docked and floating" test therefore asserts the
+  gets a complete border) — measured docked `43×348` at y-offset 47 vs.
+  floating `42×348` at y-offset 48. The cause is NOT the border *count*: the
+  shell is `box-sizing: border-box` with its width/height set inline, so the
+  declared size is authoritative regardless of how many borders it carries —
+  a docked rail's outer box agrees with `--flow-toolbar-reserved` no matter
+  how many borders it has, and equalising them would not change that. The
+  actual cause is which SIDES gain a border: a floating shell has a top and a
+  left border that a docked one has neither of, and those are exactly what
+  push the floating content box 1px right and 1px down from its own shell's
+  top-left corner — one px narrower, one px lower. This is correct and must
+  not be "fixed" by equalising the borders: doing so would paint hairlines
+  against the viewport edges themselves, since the docked rail sits flush at
+  the viewport's own x=0/y=36 with nothing beyond them to visually separate
+  from, and flush again at the viewport floor. `toolbar.spec.ts`'s "lays its
+  tools out identically docked and floating" test therefore asserts the
   grid's **height** exactly (that's the axis the real bug lived on) and
   allows ±1px on width and on both y-offsets, with this border asymmetry
   named in a comment at the assertion site.

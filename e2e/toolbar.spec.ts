@@ -175,14 +175,20 @@ test.describe("vertical tool bar", () => {
     const floatColor = (await color.boundingBox())!;
 
     // `.flow-toolbar--docked` carries only a right border; `.flow-toolbar--floating`
-    // carries all four (a floating panel legitimately gets a full border), and the
-    // shell is box-sizing: border-box — so the floating content box is 1px narrower
-    // and 1px lower than the docked one. That 1px is permanent and correct; do not
-    // "fix" it by equalising the borders — the docked rail's single border is
-    // exactly what makes its outer box agree with `--flow-toolbar-reserved` (see
-    // color-panel.spec.ts's "outer edge meets the canvas" test). Height is the
-    // axis the actual bug lived on (534.5 docked vs 196 floating pre-fix), so it
-    // is asserted exactly; width and the y-offsets get a ±1px tolerance.
+    // carries all four (a floating panel legitimately gets a full border). Both
+    // shells are box-sizing: border-box with their width/height set inline, so
+    // that alone does NOT move the docked outer box relative to
+    // `--flow-toolbar-reserved` (border-box makes the declared width authoritative
+    // regardless of border count — see toolbar.css's comment on `.flow-toolbar`).
+    // What the extra borders DO shift is the top-left origin: a floating shell
+    // has a top and a left border where a docked one has neither, so the floating
+    // content box starts 1px lower and 1px narrower than the docked one. That 1px
+    // is permanent and correct; do not "fix" it by equalising the borders — doing
+    // so would paint hairlines against the viewport edges themselves (the docked
+    // rail sits flush at x=0/y=36, and its bottom at the viewport floor) with
+    // nothing to visually separate them from. Height is the axis the actual bug
+    // lived on (534.5 docked vs 196 floating pre-fix), so it is asserted exactly;
+    // width and the y-offsets get a ±1px tolerance for the border-origin shift.
     expect(Math.abs(floatGrid.width - dockedGrid.width)).toBeLessThanOrEqual(1);
     expect(Math.round(floatGrid.height)).toBe(Math.round(dockedGrid.height));
     expect(
