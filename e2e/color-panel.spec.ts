@@ -29,6 +29,10 @@ async function seedSaturation(page: Page) {
 
 const panel = ".flow-clr-panel";
 
+/** The toolbar, specifically. The shapebar shares `.flow-toolbar`, so a bare
+ *  class selector now matches two elements and trips Playwright's strict mode. */
+const toolRail = (page: Page) => page.getByRole("toolbar", { name: "Tools" });
+
 /**
  * Click the stroke box where a user actually clicks it: the exposed ring in
  * its lower-right.
@@ -484,7 +488,9 @@ test("adding the current color to a palette persists", async ({ page }) => {
 test("the rail's outer edge meets the canvas with no overlap or gap", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
-  const rail = (await page.locator(".flow-toolbar").boundingBox())!;
+  // The toolbar's own right edge is 44px, but the reserved gutter is now the
+  // sum of both rails — measure the outermost docked rail, the shapebar.
+  const rail = (await page.getByRole("toolbar", { name: "Shapes" }).boundingBox())!;
   const canvasLeft = await page.evaluate(
     () => getComputedStyle(document.documentElement).getPropertyValue("--flow-toolbar-reserved"),
   );
@@ -502,24 +508,24 @@ test("the rail tears off and redocks at the new width", async ({ page }) => {
   // grip, and the header's own bounding-box centre falls inside that button
   // — a drag started there is silently rejected (`useDrag`'s `onStart`
   // bails out of any press that starts on a `button`).
-  const grip = page.locator(".flow-toolbar__grip");
+  const grip = toolRail(page).locator(".flow-toolbar__grip");
 
   const start = (await grip.boundingBox())!;
   await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
   await page.mouse.down();
   await page.mouse.move(start.x + 320, start.y + 160, { steps: 10 });
   await page.mouse.up();
-  await expect(page.locator(".flow-toolbar--floating")).toBeVisible();
+  await expect(toolRail(page)).toHaveClass(/flow-toolbar--floating/);
 
   const floated = (await grip.boundingBox())!;
   await page.mouse.move(floated.x + floated.width / 2, floated.y + floated.height / 2);
   await page.mouse.down();
   await page.mouse.move(4, 120, { steps: 10 });
   await page.mouse.up();
-  await expect(page.locator(".flow-toolbar--docked")).toBeVisible();
+  await expect(toolRail(page)).toHaveClass(/flow-toolbar--docked/);
 });
 
-test("hiding the rail reclaims the canvas gutter", async ({ page }) => {
+test("hiding the toolbar reclaims its share of the canvas gutter", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-toolbar");
   const reserved = () =>
@@ -527,11 +533,13 @@ test("hiding the rail reclaims the canvas gutter", async ({ page }) => {
       getComputedStyle(document.documentElement).getPropertyValue("--flow-toolbar-reserved").trim(),
     );
 
-  expect(await reserved()).toBe("88px");
+  expect(await reserved()).toBe("124px");
   await page.getByRole("button", { name: "Toolbar options" }).click();
   await page.getByRole("menuitem", { name: /hide/i }).click();
-  await expect(page.locator(".flow-toolbar")).toHaveCount(0);
-  expect(await reserved()).toBe("0px");
+  // Hiding the toolbar leaves the shapebar docked, so the gutter drops to the
+  // shapebar's own width, not zero.
+  await expect(toolRail(page)).toHaveCount(0);
+  expect(await reserved()).toBe("80px");
 });
 
 test("dragging a swatch onto the trash deletes it", async ({ page }) => {
@@ -580,10 +588,10 @@ test("the rail's color control fits the rail without overflowing", async ({ page
   // every selection — so this no longer proves a state transition was reached.
   // It stays as a cheap guard that the rail's chooser is mounted and whole
   // before we measure it; the height it measures is the only height there is.
-  await expect(page.locator(".flow-toolbar").getByRole("radio")).toHaveCount(3);
+  await expect(toolRail(page).getByRole("radio")).toHaveCount(3);
 
   const overflow = await page.evaluate(() => {
-    const rail = document.querySelector(".flow-toolbar") as HTMLElement;
+    const rail = document.querySelector('[aria-label="Tools"]') as HTMLElement;
     return {
       v: rail.scrollHeight - rail.clientHeight,
       h: rail.scrollWidth - rail.clientWidth,

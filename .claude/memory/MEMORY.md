@@ -8,7 +8,7 @@ Repo-local memory index. One line per memory; see `CLAUDE.md` for the read-at-st
 - [Rename wimp → flow](rename-wimp-to-flow.md) — 2026-07-07 project rename: branding, storage keys (no migration), fork branch, directory, memory moved repo-local
 - [Left-panel accordion](left-panel-accordion.md) — IN PROGRESS: Illustrator-style dockable panels replacing the island; Phase 0–1 done (selection-style core + docking engine), P2+ pending
 - [Pending follow-ups](pending-followups.md) — deferred tasks; currently: purge local git recovery refs from the 2026-07-08 .claude history scrub
-- [Vertical toolbar](vertical-toolbar.md) — flow-native left tool rail (float/close/configurable), replaces Excalidraw's island; shipped 2026-07-08
+- [Vertical toolbar](vertical-toolbar.md) — flow-native left tool rail (float/close/configurable), replaces Excalidraw's island; shipped 2026-07-08. **Split 2026-08-12** into a 44px "Tools" toolbar + an 80px two-column "Shapes" shapebar, both instances of one `ToolRail` mounted by `ToolRails`; gutter sum 124px, `flow.shapebar` persistence key, docked/floating layout now identical; e2e 148/150 (2 pre-existing text-panel failures)
 - [Quick actions bar](quick-actions-bar.md) — flow-native horizontal top bar (arrange/group/align/toggles/undo-redo/tools), right of the menu; adds the arrow-binding lock (2nd fork edit); shipped 2026-07-08
 - [Bottom bar](bottom-bar.md) — flow-native horizontal bottom-left bar (grid/zen/zoom/canvas-bg/search); zero fork; shipped 2026-07-08
 - [Search sub-panel](search-panel.md) — flow-native canvas search in the controls dock (fork export #2 `getSearchMatches`); native sidebar retired; bottom bar + Ctrl/F auto-open it; shipped 2026-07-09

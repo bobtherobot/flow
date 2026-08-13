@@ -1,5 +1,4 @@
 import { test, expect } from "@playwright/test";
-import { railButton } from "./helpers/rails";
 
 test.describe("vertical tool bar", () => {
   test("renders docked on the left, below the menu bar", async ({ page }) => {
@@ -14,15 +13,19 @@ test.describe("vertical tool bar", () => {
 
   test("selecting a tool marks it active", async ({ page }) => {
     await page.goto("/");
-    const rect = railButton(page, "Rectangle");
-    await rect.click();
-    await expect(rect).toHaveAttribute("aria-pressed", "true");
+    const line = page.getByRole("toolbar", { name: "Tools" }).getByRole("button", {
+      name: "Line",
+      exact: true,
+    });
+    await line.click();
+    await expect(line).toHaveAttribute("aria-pressed", "true");
   });
 
   test("each of the three arrow-shape tools activates the arrow tool", async ({ page }) => {
     await page.goto("/");
+    const rail = page.getByRole("toolbar", { name: "Shapes" });
     for (const name of ["Arrow", "Curved arrow", "Elbow arrow"]) {
-      const btn = railButton(page, name);
+      const btn = rail.getByRole("button", { name, exact: true });
       await btn.click();
       // Only the clicked shape is highlighted (they share the "arrow" tool).
       await expect(btn).toHaveAttribute("aria-pressed", "true");
@@ -31,9 +34,10 @@ test.describe("vertical tool bar", () => {
 
   test("pressing A repeatedly cycles the highlighted arrow shape and wraps", async ({ page }) => {
     await page.goto("/");
-    const sharp = railButton(page, "Arrow");
-    const curved = railButton(page, "Curved arrow");
-    const elbow = railButton(page, "Elbow arrow");
+    const rail = page.getByRole("toolbar", { name: "Shapes" });
+    const sharp = rail.getByRole("button", { name: "Arrow", exact: true });
+    const curved = rail.getByRole("button", { name: "Curved arrow", exact: true });
+    const elbow = rail.getByRole("button", { name: "Elbow arrow", exact: true });
 
     // Excalidraw's shortcut handler is bound to the canvas container, so focus it
     // with a harmless selection-tool click before driving the keyboard cycle.
@@ -106,7 +110,7 @@ test.describe("vertical tool bar", () => {
     const before = await rail.boundingBox();
 
     // Drag from the grip at the top of the header (above the hamburger button).
-    const grip = page.locator(".flow-toolbar__grip");
+    const grip = rail.locator(".flow-toolbar__grip");
     const g = await grip.boundingBox();
     await page.mouse.move(g!.x + g!.width / 2, g!.y + g!.height / 2);
     await page.mouse.down();
@@ -122,7 +126,7 @@ test.describe("vertical tool bar", () => {
     const rail = page.getByRole("toolbar", { name: "Tools" });
 
     // Detach and drag the rail far to the right.
-    const grip = page.locator(".flow-toolbar__grip");
+    const grip = rail.locator(".flow-toolbar__grip");
     const g = (await grip.boundingBox())!;
     await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
     await page.mouse.down();
@@ -139,5 +143,61 @@ test.describe("vertical tool bar", () => {
     await page.getByRole("button", { name: "Toolbar options" }).click();
     await page.getByRole("menuitem", { name: "Detach toolbar" }).click();
     expect((await rail.boundingBox())!.x).toBeLessThan(50);
+  });
+
+  test("is 44px wide", async ({ page }) => {
+    await page.goto("/");
+    const box = await page.getByRole("toolbar", { name: "Tools" }).boundingBox();
+    expect(Math.round(box!.width)).toBe(44);
+  });
+
+  test("lays its tools out identically docked and floating", async ({ page }) => {
+    // The regression this refactor exists to prevent: the docked shell is
+    // viewport-tall, and the tool grid used to absorb that height while the
+    // color footer rode it to the bottom of the screen.
+    await page.goto("/");
+    const rail = page.getByRole("toolbar", { name: "Tools" });
+    const grid = rail.locator(".flow-toolbar__tools");
+    const color = rail.locator(".flow-toolbar__color");
+
+    const dockedRail = (await rail.boundingBox())!;
+    const dockedGrid = (await grid.boundingBox())!;
+    const dockedColor = (await color.boundingBox())!;
+
+    // Tear off by the grip (the topbar's centre sits over the hamburger), scoped
+    // to this rail — the shapebar has a grip of its own. The grip glyph itself is
+    // `pointer-events: none` (so a drag started on it falls through to the topbar's
+    // own drag surface), which makes Playwright's `.hover()` actionability check
+    // spin forever waiting for the grip to receive pointer events; move to its
+    // bounding-box centre directly instead, as the sibling drag tests above do.
+    const grip = rail.locator(".flow-toolbar__grip");
+    const g = (await grip.boundingBox())!;
+    await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(400, 300, { steps: 10 });
+    await page.mouse.up();
+    await expect(rail).toHaveCSS("position", "fixed");
+
+    const floatRail = (await rail.boundingBox())!;
+    const floatGrid = (await grid.boundingBox())!;
+    const floatColor = (await color.boundingBox())!;
+
+    // `.flow-toolbar--docked` carries only a right border; `.flow-toolbar--floating`
+    // carries all four (a floating panel legitimately gets a full border), and the
+    // shell is box-sizing: border-box — so the floating content box is 1px narrower
+    // and 1px lower than the docked one. That 1px is permanent and correct; do not
+    // "fix" it by equalising the borders — the docked rail's single border is
+    // exactly what makes its outer box agree with `--flow-toolbar-reserved` (see
+    // color-panel.spec.ts's "outer edge meets the canvas" test). Height is the
+    // axis the actual bug lived on (534.5 docked vs 196 floating pre-fix), so it
+    // is asserted exactly; width and the y-offsets get a ±1px tolerance.
+    expect(Math.abs(floatGrid.width - dockedGrid.width)).toBeLessThanOrEqual(1);
+    expect(Math.round(floatGrid.height)).toBe(Math.round(dockedGrid.height));
+    expect(
+      Math.abs((floatGrid.y - floatRail.y) - (dockedGrid.y - dockedRail.y)),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs((floatColor.y - floatRail.y) - (dockedColor.y - dockedRail.y)),
+    ).toBeLessThanOrEqual(1);
   });
 });

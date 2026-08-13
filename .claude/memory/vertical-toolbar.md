@@ -7,10 +7,13 @@ Spec/plan: `docs/superpowers/specs|plans/2026-07-08-vertical-toolbar*.md`.
 - `src/ui/toolbar/`: `tools.ts` (TOOLS/ToolId/LOCK_ID), `toolbar-state.ts` (pure
   state: normalize/withHiddenToggled/shouldRedock), `useActiveTool.ts` (onChange
   bridge → setActiveTool; types-only vendor import so NO vi.mock needed),
-  `icons.tsx`, `ToolButton.tsx`, `ToolbarConfigMenu.tsx`, `ToolBar.tsx`, `toolbar.css`.
+  `icons.tsx`, `ToolButton.tsx`, `ToolbarConfigMenu.tsx`, `toolbar.css`.
+  **`ToolBar.tsx` no longer exists** — replaced 2026-08-12 by `ToolRail.tsx` +
+  `ToolRails.tsx`, see the split section below.
 - Persistence in `src/app/preferences.ts`: `get/setToolbarState` (`flow.toolbar`).
 - `App.tsx` owns `toolbar` state (so View menu reads visibility), persists via
-  effect, mounts `<ToolBar>`, insets the canvas left by `--flow-toolbar-reserved`.
+  effect, mounts `<ToolRails>` (was `<ToolBar>`), insets the canvas left by
+  `--flow-toolbar-reserved`.
 - MenuBar: View ▸ Show Toolbar (`Menubar.CheckboxItem`).
 - Native island hidden via `index.css` `.App-toolbar-container { display:none }`.
 - Arrow-shape tools added (2026-07-09): the single Arrow rail tool split into
@@ -42,8 +45,10 @@ Spec/plan: `docs/superpowers/specs|plans/2026-07-08-vertical-toolbar*.md`.
 ## Key facts
 - ZERO fork edits — `setActiveTool`/`appState.activeTool` are public API.
 - Reuses panel infra: `useDrag`, `clampMenuPosition`, global `.flow-pnl-config*`.
-- Rail width 48px; docks left below the 36px menu bar; symmetric with the
-  right-docked controls panel (`--flow-panel-reserved`).
+- **SUPERSEDED by the 2026-08-12 split below**: this used to be one 88px rail
+  holding all 15 tools. It is now two rails, 44px + 80px.
+- Docks left below the 36px menu bar; symmetric with the right-docked controls
+  panel (`--flow-panel-reserved`).
 - Drag/float/dock is e2e-tested only (jsdom can't do pointer-drag + layout) —
   same split as the panel dock. Unit/component tests cover the rest.
 - Config menu: dock/undock + per-tool show/hide (incl. lock), persisted in
@@ -69,3 +74,83 @@ Spec/plan: `docs/superpowers/specs|plans/2026-07-08-vertical-toolbar*.md`.
   its top grip) lands under the 36px main menu and is unreachable. e2e tear-off
   test now drags `.flow-toolbar__grip` (was topbar center, which the vertical
   stack put over the hamburger).
+
+## The toolbar/shapebar split (2026-08-12)
+
+The single 88px, 15-tool rail became two docked rails: a 44px "Tools" toolbar
+(9 non-shape tools, color part-chooser at its foot) and an 80px two-column
+"Shapes" shapebar (arrow ×3, rectangle, diamond, ellipse) docked flush to its
+right. Docked and floating layouts are identical for both. Spec/plan:
+`.superpowers/sdd/2026-08-12-toolbar-shapebar-split/`.
+
+- **One `ToolRail` component, two instances, mounted by `ToolRails`.**
+  `ToolRails` (`src/ui/toolbar/ToolRails.tsx`) is the single writer of
+  `--flow-toolbar-reserved` — two `ToolRail` instances writing it independently
+  would race — and is also the home of the `useSelectionStyle` call the
+  toolbar's color control needs. That call cannot live in `App`: an
+  onChange-driven state bump there re-renders `<Excalidraw>`, whose
+  `componentDidUpdate` re-fires `onChange` regardless of whether anything
+  changed, producing a tight, un-terminating loop. Every onChange bridge in
+  this codebase lives in a sibling of `<Excalidraw>`, never in `App` itself —
+  same rule `useActiveTool`'s call site already followed.
+- **`TOOLS` (9) / `SHAPES` (6) / `ALL_TOOLS` (15)** in `tools.ts`. The quickbar
+  (`src/ui/quickbar/actions.ts`) reads `ALL_TOOLS` for its item registry, and
+  **that is load-bearing** — reading `TOOLS` there instead would silently drop
+  the six shape tools from the quickbar with no type error and no test
+  failure unless the quickbar's own coverage checks for all fifteen.
+- **Widths and the gutter**: `TOOL_RAIL_WIDTH = 44`, `SHAPE_RAIL_WIDTH = 80`
+  (`src/ui/toolbar/rail-layout.ts`), gutter sum 124 with both docked. Dock
+  slots collapse: hide or float the toolbar and the docked shapebar slides to
+  the screen edge rather than leaving a hole (`shapebarDockLeft`). `railGutter`
+  and `shapebarDockLeft` are pure functions — `ToolRails` is the only caller
+  that turns them into a DOM write, and `App` passes the same number to the
+  bottom bar so its own dock offset clears both rails.
+- **`shouldRedock(dropX, slotX)`** — the slot argument (not a hardcoded
+  screen-edge test like `x < 10`) is what makes a floating shapebar
+  re-dockable at all, since its docked slot sits at `x ≈ 44`, not `x ≈ 0`.
+- **The docked/floating layout fix** (carried from Task 6, restated here since
+  it's the invariant Task 8's e2e test exists to guard): `.flow-toolbar__content`
+  is `flex: 0 1 auto`, the tool grid uses fixed 36px tracks (not `1fr`), and
+  `.flow-toolbar__color` lost `margin-top: auto`. Restoring any one of those
+  three brings back the original bug — a docked (viewport-tall) shell whose
+  grid stretched to fill it, riding the color footer down to the bottom of the
+  screen, while the floating shell hugged its content. Measured pre-fix:
+  538.5px docked vs 196px floating grid height, from `--flow-toolbar-reserved`
+  disagreeing with the visible dock width.
+- **`e2e/helpers/rails.ts`** (`railButton`/`pickTool`) scopes to `.flow-toolbar`
+  rather than to either rail's `aria-label`, so one locator spans both rails —
+  the reason the split only had to touch ten existing e2e specs once, instead
+  of every future shape tool touching every spec that picks a shape tool again.
+- **`flow.shapebar`** persistence key, independent of `flow.toolbar`, no
+  migration between them. A stale tool id surviving in either rail's
+  `hiddenTools` array is inert — it just never matches anything in that rail's
+  own tool list.
+- **`z-index: 91` via `.flow-toolbar--menu-open`, and why it was needed**: the
+  two rails are equal-`z-index` fixed siblings. A rail's own (non-portaled)
+  config menu is `z-index: 130`, but that number only orders it *within its
+  own rail's* stacking context — it does not lift the whole rail above its
+  sibling. With the toolbar and shapebar both at the same base z-index, the
+  later-painted shapebar sat on top of the toolbar's open menu regardless of
+  the menu's own z-index. The fix raises the *open rail's shell* (not the
+  menu) via `.flow-toolbar--menu-open { z-index: 91 }`, which lifts the whole
+  stacking context the menu paints inside. Same class of bug as commit
+  `1d37e5e` (PaletteMenu) — a z-index war only within a stacking context is
+  invisible to, and unfixable from, inside that context; it has to be fixed on
+  the ancestor that creates the context. e2e:
+  `toolbar.spec.ts` "the Tools rail's open hamburger menu paints above the
+  docked Shapes rail" (asserts `document.elementFromPoint` resolves inside the
+  menu, not the sibling rail, rather than trusting a click succeeded).
+- **The permanent 1px docked-vs-floating delta, and why it must stay**:
+  `.flow-toolbar--docked` carries only a `border-right`; `.flow-toolbar--floating`
+  carries a full 1px border on all four sides (a torn-off panel legitimately
+  gets a complete border). The shell is `box-sizing: border-box`, so a
+  floating rail's content box ends up 1px narrower and 1px lower than the
+  docked one — measured docked `43×348` at y-offset 47 vs. floating `42×348`
+  at y-offset 48. This is correct and must not be "fixed" by equalising the
+  borders: the docked rail's single border is exactly what makes its outer box
+  agree with `--flow-toolbar-reserved`, which `color-panel.spec.ts`'s "the
+  rail's outer edge meets the canvas" test asserts. `toolbar.spec.ts`'s "lays
+  its tools out identically docked and floating" test therefore asserts the
+  grid's **height** exactly (that's the axis the real bug lived on) and
+  allows ±1px on width and on both y-offsets, with this border asymmetry
+  named in a comment at the assertion site.
