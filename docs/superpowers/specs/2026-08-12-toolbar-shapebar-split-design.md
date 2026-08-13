@@ -113,9 +113,10 @@ toolbar and nothing to the shapebar. It is also the natural home for the
 `TOOLS`, and its "Hide toolbar" item takes its noun from `label`.
 
 Widths live in `rail-layout.ts` as `TOOL_RAIL_WIDTH = 44` and
-`SHAPE_RAIL_WIDTH = 80`. `RailColorControl` currently imports `RAIL_WIDTH` for
-its popup fallback anchor; it takes the rail width as a prop instead, since
-there are now two possible answers.
+`SHAPE_RAIL_WIDTH = 80`, replacing `RAIL_WIDTH`. `RailColorControl` imports the
+old constant for its popup's fallback anchor and switches to `TOOL_RAIL_WIDTH` —
+it is mounted only as the toolbar's footer, so the toolbar's width is the only
+correct answer for it.
 
 ### Layout that does not shift
 
@@ -139,15 +140,18 @@ bounding box is identical docked and floating.**
 
 ### Dock slots
 
-App becomes the single writer of the reserved left gutter:
+`ToolRails` becomes the single writer of the reserved left gutter:
 
 ```
 --flow-toolbar-reserved = (toolbar docked ? 44 : 0) + (shapebar docked ? 80 : 0)
 ```
 
-The effect that sets it moves out of the rail component, which is now
+The effect that sets it moves out of `ToolRail`, which is now
 multiply-instantiated and would otherwise have two writers racing over one
-variable. The variable keeps its name so the canvas padding rule
+variable. It lands on `ToolRails` rather than App for two reasons: App has no
+test file, so the assertion that the gutter tracks both rails would have nowhere
+to live; and `ToolRails` already holds both states for its `dockLeft`
+arithmetic. The variable keeps its name so the canvas padding rule
 (`src/App.tsx:424`) and the bottombar's `toolbarReserved` prop
 (`src/App.tsx:465`) keep working; the bottombar receives the same sum, so it
 still clears both rails.
