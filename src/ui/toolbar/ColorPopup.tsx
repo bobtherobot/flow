@@ -48,7 +48,7 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
 
   // This popup can be unmounted out from under an in-flight pick — not just
   // via its own Escape/outside-click handlers, but programmatically (e.g.
-  // View ▸ Show Toolbar hiding the whole rail: `ToolBar` returns `null` when
+  // View ▸ Show Toolbar hiding the whole rail: `ToolRail` returns `null` when
   // `!state.visible`, which unmounts this component along with it). The
   // overlay itself lives outside this subtree (LayerUI mounts it globally),
   // so without this it would survive with `onSelect` closing over a `target`
@@ -85,7 +85,7 @@ export function ColorPopup({ target, anchor, onClose }: ColorPopupProps) {
       // close here on pointerdown and the click that follows would reopen —
       // the toggle's close branch becomes unreachable, and the remount
       // re-seeds useColorDraft, discarding an in-progress hue. Same guard
-      // ToolBar uses for its hamburger (ToolBar.tsx's config-menu effect).
+      // ToolRail uses for its hamburger (ToolRail.tsx's config-menu effect).
       if ((e.target as HTMLElement).closest(".flow-toolbar__color")) return;
       if (!ref.current?.contains(e.target as Node)) onClose();
     };

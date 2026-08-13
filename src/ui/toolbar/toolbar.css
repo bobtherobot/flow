@@ -14,8 +14,10 @@
   font-family: var(--flow-font);
   color: var(--flow-ink);
   /* The docked rail carries a 1px right border. Under the default content-box
-     the box would be RAIL_WIDTH + 1 while `--flow-toolbar-reserved` reserves
-     exactly RAIL_WIDTH, so the rail (z-index 90) paints its border over the
+     an instance's box would be its declared width (TOOL_RAIL_WIDTH /
+     SHAPE_RAIL_WIDTH, rail-layout.ts) + 1, while `--flow-toolbar-reserved`
+     reserves exactly the sum of the declared widths (railGutter), so the
+     outermost docked rail (z-index 90) would paint its border over the
      canvas's leftmost pixel. Border-box makes the two agree. */
   box-sizing: border-box;
 }
