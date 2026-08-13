@@ -19,6 +19,24 @@
      canvas's leftmost pixel. Border-box makes the two agree. */
   box-sizing: border-box;
 }
+/* Two rails share this class and this z-index (90). `.flow-toolbar` is
+   `position: fixed` with an explicit z-index, so it establishes its own
+   stacking context — the hamburger dropdown's z-index: 130 (.flow-pnl-config,
+   panels.css) only outranks things *inside that context*. Across siblings at
+   the same 90, DOM order decides, and the Shapes rail (mounted second by
+   ToolRails) always wins that tie — so the Tools rail's open menu rendered
+   underneath it. Same root cause `1d37e5e` fixed for PaletteMenu vs. the
+   docked panel; the fix there was raising the menu itself because that panel
+   z-index (90) sat below the menu's already-correct 130. Here the menu's
+   130 is already right, so the parent's own rank is what's wrong: bump the
+   rail's rank (not the menu's) whenever its menu is open, high enough to beat
+   the other rail's 90 but still under the menu bar's 100 — the whole
+   subtree, hamburger dropdown included, rides along. Scoped to `menuOpen` so
+   it applies to whichever rail's menu is open, not just the toolbar's. */
+.flow-toolbar--menu-open {
+  z-index: 91;
+}
+
 .flow-toolbar--docked {
   border-right: 1px solid var(--flow-border);
 }

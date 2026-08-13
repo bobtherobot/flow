@@ -78,6 +78,28 @@ test.describe("vertical tool bar", () => {
     await expect(page.getByRole("button", { name: "Frame" })).toHaveCount(0);
   });
 
+  test("the Tools rail's open hamburger menu paints above the docked Shapes rail", async ({
+    page,
+  }) => {
+    // A click-success assertion alone can pass for the wrong reason (e.g. a
+    // click landing through an overlapping element by luck of hit-testing
+    // order). Assert paint order directly: the menu's own centre point must
+    // resolve to something inside .flow-pnl-config, not inside the Shapes
+    // rail sitting on top of it.
+    await page.goto("/");
+    await page.getByRole("button", { name: "Toolbar options" }).click();
+    const menu = page.locator(".flow-pnl-config");
+    await expect(menu).toBeVisible();
+    const box = (await menu.boundingBox())!;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const topmostIsMenu = await page.evaluate(
+      ([x, y]) => document.elementFromPoint(x, y)?.closest(".flow-pnl-config") !== null,
+      [cx, cy],
+    );
+    expect(topmostIsMenu).toBe(true);
+  });
+
   test("tearing off the top bar floats the rail", async ({ page }) => {
     await page.goto("/");
     const rail = page.getByRole("toolbar", { name: "Tools" });

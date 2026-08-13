@@ -114,7 +114,7 @@ export function ToolRail({
   return (
     <div
       ref={shellRef}
-      className={`flow-toolbar ${state.floating ? "flow-toolbar--floating" : "flow-toolbar--docked"}`}
+      className={`flow-toolbar ${state.floating ? "flow-toolbar--floating" : "flow-toolbar--docked"}${menuOpen ? " flow-toolbar--menu-open" : ""}`}
       style={shellStyle}
       role="toolbar"
       aria-label={label}
