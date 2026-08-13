@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { TOOLS } from "./tools";
+import { TOOLS, SHAPES, ALL_TOOLS } from "./tools";
+import { TOOL_ICONS } from "./icons";
 
 describe("TOOLS", () => {
   it("lists the nine non-shape tools in order", () => {
@@ -21,24 +22,7 @@ describe("TOOLS", () => {
   });
 });
 
-import { SHAPES, ALL_TOOLS } from "./tools";
-import { TOOL_ICONS } from "./icons";
-
 describe("the toolbar / shapebar split", () => {
-  it("puts the nine non-shape tools in TOOLS, in order", () => {
-    expect(TOOLS.map((t) => t.id)).toEqual([
-      "selection",
-      "hand",
-      "text",
-      "freedraw",
-      "line",
-      "frame",
-      "image",
-      "eraser",
-      "laser",
-    ]);
-  });
-
   it("puts the six shape tools in SHAPES, arrows first", () => {
     expect(SHAPES.map((t) => t.id)).toEqual([
       "arrow",
