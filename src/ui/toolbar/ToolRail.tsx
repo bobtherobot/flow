@@ -17,6 +17,17 @@ const DETACH_GAP = 12;
 /** Bottom breathing room for a floating rail's max-height, so a tall one
  *  scrolls inside itself instead of running off the viewport. */
 const FLOAT_BOTTOM_GAP = 8;
+/**
+ * Floor for a floating rail's max-height: the topbar (grip + hamburger, ~44px)
+ * plus one full 36px tool row and some padding, so the rail never collapses to
+ * nothing. Without a floor, `calc(100vh - state.y - FLOAT_BOTTOM_GAP)` has no
+ * lower bound — drag a floating rail's grip low enough and the clamp falls
+ * under the topbar's own height. The topbar is `flex-shrink: 0`, so it spills
+ * out of the bordered shell while the content box (the `min-height: 0` flex
+ * item under it) collapses to zero: every tool disappears with no scroll
+ * affordance to recover them.
+ */
+const MIN_FLOAT_H = 120;
 
 interface ToolRailProps {
   api: ExcalidrawAPI | null;
@@ -69,11 +80,21 @@ export function ToolRail({
   };
 
   // Close the config menu on any outside pointer press (mirrors PanelShell).
+  // The exemption is scoped to THIS rail's own shell (`shellRef.current?.
+  // contains(t)` — which covers both the hamburger button and the menu
+  // itself, since `ToolbarConfigMenu` renders inline as a child of the
+  // shell, not portaled), not an unscoped `.closest(".flow-toolbar__hamburger")`.
+  // The two rails share that class, so the unscoped check matched the OTHER
+  // rail's hamburger too: opening "Toolbar options" then clicking "Shapebar
+  // options" left BOTH menus open, both shells at the same bumped z-index,
+  // with DOM order deciding which one painted on top — the exact bug commit
+  // `8cb5e44` fixed for the sibling-rail z-index war, re-created one layer
+  // up. Opening one rail's menu must dismiss the other's.
   useEffect(() => {
     if (!menuOpen) return;
     const onDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest(".flow-pnl-config") || t.closest(".flow-toolbar__hamburger")) return;
+      if (shellRef.current?.contains(t)) return;
       setMenuOpen(false);
     };
     window.addEventListener("pointerdown", onDown);
@@ -105,7 +126,10 @@ export function ToolRail({
         width,
         top: state.y,
         left: state.x,
-        maxHeight: `calc(100vh - ${state.y}px - ${FLOAT_BOTTOM_GAP}px)`,
+        // `max()` floors the clamp at MIN_FLOAT_H: dragged low enough, the
+        // plain calc() falls under the topbar's own height and the rail
+        // collapses to nothing (see MIN_FLOAT_H's comment).
+        maxHeight: `max(${MIN_FLOAT_H}px, calc(100vh - ${state.y}px - ${FLOAT_BOTTOM_GAP}px))`,
       }
     : { width, top: MENUBAR_H, left: dockLeft, bottom: 0 };
 

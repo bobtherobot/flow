@@ -120,4 +120,22 @@ describe("two rails", () => {
     const shapes = container.querySelector<HTMLElement>(".flow-toolbar")!;
     expect(shapes.style.left).toBe("0px");
   });
+
+  it("opening one rail's menu closes the other's, never both at once", async () => {
+    // Regression test for the bug commit 8cb5e44 fixed re-appearing one layer
+    // up: the outside-pointerdown guard used to exempt ANY element matching
+    // `.flow-toolbar__hamburger`, not just this rail's own, so opening the
+    // Tools menu and then the Shapes menu left both open — both shells at the
+    // same bumped z-index, with DOM order deciding which one painted on top
+    // (the later-mounted shapebar covering the toolbar's menu checkboxes).
+    const user = userEvent.setup();
+    renderRails();
+
+    await user.click(screen.getByRole("button", { name: "Toolbar options" }));
+    expect(screen.getByRole("menuitem", { name: "Detach toolbar" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Shapebar options" }));
+    expect(screen.getByRole("menuitem", { name: "Detach shapebar" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Detach toolbar" })).not.toBeInTheDocument();
+  });
 });

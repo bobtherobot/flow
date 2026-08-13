@@ -201,9 +201,21 @@ describe("ToolRail", () => {
     const { container } = renderRail({ ...DEFAULT_TOOLBAR_STATE, floating: true, y: 100 });
     const shell = container.querySelector<HTMLElement>(".flow-toolbar");
     // jsdom's calc() serializer re-normalizes term order/signs on readback
-    // (confirmed independent of source order), so the echoed string isn't the
-    // literal source `calc(100vh - 100px - 8px)` — it's the same expression,
-    // reordered by jsdom.
-    expect(shell!.style.maxHeight).toBe("calc(100vh - 8px + 100px)");
+    // when calc() is the top-level value, but leaves it alone when nested
+    // inside max() (confirmed empirically) — so, unlike the un-nested case,
+    // this is the literal source order.
+    expect(shell!.style.maxHeight).toBe("max(120px, calc(100vh - 100px - 8px))");
+  });
+
+  it("floors a floating rail's max-height so it never collapses to nothing", () => {
+    // Regression test: dragged low enough (y ≈ 700+ in a typical viewport),
+    // the un-floored `calc(100vh - y - gap)` falls under the topbar's own
+    // height and the whole rail disappears with no scroll affordance. The
+    // floor is expressed as a `max()` wrapper (see MIN_FLOAT_H's comment), so
+    // this asserts the wrapper survives even at a y large enough that the
+    // calc() term alone would go negative.
+    const { container } = renderRail({ ...DEFAULT_TOOLBAR_STATE, floating: true, y: 5000 });
+    const shell = container.querySelector<HTMLElement>(".flow-toolbar");
+    expect(shell!.style.maxHeight).toContain("max(120px,");
   });
 });
