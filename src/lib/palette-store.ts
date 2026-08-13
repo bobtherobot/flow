@@ -291,6 +291,13 @@ export function copySwatchesTo(targetId: string, colors: string[]): void {
   const seen = new Set(target.colors);
   const additions: string[] = [];
   for (const color of colors) {
+    // Not dead defensiveness despite the `string[]` signature: callers build
+    // this array by indexing a live palette with a held selection
+    // (`selected.map((i) => current.colors[i])`), and the Recent palette
+    // truncates itself to RECENT_PALETTE_LIMIT — the one path that can SHRINK
+    // a palette under a selection. A stale index then yields `undefined`, and
+    // `scrubHex` would throw on `.trim()` and take the app down.
+    if (typeof color !== "string") continue;
     const hex = scrubHex(color);
     if (!hex || seen.has(hex)) continue;
     seen.add(hex);

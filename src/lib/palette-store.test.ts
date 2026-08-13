@@ -482,6 +482,17 @@ describe("copySwatchesTo", () => {
     expect(colorsOf(target.id)).toEqual(["#aabbcc", "#ddeeff"]);
   });
 
+  it("survives a stale index that resolved to undefined", () => {
+    // The caller builds this array by indexing a live palette with a held
+    // selection. Recent truncates itself to RECENT_PALETTE_LIMIT, so it can
+    // shrink under that selection and `current.colors[i]` comes back
+    // undefined — which `scrubHex` would throw on. Skip it, copy the rest.
+    const target = store.addPalette("Target");
+    const withHole = ["#111111", undefined, "#222222"] as unknown as string[];
+    expect(() => store.copySwatchesTo(target.id, withHole)).not.toThrow();
+    expect(colorsOf(target.id)).toEqual(["#111111", "#222222"]);
+  });
+
   it("no-ops on an unknown target id", () => {
     const before = store.getSnapshot();
     store.copySwatchesTo("nope", ["#111111"]);
