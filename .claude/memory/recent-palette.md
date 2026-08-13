@@ -13,6 +13,17 @@ e2e **135 passed / 2 failed** — the two permanent `text-panel.spec.ts`
 container-padding failures and nothing else. No new runtime dependency.
 Builds on [[color-system]], which this supersedes on recents specifically.
 
+> **Partly superseded 2026-08-12 by [[palette-gear-menu]]**, same day, next
+> branch. Everything about *capture* (the popup-close rule, `recordUsedColor`,
+> the fixed `RECENT_PALETTE_ID`, `migrateBuiltins`, the no-move-to-front
+> ruling) is unchanged and still current. What moved is the **palette footer
+> UI**: the `+` / `🗑` pair beside the palette `<select>` was replaced by a
+> single ⚙ opening a five-item menu, and the delete-palette guard is now a menu
+> item rather than that footer trash. The passages below that described the old
+> footer have been corrected in place and are marked where the reason changed.
+> The grid's own leading `🗑` and `+` tiles are a different thing and are
+> unchanged.
+
 ## The load-bearing idea
 
 **The list and the palette are one array.** There is no recents store mirrored
@@ -151,8 +162,9 @@ on the rail **outside** the popup, so no session ever captures them.
 ## Editability, and the one carve-out
 
 The Recent palette behaves like every other palette — selectable, swatches
-apply on click, `+` adds the live color, trash tile and ⌘/Ctrl/Shift-click
-delete swatches, drag reorders, double-click renames. Colors can therefore
+apply on click, the grid's `+` tile adds the live color, the grid's trash tile
+and ⌘/Ctrl/Shift-click delete swatches, drag reorders, and it can be renamed.
+Colors can therefore
 enter it by hand as well as by capture; that is deliberate. The "popup only"
 rule governs *automatic* recording.
 
@@ -190,18 +202,28 @@ leave the store able to produce a state the app immediately undoes on reload
 
 Two things about that guard:
 
-- **`aria-disabled`, never `disabled`.** Chrome delivers no mouse events at all
-  to a disabled form control, and this grid's tiles are HTML5 drop targets that
-  run on mouse events — the same trap already documented on the grid's trash
-  tile. jsdom models none of this, so a unit test keeps passing with `disabled`
-  swapped back in. `e2e/color-panel.spec.ts`'s "the Recent palette cannot be
-  deleted" is the only place the distinction is asserted.
-- `aria-disabled` alone is invisible without CSS. Task 5's review caught the
-  inert trash still showing the full hover highlight and pointer cursor:
-  `.flow-clr-palette__icon[aria-disabled="true"]` is placed **after** `:hover`
-  in `color.css` so equal-specificity **source order** wins, matching the
-  sibling `__trash` rule. A specificity bump would work today and break the
-  moment the rules are reordered.
+- **`aria-disabled`, never `disabled`.** jsdom models none of this, so a unit
+  test keeps passing with `disabled` swapped back in. `e2e/color-panel.spec.ts`'s
+  "the Recent palette cannot be deleted" is the only place the distinction is
+  asserted, and it needs `click({ force: true })` to assert it at all.
+  **The *reason* changed with [[palette-gear-menu]]:** the guard used to live on
+  the footer trash button, where the argument was Chrome delivering no mouse
+  events to a disabled control (these tiles are HTML5 drop targets). It now
+  lives on the `Delete palette…` **menu item**, where the argument is
+  **focusability** — a natively disabled button cannot be focused, so a keyboard
+  user could never land on it to learn why it is unavailable. Same attribute,
+  different justification; the drop-target argument still applies to the *grid's*
+  trash tile, which is a separate element. See [[palette-gear-menu]] for the
+  three coexisting disabled rules and why unifying them breaks one.
+- `aria-disabled` alone is invisible without CSS, and it does not stop a click,
+  so every guarded handler re-checks its own condition. Task 5's review of the
+  previous branch caught the inert *footer* trash still showing the full hover
+  highlight; that element and its `.flow-clr-palette__icon[aria-disabled="true"]`
+  rule are both gone. The surviving instance of the pattern is
+  `.flow-clr-palette__menuitem[aria-disabled="true"]` (and the grid's
+  `.flow-clr-palette__trash[aria-disabled="true"]`), placed **after** `:hover`
+  in `color.css` so equal-specificity **source order** wins. A specificity bump
+  would work today and break the moment the rules are reordered.
 
 **`removePalette`'s zero-length reseed branch is now unreachable** and was
 deliberately kept as documented defensive code (reviewer-adjudicated, Task 5).
@@ -214,14 +236,18 @@ deletes it is removing the invariant's last written statement.
 All in `e2e/color-panel.spec.ts`:
 
 - **Playwright's actionability check honours `aria-disabled`.** A plain
-  `.click()` on the inert trash never dispatches anything — it sits retrying
+  `.click()` on the inert control never dispatches anything — it sits retrying
   "element is not enabled" until the 30s test timeout. `click({ force: true })`
   is required, and is the *right* assertion: it sends a real mouse event, which
   Chrome does deliver because the element is not natively disabled, so what the
   test proves is that the handler declines rather than that the browser
-  swallowed the event.
-- **`getByLabel("Palette")` is ambiguous** — it substring-matches the "Add
-  palette" and "Delete palette" buttons beside the select. `exact: true`.
+  swallowed the event. (The target moved from the footer trash to the
+  `Delete palette…` menu item; the rule is unchanged and the forced click must
+  stay.)
+- **`getByLabel("Palette")` is ambiguous** — it used to substring-match the
+  "Add palette" / "Delete palette" buttons beside the select, and now
+  substring-matches **"Palette actions"**, the gear. Still needs `exact: true`;
+  use the `selectPalette` helper.
 - **The scene's fill hex carries an alpha byte.** A fresh rectangle's fill is
   `"transparent"`, which `splitColorAlpha` reads as alpha 0, so every write
   from the picker recombines to `#rrggbb00` until someone touches opacity.
@@ -235,8 +261,10 @@ All in `e2e/color-panel.spec.ts`:
   accumulation coverage is unchanged, only the route in moved.
 - Never hardcode a preset hex, and don't hardcode a palette *name* either —
   which palettes ship is a product decision that has broken tests before. The
-  delete test's control case creates a throwaway palette with the `+` button
-  instead of naming a builtin.
+  delete test's control case creates a throwaway palette rather than naming a
+  builtin (via the gear's `Add palette…` dialog now, not the retired footer
+  `+`), and [[palette-gear-menu]]'s copy test does the same for its
+  destination.
 - All six Recent-palette tests were mutation-checked at Task 6 (drop the close
   flush; put recording back in `useColorTarget.setColor`; delete the `isRecent`
   guard in `onTrash`). Each mutation turns exactly the expected tests red.

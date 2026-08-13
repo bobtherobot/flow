@@ -419,6 +419,46 @@ test("Escape abandons an in-progress palette rename", async ({ page }) => {
   await expect(select.locator("option:checked")).toHaveText(originalName);
 });
 
+/**
+ * The committing half of the rename path, which the Escape test above cannot
+ * prove on its own: a rename that silently did nothing would leave the option
+ * text unchanged and look identical to a working Escape.
+ *
+ * The assertion is keyed on the palette's *id*, read before the rename, so it
+ * pins "this same palette's label changed" rather than "some option somewhere
+ * now says the new name" — a rename that wrote to the wrong palette, or one
+ * that created a new palette instead of renaming, both fail here.
+ */
+test("renaming a palette through the gear updates the dropdown", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+
+  const select = page.locator(panel).getByLabel("Palette", { exact: true });
+  const id = await select.inputValue();
+  const originalName = (await select.locator("option:checked").textContent()) ?? "";
+  // Which palettes ship is a product decision, so the test asserts the rename
+  // moved the label rather than assuming what it moved from — this only checks
+  // there was somewhere to move from.
+  expect(originalName).not.toBe("Renamed in a browser");
+
+  await openPaletteMenu(page);
+  await page.getByRole("menuitem", { name: "Rename palette…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Rename palette" });
+  await dialog.getByLabel("Palette name").fill("Renamed in a browser");
+  // Scoped and exact, like the Add dialog's OK below: an unqualified "OK"
+  // substring-matches accessible names elsewhere on the page.
+  await dialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+
+  await expect(select).toHaveValue(id);
+  await expect(select.locator(`option[value="${id}"]`)).toHaveText("Renamed in a browser");
+  // One palette renamed, not one added: `addPalette` would also leave a new
+  // option carrying the typed name.
+  await expect(
+    select.locator("option").filter({ hasText: /^Renamed in a browser$/ }),
+  ).toHaveCount(1);
+});
+
 test("adding the current color to a palette persists", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
@@ -682,6 +722,64 @@ test("the Recent palette cannot be deleted", async ({ page }) => {
   await expect(del).toHaveAttribute("aria-disabled", "false");
   await del.click();
   await expect(page.getByRole("dialog", { name: "Delete palette" })).toBeVisible();
+});
+
+/**
+ * Copy-to, end to end across the two gestures no unit test can drive together:
+ * a real modifier-click to select a swatch, and a real `<select>` in a portaled
+ * modal to choose where it goes.
+ *
+ * The destination is a palette this test creates rather than a shipped one.
+ * That buys two things: which palettes ship is a product decision that has
+ * changed before, and an empty destination makes "the swatch landed" a count
+ * going 0 -> 1 instead of a `toBeVisible` that a preset already containing the
+ * color would satisfy for free.
+ */
+test("copying a swatch from Recent lands it in another palette", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".flow-pnl");
+  await drawRect(page, 560, 300, 680, 380);
+
+  // The rail popup's close is the only automatic route into Recent.
+  const applied = await pickInRailPopup(page, 0.8, 0.3);
+
+  // Make the destination: an empty palette, whose prefilled "color set N" name
+  // is read back off the dropdown rather than predicted.
+  const select = page.locator(panel).getByLabel("Palette", { exact: true });
+  await openPaletteMenu(page);
+  await page.getByRole("menuitem", { name: "Add palette…" }).click();
+  const addDialog = page.getByRole("dialog", { name: "Add palette" });
+  await addDialog.getByRole("button", { name: "OK", exact: true }).click();
+  await expect(addDialog).toHaveCount(0);
+  const target = (await select.locator("option:checked").textContent())!;
+  await expect(paletteTiles(page)).toHaveCount(0);
+
+  // Select the swatch in Recent. ⌘/Ctrl-click selects; a plain click would
+  // apply the color instead and leave the menu's copy item inert, so assert
+  // the selection landed before relying on it.
+  await selectPalette(page, RECENT_PALETTE_NAME);
+  const swatch = page.locator(panel).getByRole("button", { name: `Swatch ${applied}` });
+  await swatch.click({ modifiers: ["ControlOrMeta"] });
+  await expect(swatch).toHaveAttribute("aria-pressed", "true");
+
+  await openPaletteMenu(page);
+  await page.getByRole("menuitem", { name: "Copy selected swatches to…" }).click();
+  const copyDialog = page.getByRole("dialog", { name: "Copy swatches to" });
+  await copyDialog.getByLabel("Target palette").selectOption({ label: target });
+  await copyDialog.getByRole("button", { name: "Copy", exact: true }).click();
+  await expect(copyDialog).toHaveCount(0);
+
+  await selectPalette(page, target);
+  await expect(page.locator(panel).getByRole("button", { name: `Swatch ${applied}` }))
+    .toBeVisible();
+  // Exactly one: `copySwatchesTo` commits the whole batch once, and a
+  // re-introduced per-color `addSwatch` loop is the regression to catch.
+  await expect(paletteTiles(page)).toHaveCount(1);
+
+  // Copy, not move — the source keeps its swatch.
+  await selectPalette(page, RECENT_PALETTE_NAME);
+  await expect(page.locator(panel).getByRole("button", { name: `Swatch ${applied}` }))
+    .toBeVisible();
 });
 
 test("the Recent palette survives a reload", async ({ page }) => {
