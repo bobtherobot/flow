@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToolBar } from "./ToolBar";
-import { RAIL_WIDTH } from "./rail-layout";
+import { TOOL_RAIL_WIDTH } from "./rail-layout";
 import { DEFAULT_TOOLBAR_STATE } from "./toolbar-state";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
@@ -135,14 +135,10 @@ describe("ToolBar", () => {
     expect(next.y).toBeGreaterThanOrEqual(36);
   });
 
-  it("is 88px wide so the tools sit in two columns", () => {
-    expect(RAIL_WIDTH).toBe(88);
-  });
-
   it("reserves the canvas gutter at the docked width", () => {
     render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
     expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
-      .toBe("88px");
+      .toBe(`${TOOL_RAIL_WIDTH}px`);
   });
 
   it("reserves nothing while floating", () => {

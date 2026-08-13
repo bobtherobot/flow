@@ -3,7 +3,7 @@ import "./toolbar.css";
 import { PartChooser } from "../color/PartChooser";
 import { useColorTarget, type ColorTarget } from "../color/useColorTarget";
 import { ColorPopup } from "./ColorPopup";
-import { RAIL_WIDTH } from "./rail-layout";
+import { TOOL_RAIL_WIDTH } from "./rail-layout";
 import { recordUsedColor } from "../../lib/palette-store";
 import type { MenuPoint } from "../panels/dock/menu-position";
 import type { SelectionStyle } from "../panels/useSelectionStyle";
@@ -76,7 +76,7 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
 
   const anchor = (): MenuPoint => {
     const r = wrapRef.current?.getBoundingClientRect();
-    return { top: r?.top ?? 0, left: (r?.right ?? RAIL_WIDTH) + POPUP_GAP };
+    return { top: r?.top ?? 0, left: (r?.right ?? TOOL_RAIL_WIDTH) + POPUP_GAP };
   };
 
   const closePopup = () => {

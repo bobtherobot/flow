@@ -13,7 +13,7 @@ import { ToolbarConfigMenu } from "./ToolbarConfigMenu";
 import { RailColorControl } from "./RailColorControl";
 import { useActiveTool } from "./useActiveTool";
 import { shouldRedock, withHiddenToggled, type ToolbarState } from "./toolbar-state";
-import { RAIL_WIDTH } from "./rail-layout";
+import { TOOL_RAIL_WIDTH } from "./rail-layout";
 
 const MENUBAR_H = 36;
 /** On first detach, drop the rail this far below the menu bar so its drag grip
@@ -29,7 +29,7 @@ interface ToolBarProps {
 /** Anchor the config dropdown just to the right of the rail's top-left. */
 function configAnchor(el: HTMLElement | null): MenuPoint {
   const r = el?.getBoundingClientRect();
-  return { top: r?.top ?? MENUBAR_H, left: (r?.right ?? RAIL_WIDTH) + 4 };
+  return { top: r?.top ?? MENUBAR_H, left: (r?.right ?? TOOL_RAIL_WIDTH) + 4 };
 }
 
 /**
@@ -57,7 +57,7 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
   // Excalidraw's bottom-left zoom/undo controls clear). Floating/hidden = 0.
   useEffect(() => {
     const root = document.documentElement;
-    const reserved = state.visible && !state.floating ? RAIL_WIDTH : 0;
+    const reserved = state.visible && !state.floating ? TOOL_RAIL_WIDTH : 0;
     root.style.setProperty("--flow-toolbar-reserved", `${reserved}px`);
     return () => {
       root.style.removeProperty("--flow-toolbar-reserved");
@@ -88,15 +88,15 @@ export function ToolBar({ api, state, onChange }: ToolBarProps) {
     },
     onEnd: (m) => {
       if (!m.moved) return;
-      if (shouldRedock(origin.current.x + m.dx)) onChange({ ...state, floating: false });
+      if (shouldRedock(origin.current.x + m.dx, 0)) onChange({ ...state, floating: false });
     },
   });
 
   if (!state.visible) return null;
 
   const shellStyle: CSSProperties = state.floating
-    ? { width: RAIL_WIDTH, top: state.y, left: state.x }
-    : { width: RAIL_WIDTH, top: MENUBAR_H, left: 0, bottom: 0 };
+    ? { width: TOOL_RAIL_WIDTH, top: state.y, left: state.x }
+    : { width: TOOL_RAIL_WIDTH, top: MENUBAR_H, left: 0, bottom: 0 };
 
   return (
     <div

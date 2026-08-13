@@ -1,13 +1,39 @@
 // src/ui/toolbar/rail-layout.ts
 
-/** Docked rail width; also the horizontal gutter reserved on the left. Two
- *  columns of 40px tool buttons plus padding — the second column exists to
- *  make room for the shape tools coming later, and for the color control
- *  pinned at the bottom.
+import type { ToolbarState } from "./toolbar-state";
+
+/** Docked toolbar width: one 36px button column plus 4px padding each side. */
+export const TOOL_RAIL_WIDTH = 44;
+
+/** Docked shapebar width: two 36px button columns plus 4px padding each side.
+ *  Two columns because the shapebar grows to seventeen tools once the new
+ *  parametric shapes land, and a single column of seventeen runs off a laptop
+ *  screen. */
+export const SHAPE_RAIL_WIDTH = 80;
+
+/** A rail occupies a dock slot only when it is both shown and not torn off. */
+export function isRailDocked(state: ToolbarState): boolean {
+  return state.visible && !state.floating;
+}
+
+/**
+ * Total left gutter the canvas must inset by, in px.
  *
- *  Lives in its own module (rather than on `ToolBar.tsx`, which is where it
- *  used to live) so `RailColorControl` can read it without importing
- *  `ToolBar` — the two used to import each other, which happened to be safe
- *  only because the constant was read inside a component body rather than at
- *  module scope, but bought nothing and was one refactor away from breaking. */
-export const RAIL_WIDTH = 88;
+ * Pure so the two callers cannot drift: `ToolRails` writes it to
+ * `--flow-toolbar-reserved`, and App passes the same number to the bottom bar
+ * so its dock offset clears both rails.
+ */
+export function railGutter(toolbar: ToolbarState, shapebar: ToolbarState): number {
+  return (
+    (isRailDocked(toolbar) ? TOOL_RAIL_WIDTH : 0) +
+    (isRailDocked(shapebar) ? SHAPE_RAIL_WIDTH : 0)
+  );
+}
+
+/**
+ * The shapebar's docked left edge. Slots collapse: hide or float the toolbar
+ * and the docked shapebar slides to the screen edge rather than leaving a hole.
+ */
+export function shapebarDockLeft(toolbar: ToolbarState): number {
+  return isRailDocked(toolbar) ? TOOL_RAIL_WIDTH : 0;
+}

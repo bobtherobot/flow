@@ -47,7 +47,18 @@ export function withHiddenToggled(state: ToolbarState, id: string): ToolbarState
   return { ...state, hiddenTools: hidden };
 }
 
-/** Whether a floating rail dropped with its left edge at `x` should re-dock. */
-export function shouldRedock(x: number, margin: number = REDOCK_MARGIN): boolean {
-  return x < margin;
+/**
+ * Whether a floating rail dropped with its left edge at `dropX` should re-dock
+ * into the slot whose left edge is `slotX`.
+ *
+ * The slot is a parameter because the shapebar's slot is not at 0 — it sits to
+ * the right of a docked toolbar. Testing against the screen edge instead would
+ * make a floating shapebar impossible to re-dock by dragging.
+ */
+export function shouldRedock(
+  dropX: number,
+  slotX: number,
+  margin: number = REDOCK_MARGIN,
+): boolean {
+  return dropX - slotX < margin;
 }

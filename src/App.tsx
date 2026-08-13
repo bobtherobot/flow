@@ -50,7 +50,7 @@ import { FLOW_DOCS_URL, FLOW_ISSUES_URL } from "./lib/links";
 import { MenuBar } from "./ui/menubar/MenuBar";
 import { PanelsRoot } from "./ui/panels/PanelsRoot";
 import { ToolBar } from "./ui/toolbar/ToolBar";
-import { RAIL_WIDTH } from "./ui/toolbar/rail-layout";
+import { railGutter } from "./ui/toolbar/rail-layout";
 import { DEFAULT_TOOLBAR_STATE, type ToolbarState } from "./ui/toolbar/toolbar-state";
 import { QuickBar } from "./ui/quickbar/QuickBar";
 import { DEFAULT_QUICKBAR_STATE, type QuickbarState } from "./ui/quickbar/quickbar-state";
@@ -67,6 +67,11 @@ import { useStyleMemory } from "./ui/useStyleMemory";
 import { useToolOverride } from "./ui/toolbar/useToolOverride";
 
 const AUTOSAVE_DELAY_MS = 800;
+
+/** Placeholder for the not-yet-wired shapebar (Task 7 replaces it with real
+ *  state). Absent, so `railGutter` reserves the toolbar's width alone —
+ *  exactly what App reserved before. */
+const NO_SHAPEBAR: ToolbarState = { ...DEFAULT_TOOLBAR_STATE, visible: false };
 
 /** The element list Excalidraw hands `onChange` on every scene update. */
 type SceneChangeElements = Parameters<
@@ -462,7 +467,7 @@ export default function App() {
         state={bottombar}
         onChange={setBottombar}
         onSearch={runSearch}
-        toolbarReserved={toolbar.visible && !toolbar.floating ? RAIL_WIDTH : 0}
+        toolbarReserved={railGutter(toolbar, NO_SHAPEBAR)}
       />
 
       {saveOpen && (

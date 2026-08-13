@@ -40,17 +40,19 @@ describe("withHiddenToggled", () => {
 });
 
 describe("shouldRedock", () => {
-  it("re-docks only when the left edge is within the tight 10px margin", () => {
-    expect(shouldRedock(5)).toBe(true);
-    expect(shouldRedock(20)).toBe(false);
-    expect(shouldRedock(200)).toBe(false);
+  it("redocks a drop at or left of its own slot", () => {
+    expect(shouldRedock(0, 0)).toBe(true);
+    expect(shouldRedock(44, 44)).toBe(true);
+    expect(shouldRedock(20, 44)).toBe(true);
   });
 
-  it("redocks on the left edge regardless of rail width", () => {
-    // shouldRedock tests the rail's left edge against the viewport, so the
-    // 48 -> 88 widening must not change the threshold.
-    expect(shouldRedock(9)).toBe(true);
-    expect(shouldRedock(10)).toBe(false);
-    expect(shouldRedock(87)).toBe(false);
+  it("redocks a drop just short of the slot's margin", () => {
+    expect(shouldRedock(9, 0)).toBe(true);
+    expect(shouldRedock(54, 44)).toBe(false);
+  });
+
+  it("leaves a drop out past the margin floating", () => {
+    expect(shouldRedock(300, 0)).toBe(false);
+    expect(shouldRedock(300, 44)).toBe(false);
   });
 });
