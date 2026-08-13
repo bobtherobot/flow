@@ -78,20 +78,34 @@
   color: var(--flow-ink);
 }
 
-/* Tool button grid (two columns). */
+/*
+ * Content box: tool grid plus the optional footer.
+ *
+ * A docked rail's shell runs to the bottom of the viewport (that's where its
+ * background and right hairline come from), but its contents must not — the
+ * rail used to lay out differently docked than floating because this grid was
+ * `flex: 1 1 auto` and absorbed that height, and the color footer's
+ * `margin-top: auto` then rode it to the very bottom of the screen. `0 1 auto`
+ * hugs the content in both modes, and only shrinks — into a scroll — when the
+ * tools genuinely don't fit the available height.
+ */
+.flow-toolbar__content {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Tool button grid. Fixed 36px tracks, not `1fr`: `1fr` tracks resize with the
+   shell, which is the other half of the docked/floating mismatch. */
 .flow-toolbar__tools {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(var(--flow-rail-cols, 1), 36px);
+  justify-content: center;
   gap: 2px;
   padding: 4px;
-  overflow-y: auto;
-  flex: 1 1 auto;
-  min-height: 0;
-  /* `.flow-toolbar` is `align-items: center`, so without this the grid hugs
-     its content and centres itself — the `1fr` tracks then size to max-content
-     instead of splitting the rail, and anything wider than the buttons (the
-     quartet in Task 16's control) overflows. */
-  align-self: stretch;
 }
 .flow-toolbar__btn {
   display: inline-flex;
@@ -116,12 +130,12 @@
   color: var(--flow-accent);
 }
 
-/* Pinned to the bottom of the rail, below the scrolling tool grid. */
+/* Directly under the tool grid — docked and floating alike. No `margin-top:
+   auto`: pinning it to the shell's foot is exactly the shift this removes. */
 .flow-toolbar__color {
   display: flex;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: auto;
   padding: 8px 4px;
   border-top: 1px solid var(--flow-border);
 }

@@ -183,4 +183,27 @@ describe("ToolRail", () => {
     const { container } = renderRail();
     expect(container.querySelector(".flow-toolbar__color")).toBeNull();
   });
+
+  it("wraps the tool grid in a content box so a docked rail does not stretch it", () => {
+    const { container } = renderRail();
+    const content = container.querySelector(".flow-toolbar__content");
+    expect(content).toBeInTheDocument();
+    expect(content!.querySelector(".flow-toolbar__tools")).toBeInTheDocument();
+  });
+
+  it("drives the grid column count from the columns prop", () => {
+    const { container } = renderRail();
+    const grid = container.querySelector<HTMLElement>(".flow-toolbar__tools");
+    expect(grid!.style.getPropertyValue("--flow-rail-cols")).toBe("1");
+  });
+
+  it("caps a floating rail's height so a tall one scrolls instead of overflowing", () => {
+    const { container } = renderRail({ ...DEFAULT_TOOLBAR_STATE, floating: true, y: 100 });
+    const shell = container.querySelector<HTMLElement>(".flow-toolbar");
+    // jsdom's calc() serializer re-normalizes term order/signs on readback
+    // (confirmed independent of source order), so the echoed string isn't the
+    // literal source `calc(100vh - 100px - 8px)` — it's the same expression,
+    // reordered by jsdom.
+    expect(shell!.style.maxHeight).toBe("calc(100vh - 8px + 100px)");
+  });
 });

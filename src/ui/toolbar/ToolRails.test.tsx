@@ -58,4 +58,16 @@ describe("ToolRails", () => {
     expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
       .toBe("0px");
   });
+
+  it("puts the color control inside the content box, after the tool grid", () => {
+    // Asserting only that the radiogroup exists would pass even if it were
+    // mounted above the tool grid, or outside the content box where a docked
+    // rail's stretch would shove it to the foot.
+    const { container } = renderRails();
+    const content = container.querySelector(".flow-toolbar__content")!;
+    const tools = content.querySelector(".flow-toolbar__tools")!;
+    const color = content.querySelector(".flow-toolbar__color");
+    expect(color).toBeInTheDocument();
+    expect(tools.compareDocumentPosition(color!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

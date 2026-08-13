@@ -133,31 +133,37 @@ export function ToolRail({
         </button>
       </div>
 
-      <div
-        className="flow-toolbar__tools"
-        style={{ "--flow-rail-cols": columns } as CSSProperties}
-      >
-        {tools
-          .filter((t) => !state.hiddenTools.includes(t.id))
-          .map((t) => {
-            const toolType = t.toolType ?? t.id;
-            // Arrow variants share activeType "arrow"; disambiguate on the shape.
-            const active =
-              activeType === toolType && (t.arrowType === undefined || arrowType === t.arrowType);
-            return (
-              <ToolButton
-                key={t.id}
-                icon={TOOL_ICONS[t.id]}
-                label={t.label}
-                shortcut={t.shortcut}
-                active={active}
-                onClick={() => setTool(toolType, t.arrowType)}
-              />
-            );
-          })}
+      {/* Content box, not a bare grid: a docked shell is viewport-tall, and a
+          stretching grid is what used to make the docked layout differ from the
+          floating one. `flex: 0 1 auto` hugs the content and only shrinks (into
+          a scroll) when the tools genuinely don't fit. */}
+      <div className="flow-toolbar__content">
+        <div
+          className="flow-toolbar__tools"
+          style={{ "--flow-rail-cols": columns } as CSSProperties}
+        >
+          {tools
+            .filter((t) => !state.hiddenTools.includes(t.id))
+            .map((t) => {
+              const toolType = t.toolType ?? t.id;
+              // Arrow variants share activeType "arrow"; disambiguate on the shape.
+              const active =
+                activeType === toolType &&
+                (t.arrowType === undefined || arrowType === t.arrowType);
+              return (
+                <ToolButton
+                  key={t.id}
+                  icon={TOOL_ICONS[t.id]}
+                  label={t.label}
+                  shortcut={t.shortcut}
+                  active={active}
+                  onClick={() => setTool(toolType, t.arrowType)}
+                />
+              );
+            })}
+        </div>
+        {footer}
       </div>
-
-      {footer}
 
       {menuOpen && (
         <ToolbarConfigMenu
