@@ -49,7 +49,7 @@ import { ensureExtension, stripExtension } from "./lib/filename";
 import { FLOW_DOCS_URL, FLOW_ISSUES_URL } from "./lib/links";
 import { MenuBar } from "./ui/menubar/MenuBar";
 import { PanelsRoot } from "./ui/panels/PanelsRoot";
-import { ToolBar } from "./ui/toolbar/ToolBar";
+import { ToolRails } from "./ui/toolbar/ToolRails";
 import { railGutter } from "./ui/toolbar/rail-layout";
 import { DEFAULT_TOOLBAR_STATE, type ToolbarState } from "./ui/toolbar/toolbar-state";
 import { QuickBar } from "./ui/quickbar/QuickBar";
@@ -115,7 +115,7 @@ export default function App() {
   }, []);
 
   // Tool-rail layout/config. App owns it so the View menu can read visibility;
-  // ToolBar mutates it via onChange. Persisted to flow.toolbar.
+  // ToolRails mutates it via onChange. Persisted to flow.toolbar.
   const [toolbar, setToolbar] = useState<ToolbarState>(() => getToolbarState());
   useEffect(() => {
     setToolbarState(toolbar);
@@ -452,7 +452,15 @@ export default function App() {
         <PanelsRoot api={excalidrawApi} units={units} search={search} />
       </div>
 
-      <ToolBar api={excalidrawApi} state={toolbar} onChange={setToolbar} />
+      {/* Task 5 scaffold: the shapebar is not wired until Task 7, so it is
+          passed as absent and its onChange is a no-op. */}
+      <ToolRails
+        api={excalidrawApi}
+        toolbar={toolbar}
+        onToolbarChange={setToolbar}
+        shapebar={NO_SHAPEBAR}
+        onShapebarChange={() => {}}
+      />
 
       <QuickBar
         api={excalidrawApi}

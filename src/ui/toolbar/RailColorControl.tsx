@@ -51,7 +51,7 @@ export function RailColorControl({ sel }: { sel: SelectionStyle }) {
 
   /**
    * The popup can be unmounted with a session in flight — `View ▸ Show
-   * Toolbar` makes `ToolBar` return null, taking this component and the popup
+   * Toolbar` makes `ToolRail` return null, taking this component and the popup
    * with it. Same hazard `cancelEyeDropper` guards in ColorPopup/ColorPanel,
    * same cleanup-effect shape. Without this the session's color is lost.
    * `lastHex` is a ref and `recordUsedColor` a module import, so the empty

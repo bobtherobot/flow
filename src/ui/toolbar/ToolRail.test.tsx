@@ -1,9 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ToolBar } from "./ToolBar";
+import { ToolRail } from "./ToolRail";
+import { ALL_TOOLS, TOOLS, SHAPES } from "./tools";
 import { TOOL_RAIL_WIDTH } from "./rail-layout";
-import { DEFAULT_TOOLBAR_STATE } from "./toolbar-state";
+import {
+  DEFAULT_TOOLBAR_STATE,
+  DEFAULT_SHAPEBAR_STATE,
+  type ToolbarState,
+} from "./toolbar-state";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
 function fakeApi(type = "selection", locked = false, currentItemArrowType = "sharp") {
@@ -26,37 +31,54 @@ function fakeApi(type = "selection", locked = false, currentItemArrowType = "sha
   } as unknown as ExcalidrawAPI;
 }
 
-describe("ToolBar", () => {
+function renderRail(
+  state = DEFAULT_TOOLBAR_STATE,
+  api = fakeApi(),
+  onChange: (next: ToolbarState) => void = () => {},
+  tools = ALL_TOOLS,
+) {
+  return render(
+    <ToolRail
+      api={api}
+      tools={tools}
+      width={TOOL_RAIL_WIDTH}
+      columns={1}
+      label="Tools"
+      noun="toolbar"
+      dockLeft={0}
+      state={state}
+      onChange={onChange}
+    />,
+  );
+}
+
+describe("ToolRail", () => {
   it("renders nothing when not visible", () => {
-    render(
-      <ToolBar api={fakeApi()} state={{ ...DEFAULT_TOOLBAR_STATE, visible: false }} onChange={() => {}} />,
-    );
+    renderRail({ ...DEFAULT_TOOLBAR_STATE, visible: false });
     expect(screen.queryByRole("toolbar", { name: "Tools" })).toBeNull();
   });
 
   it("renders a button for every visible tool", () => {
-    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    renderRail();
     expect(screen.getByRole("button", { name: "Rectangle" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Keep tool active" })).toBeNull();
   });
 
   it("omits a hidden tool", () => {
-    render(
-      <ToolBar api={fakeApi()} state={{ ...DEFAULT_TOOLBAR_STATE, hiddenTools: ["frame"] }} onChange={() => {}} />,
-    );
+    renderRail({ ...DEFAULT_TOOLBAR_STATE, hiddenTools: ["frame"] });
     expect(screen.queryByRole("button", { name: "Frame" })).toBeNull();
   });
 
   it("dispatches setActiveTool when a tool is clicked", async () => {
     const user = userEvent.setup();
     const api = fakeApi();
-    render(<ToolBar api={api} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    renderRail(DEFAULT_TOOLBAR_STATE, api);
     await user.click(screen.getByRole("button", { name: "Diamond" }));
     expect(api.setActiveTool).toHaveBeenCalledWith({ type: "diamond" });
   });
 
   it("renders the three arrow-shape tools", () => {
-    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    renderRail();
     expect(screen.getByRole("button", { name: "Arrow" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Curved arrow" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Elbow arrow" })).toBeInTheDocument();
@@ -65,7 +87,7 @@ describe("ToolBar", () => {
   it("selecting the curved arrow sets the round default and activates the arrow tool", async () => {
     const user = userEvent.setup();
     const api = fakeApi();
-    render(<ToolBar api={api} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    renderRail(DEFAULT_TOOLBAR_STATE, api);
     await user.click(screen.getByRole("button", { name: "Curved arrow" }));
     expect(api.updateScene).toHaveBeenCalledWith({
       appState: { currentItemArrowType: "round" },
@@ -74,9 +96,7 @@ describe("ToolBar", () => {
   });
 
   it("highlights only the arrow variant matching the current shape", () => {
-    render(
-      <ToolBar api={fakeApi("arrow", false, "elbow")} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />,
-    );
+    renderRail(DEFAULT_TOOLBAR_STATE, fakeApi("arrow", false, "elbow"));
     expect(screen.getByRole("button", { name: "Elbow arrow" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -91,25 +111,25 @@ describe("ToolBar", () => {
   it("dispatches setActiveTool when the laser tool is clicked", async () => {
     const user = userEvent.setup();
     const api = fakeApi();
-    render(<ToolBar api={api} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    renderRail(DEFAULT_TOOLBAR_STATE, api);
     await user.click(screen.getByRole("button", { name: "Laser pointer" }));
     expect(api.setActiveTool).toHaveBeenCalledWith({ type: "laser" });
   });
 
   it("marks the active tool as pressed", () => {
-    render(<ToolBar api={fakeApi("ellipse")} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    renderRail(DEFAULT_TOOLBAR_STATE, fakeApi("ellipse"));
     expect(screen.getByRole("button", { name: "Ellipse" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("marks the laser tool as pressed when active", () => {
-    render(<ToolBar api={fakeApi("laser")} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    renderRail(DEFAULT_TOOLBAR_STATE, fakeApi("laser"));
     expect(screen.getByRole("button", { name: "Laser pointer" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("hides the rail via the hamburger's Hide toolbar item", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={onChange} />);
+    renderRail(DEFAULT_TOOLBAR_STATE, fakeApi(), onChange);
     await user.click(screen.getByRole("button", { name: "Toolbar options" }));
     await user.click(screen.getByRole("menuitem", { name: "Hide toolbar" }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ visible: false }));
@@ -117,7 +137,7 @@ describe("ToolBar", () => {
 
   it("opens the config menu from the hamburger", async () => {
     const user = userEvent.setup();
-    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
+    renderRail();
     await user.click(screen.getByRole("button", { name: "Toolbar options" }));
     expect(screen.getByRole("menuitem", { name: "Detach toolbar" })).toBeInTheDocument();
   });
@@ -127,7 +147,7 @@ describe("ToolBar", () => {
     const onChange = vi.fn();
     // Docked default has y:0; detaching from (0,0) must not leave the rail (and
     // its grip) under the 36px menu bar.
-    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={onChange} />);
+    renderRail(DEFAULT_TOOLBAR_STATE, fakeApi(), onChange);
     await user.click(screen.getByRole("button", { name: "Toolbar options" }));
     await user.click(screen.getByRole("menuitem", { name: "Detach toolbar" }));
     const next = onChange.mock.calls[0][0];
@@ -135,32 +155,32 @@ describe("ToolBar", () => {
     expect(next.y).toBeGreaterThanOrEqual(36);
   });
 
-  it("reserves the canvas gutter at the docked width", () => {
-    render(<ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />);
-    expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
-      .toBe(`${TOOL_RAIL_WIDTH}px`);
+  it("renders only the tools it is handed", () => {
+    renderRail(DEFAULT_TOOLBAR_STATE, fakeApi(), () => {}, TOOLS);
+    expect(screen.getByRole("button", { name: "Laser pointer" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Rectangle" })).toBeNull();
   });
 
-  it("reserves nothing while floating", () => {
+  it("labels its hamburger and menu from the noun", () => {
     render(
-      <ToolBar api={fakeApi()} state={{ ...DEFAULT_TOOLBAR_STATE, floating: true }} onChange={() => {}} />,
+      <ToolRail
+        api={fakeApi()}
+        tools={SHAPES}
+        width={80}
+        columns={2}
+        label="Shapes"
+        noun="shapebar"
+        dockLeft={44}
+        state={DEFAULT_SHAPEBAR_STATE}
+        onChange={() => {}}
+      />,
     );
-    expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
-      .toBe("0px");
+    expect(screen.getByRole("toolbar", { name: "Shapes" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Shapebar options" })).toBeInTheDocument();
   });
 
-  it("mounts the rail's color control beneath the tool grid", () => {
-    // Asserting only that the radiogroup exists would pass even if it were
-    // mounted above the tool grid instead of pinned below it — check DOM order.
-    const { container } = render(
-      <ToolBar api={fakeApi()} state={DEFAULT_TOOLBAR_STATE} onChange={() => {}} />,
-    );
-    const tools = container.querySelector(".flow-toolbar__tools");
-    const colorControl = container.querySelector(".flow-toolbar__color");
-    expect(tools).toBeInTheDocument();
-    expect(colorControl).toBeInTheDocument();
-    expect(
-      tools!.compareDocumentPosition(colorControl!) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+  it("renders a footer only when given one", () => {
+    const { container } = renderRail();
+    expect(container.querySelector(".flow-toolbar__color")).toBeNull();
   });
 });

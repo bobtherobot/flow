@@ -2,9 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToolbarConfigMenu } from "./ToolbarConfigMenu";
+import { ALL_TOOLS, SHAPES } from "./tools";
 
 const base = {
   floating: false,
+  noun: "toolbar",
+  tools: ALL_TOOLS,
   hiddenTools: [] as string[],
   anchor: { top: 40, left: 60 },
   onToggleFloating: () => {},
@@ -53,5 +56,24 @@ describe("ToolbarConfigMenu", () => {
     render(<ToolbarConfigMenu {...base} onHide={onHide} />);
     await user.click(screen.getByRole("menuitem", { name: "Hide toolbar" }));
     expect(onHide).toHaveBeenCalledOnce();
+  });
+
+  it("lists one checkbox per tool it is given, named from the noun", () => {
+    render(
+      <ToolbarConfigMenu
+        floating={false}
+        noun="shapebar"
+        tools={SHAPES}
+        hiddenTools={[]}
+        anchor={{ top: 0, left: 0 }}
+        onToggleFloating={() => {}}
+        onToggleTool={() => {}}
+        onHide={() => {}}
+      />,
+    );
+    expect(screen.getByRole("menuitem", { name: "Detach shapebar" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Hide shapebar" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Diamond")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Laser pointer")).toBeNull();
   });
 });

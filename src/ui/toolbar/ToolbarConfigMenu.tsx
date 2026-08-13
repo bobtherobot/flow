@@ -1,17 +1,19 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { clampMenuPosition, type MenuPoint } from "../panels/dock/menu-position";
-// TEMPORARY (Task 2 → removed in Task 7): the config menu still shows every tool so
-// this commit changes no UI. Task 7 hands each rail its own list as a prop.
-import { ALL_TOOLS } from "./tools";
+import type { ToolDef } from "./tools";
 
 interface ToolbarConfigMenuProps {
   floating: boolean;
+  /** Lowercase rail noun for the action labels ("toolbar" / "shapebar"). */
+  noun: string;
+  /** The rail's tools — one show/hide checkbox each. */
+  tools: readonly ToolDef[];
   hiddenTools: string[];
   /** Ideal top-left (near the hamburger); clamped into the viewport on mount. */
   anchor: MenuPoint;
   onToggleFloating: () => void;
   onToggleTool: (id: string) => void;
-  /** Hide the whole rail (mirrors View ▸ Show Toolbar). */
+  /** Hide the whole rail (mirrors View ▸ Show Toolbar / Show Shapebar). */
   onHide: () => void;
 }
 
@@ -22,6 +24,8 @@ interface ToolbarConfigMenuProps {
  */
 export function ToolbarConfigMenu({
   floating,
+  noun,
+  tools,
   hiddenTools,
   anchor,
   onToggleFloating,
@@ -45,7 +49,7 @@ export function ToolbarConfigMenu({
     );
   }, [anchor]);
 
-  const rows = ALL_TOOLS.map((t) => ({ id: t.id as string, label: t.label }));
+  const rows = tools.map((t) => ({ id: t.id as string, label: t.label }));
 
   return (
     <div
@@ -60,7 +64,7 @@ export function ToolbarConfigMenu({
         role="menuitem"
         onClick={onToggleFloating}
       >
-        {floating ? "Dock toolbar" : "Detach toolbar"}
+        {floating ? `Dock ${noun}` : `Detach ${noun}`}
       </button>
       <button
         type="button"
@@ -68,7 +72,7 @@ export function ToolbarConfigMenu({
         role="menuitem"
         onClick={onHide}
       >
-        Hide toolbar
+        Hide {noun}
       </button>
       <div className="flow-pnl-config__sep" />
       {rows.map((r) => (
