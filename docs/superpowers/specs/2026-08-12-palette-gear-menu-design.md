@@ -124,6 +124,19 @@ It scrubs each color, drops those already present in the target, appends the
 rest, and commits **once**. Looping `addSwatch` would fire one notification and
 one `localStorage` write per swatch for a single user action.
 
+**Copies into Recent are not guaranteed to survive, and that is accepted.**
+`copySwatchesTo` applies no cap, but `recordUsedColor` truncates Recent to
+`RECENT_PALETTE_LIMIT` (20) every time a color is captured. Recent is an
+offered destination like any other, so copying 15 swatches into an already
+full Recent leaves 35 colors there until the next rail-popup close silently
+drops the overflow. Capping the copy, or removing Recent from the destination
+list, were both considered and rejected: Recent is a self-truncating scratch
+list by design, and a copy into it is a "keep this handy for now" gesture, not
+an archival one. Being the one path that can *shrink* a palette while a
+selection is still held, it is also the reason `copySwatchesTo` guards each
+entry with `typeof color === "string"` — a stale index resolves to `undefined`
+and `scrubHex` would throw on it.
+
 ## What this retires
 
 - **Double-click-to-rename**, and with it the entire `abandonRename` ref and its

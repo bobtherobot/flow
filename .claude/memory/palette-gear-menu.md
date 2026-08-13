@@ -14,6 +14,11 @@ Verification at the end of Task 6: unit **936/936 (85 files)**, typecheck exit
 container-padding failures and nothing else. No new runtime dependency, zero
 fork edits.
 
+A final whole-branch review then produced one more fix wave (unit **946/946**,
+typecheck 0, `color-panel.spec.ts` 26/26): the portal-bubbling data-loss bug,
+the menu's focus management, the `copySwatchesTo` stale-index guard, and the
+menu's missing shadow/font. Those sections below are the post-fix state.
+
 Builds directly on [[recent-palette]] and [[color-system]]; it invalidates
 parts of [[recent-palette]]'s UI description, which has been corrected in
 place.
@@ -76,6 +81,46 @@ matching, so a press on the gear closes the menu on `pointerdown` and the
 becomes unreachable** and the gear appears to do nothing on second press. Same
 trigger-guard shape `ColorPopup` uses. Covered by a unit test added in Task 3.
 
+## Portal event bubbling: the named pattern behind two bugs here
+
+**A `createPortal` moves the DOM node, not the React tree.** React synthetic
+events bubble along the *React* tree, so every event raised inside a portaled
+child still reaches its React parent's handlers, even though the two are in
+completely different parts of the DOM. Anything a parent does "to its own
+subtree" therefore silently applies to its portaled children as well.
+
+This branch shipped **two** bugs of exactly this shape, both of which were
+correct in isolation and wrong composed:
+
+1. **Focus return** (below). `PaletteDialog` restored `document.activeElement`,
+   which the composition had already detached.
+2. **`onGridKeyDown` deleting swatches from inside a modal.**
+   `PaletteSection`'s root div carries `onKeyDown={onGridKeyDown}`, and the
+   menu and all four dialogs are React children of it. Backspace typed on a
+   dialog's Cancel button, or on the delete-confirm dialog's container (a
+   `<form>`, and its default initial focus target), reached the grid handler
+   and deleted the user's selected swatches out from under a dialog claiming
+   `aria-modal="true"`. Palettes have **no undo**, so the loss was silent and
+   unrecoverable. Newly reachable on this branch: the retired inline confirm
+   could only open with `selected.length === 0`, so that branch was dead.
+
+Fixed with `if (menuOpen || dialog) return;` at the top of `onGridKeyDown`.
+
+**The `INPUT`/`SELECT` tag check below that guard is NOT redundant — do not
+delete it.** A prior review logged "onGridKeyDown's `INPUT`/`TEXTAREA` branches
+are now unreachable" as a cleanup candidate; **that entry is false.** `INPUT`
+fires on every keystroke in the rename and add dialogs' name field, `SELECT`
+on the copy dialog's target picker *and* on the footer's own palette dropdown,
+which sits in the plain DOM subtree behind no guard at all. Only `TEXTAREA` is
+genuinely dead. Removing the check would restore the data loss.
+
+The general rule for this repo: **a portaled child is still a React child.**
+When a container handler acts on "its" subtree — keyboard shortcuts, click-away,
+selection clearing — check whether a portal puts something unexpected inside it,
+and gate on the state that says a portal is open. Neither child's unit suite can
+see this; the regression test has to live in the composed component
+(`PaletteSection.test.tsx`).
+
 ## The focus-return bug lived only in the *composition*
 
 `PaletteDialog` originally captured `document.activeElement` at render and
@@ -103,6 +148,37 @@ closes"`. Note its every `.focus()` call is load-bearing — jsdom's
 `fireEvent.click` does not move focus, so a click-only version of that test
 captures `<body>`, restores `<body>`, and passes against the bug.
 
+## `PaletteMenu` manages its own focus, because it portals
+
+Body-portaled overlays cannot rely on document order. The five items are the
+**last** focusable elements in the document, so a keyboard user reaches them
+only by tabbing the entire app — which made the `aria-disabled`-over-`disabled`
+argument above ("a keyboard user could not land on the item to find out why")
+hollow as originally shipped: they could not land on *any* item.
+
+Three pieces, all load-bearing:
+
+- **Initial focus** on the first `menuitem`, in a mount effect.
+- **Focus return to `returnFocusTo`** (PaletteSection points it at the gear) on
+  Escape and outside press, via the `dismiss()` wrapper. Done explicitly rather
+  than on unmount, because unmount is *also* how the menu leaves when an item
+  opens a dialog — and that dialog takes focus for itself.
+- **`onDeleteSwatches` returns focus itself**, in `PaletteSection`. It is the
+  only item with no dialog, so nothing mounts to claim focus and the item
+  holding it is unmounted by its own click. Before the fix this path dumped the
+  user at `<body>` — the same regression class as the dialog focus-return bug.
+
+Arrow keys (Up/Down cycling, Home/End) read the items from the DOM on each
+press and deliberately land on inert items, which is the point of
+`aria-disabled`. `PanelConfigMenu` needs none of this: it renders **inline** in
+`PanelShell`'s tree, so it already occupies a sane tab position. Do not cite it
+as precedent for a portaled menu.
+
+The tests for the two return paths each `.focus()` a menu item explicitly
+before acting. Without that, "focus is on the gear afterwards" is true for free
+(focus never left it) and the test passes against the bug — the same trap the
+dialog focus-return test documents.
+
 ## `.flow-clr-palette__menu` is `z-index: 130`, sandwiched deliberately
 
 - Below ~90 it renders **invisibly behind the docked panel** — `.flow-pnl` is
@@ -115,6 +191,18 @@ captures `<body>`, restores `<body>`, and passes against the bug.
 Everything in this stack is `position: fixed` with explicit z-indexes, so paint
 order is decided entirely by these numbers — there is no DOM-order fallback to
 rescue a wrong one.
+
+**A body portal inherits nothing.** The menu claims to match `.flow-pnl-config`
+and originally omitted `box-shadow: var(--flow-shadow)`, `font-family:
+var(--flow-font)` and `font-size: 12px`, plus `font: inherit` on the item —
+`<button>` does not inherit font, so the five items rendered in Chrome's default
+control font inside the app's own chrome, with no shadow under a menu that
+floats over the canvas. All four are now present. The dialog bodies' native
+controls carry `flow-input` (from `dialogs.css`, the same class
+`LayoutManagerDialog` uses) alongside their palette classes for the same reason.
+Tokens: `--flow-shadow` and `--flow-font` are real, defined on `:root` in
+`menubar.css`. Verify any token before using it — an earlier task in this
+feature found a plan naming three that do not exist here.
 
 The menu measures itself in `useLayoutEffect` and clamps on-screen via
 `clampMenuPosition` before paint, because the Color panel can be docked against
@@ -159,6 +247,24 @@ Also: "delete selected swatches" is the **only** menu item with no dialog. It
 is undoable by re-adding the color, and the selection itself is the
 confirmation.
 
+### Copying into Recent can silently lose colors — accepted, not an oversight
+
+`copySwatchesTo` applies no cap; `recordUsedColor` truncates Recent to
+`RECENT_PALETTE_LIMIT` (20) on every capture. Recent is an offered destination,
+so copying 15 swatches into a full Recent yields 35 colors and the next
+rail-popup close discards the overflow without saying so. **The human partner
+ruled: accept and document.** Do not cap `copySwatchesTo` and do not remove
+Recent from the destination list — Recent is a self-truncating scratch list by
+design, and copying into it is a "keep this handy" gesture, not an archival one.
+Also recorded in the spec under Copying semantics.
+
+The one thing that *was* fixed: truncation is the only path that can **shrink**
+a palette while a selection is still held, so `current.colors[i]` at the copy
+dialog's confirm can be `undefined` and `scrubHex(undefined)` throws on
+`input.trim()`. `copySwatchesTo`'s scrub loop guards with
+`typeof color === "string"`. The `string[]` signature makes that look like dead
+defensiveness; it is not — the array is built by indexing a live palette.
+
 ## Dialog state is one nullable discriminated field
 
 `useState<null | { kind: "rename"|"add"|"delete"|"copy" }>` rather than four
@@ -171,8 +277,10 @@ keeping if someone adds a fifth dialog.
 first and last focusable descendants. When the dialog **body has nothing
 focusable** — only the delete-confirm dialog, whose body is a bare `<p>` — the
 container itself holds focus on open (it has `tabIndex={-1}`), and the
-container is in the focusable list at *neither* end. Comparing against `first`
-alone therefore left **Shift+Tab as the very first keystroke** unhandled, and
+container is **not in the focusable list at all**: `queryFocusable` calls
+`querySelectorAll` on the container, which never returns the container itself,
+and `FOCUSABLE_SELECTOR` excludes `[tabindex="-1"]` besides. Comparing against
+`first` alone therefore left **Shift+Tab as the very first keystroke** unhandled, and
 focus walked backward out of the dialog into the page behind an
 `aria-modal="true"` backdrop. Fixed by treating the container as a first
 boundary too:
