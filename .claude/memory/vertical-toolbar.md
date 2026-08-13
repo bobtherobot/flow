@@ -81,7 +81,7 @@ The single 88px, 15-tool rail became two docked rails: a 44px "Tools" toolbar
 (9 non-shape tools, color part-chooser at its foot) and an 80px two-column
 "Shapes" shapebar (arrow ×3, rectangle, diamond, ellipse) docked flush to its
 right. Docked and floating layouts are identical for both. Spec/plan:
-`.superpowers/sdd/2026-08-12-toolbar-shapebar-split/`.
+`docs/superpowers/specs|plans/2026-08-12-toolbar-shapebar-split*.md`.
 
 - **One `ToolRail` component, two instances, mounted by `ToolRails`.**
   `ToolRails` (`src/ui/toolbar/ToolRails.tsx`) is the single writer of
@@ -164,3 +164,13 @@ right. Docked and floating layouts are identical for both. Spec/plan:
   grid's **height** exactly (that's the axis the real bug lived on) and
   allows ±1px on width and on both y-offsets, with this border asymmetry
   named in a comment at the assertion site.
+- **Shape extension: listing is additive, activation is not.** `ToolDef` carries
+  only `{id, label, shortcut, toolType?, arrowType?}`. Adding eleven new shapes
+  as `line` elements with `polygon: true` will require a third optional field
+  (e.g., `shapeType?`) in `ToolDef` and a matching branch in `useActiveTool.setTool`
+  — same pattern as `arrowType`, so no architectural corners painted. Work lands in
+  activation, not in the shape list itself.
+- **Tripwire for new shapes: `src/ui/toolbar/tools.test.ts` checks every non-arrow
+  tool has a non-empty shortcut.** All eleven new shapes will carry `shortcut: ""`,
+  so the assertion fails on the first additive entry. This is healthy tooling, not a
+  bug — widen the assertion deliberately rather than being surprised by it.
