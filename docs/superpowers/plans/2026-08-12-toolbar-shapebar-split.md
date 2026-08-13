@@ -1925,3 +1925,52 @@ Expected: unit green, typecheck clean, e2e green but for the two known `text-pan
 git add e2e/shapebar.spec.ts e2e/toolbar.spec.ts .claude/memory/
 git commit -m "test(e2e): shapebar docking, and the docked-equals-floating invariant"
 ```
+
+## Post-implementation amendments
+
+Recorded during the final whole-branch review fix wave, so a future reader
+diffing this plan against the shipped code trusts the code, not the plan text
+below.
+
+1. **Task 3's `shouldRedock(53, 44) === false` was arithmetically impossible.**
+   With the default `REDOCK_MARGIN = 10`, `shouldRedock(dropX, slotX)` is
+   `dropX - slotX < margin`. `53 - 44 = 9`, and `9 < 10` is `true` — the exact
+   opposite of what the plan's test asserted. The shipped test
+   (`src/ui/toolbar/toolbar-state.test.ts`) uses `shouldRedock(54, 44)`
+   instead: `54 - 44 = 10`, which is not `< 10`, so `false` is the correct,
+   reachable boundary case. Any future edit to this block should use `54`, not
+   copy `53` back out of this plan.
+
+2. **Task 5 was framed as a pure refactor ("every existing test must pass with
+   only its import path and props changed") but it wasn't one.** It shipped
+   with the floating-rail `FLOAT_BOTTOM_GAP` max-height clamp — new behavior,
+   not present on the pre-split single rail — and that clamp shipped without a
+   lower bound, which the final review's MINOR 7 fixed by wrapping it in
+   `max(MIN_FLOAT_H, …)` (`src/ui/toolbar/ToolRail.tsx`). Read Task 5 as
+   "mostly a refactor, plus one piece of genuinely new layout behavior," not
+   as behavior-preserving in full.
+
+3. **The spec's single `label` prop was split into two.** `ToolRailProps` in
+   the design spec has one `label: string` documented as "aria-label + the
+   noun in the hamburger's 'Hide …' item." The implementation instead has
+   `label` (the `aria-label` on the `role="toolbar"` element, e.g. "Tools" /
+   "Shapes") and a separate `noun` (the lowercase word used in menu strings,
+   e.g. "toolbar" / "shapebar" — "Detach toolbar", "Hide shapebar"). This is
+   the better call: "Tools" cannot substitute for "toolbar" in "Hide Tools"
+   without reading wrong, and the two needed to vary independently. Go by
+   `ToolRailProps` in `src/ui/toolbar/ToolRail.tsx`, not the spec's interface
+   block.
+
+4. **The floating clamp shipped as an inline style, not the spec's CSS
+   variable.** The spec describes floating rails getting
+   `max-height: calc(100vh - var(--flow-rail-top) - 8px)` in the stylesheet,
+   with a `--flow-rail-top` custom property supplying the rail's own top
+   offset. No such variable exists anywhere in the shipped code. Instead,
+   `ToolRail.tsx` computes the whole `max-height` value inline from
+   `state.y` (the rail's own tracked floating position) each render:
+   `` `max(${MIN_FLOAT_H}px, calc(100vh - ${state.y}px - ${FLOAT_BOTTOM_GAP}px))` ``
+   (the `max(...)` floor is the MINOR 7 addition from item 2 above). This
+   avoids a CSS custom property that would need its own write-site and
+   avoids a re-render-vs-repaint sync question the spec's version didn't
+   address; there is nothing named `--flow-rail-top` to search for in the
+   stylesheet.
