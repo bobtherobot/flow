@@ -247,10 +247,17 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
         />
       )}
 
+      {/* All three pass `returnFocusTo={gearRef}`. The menu item that opened the
+          dialog is gone by the time it mounts — `openDialog` clears `menuOpen`
+          and sets `dialog` in one batch — so the shell's default "restore
+          whatever was focused" would hand focus to a detached node and drop
+          the user on <body>. The gear is the durable anchor, and it is what
+          they pressed to start the interaction. */}
       {dialog?.kind === "rename" && (
         <PaletteDialog
           title="Rename palette"
           confirmLabel="OK"
+          returnFocusTo={gearRef}
           confirmDisabled={draftName.trim() === ""}
           onConfirm={() => {
             renamePalette(current.id, draftName.trim());
@@ -272,6 +279,7 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
         <PaletteDialog
           title="Add palette"
           confirmLabel="OK"
+          returnFocusTo={gearRef}
           confirmDisabled={draftName.trim() === ""}
           // Creating AND switching is what the `+` button did; a new palette is
           // empty, so creating without switching looks like nothing happened.
@@ -298,6 +306,7 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
         <PaletteDialog
           title="Delete palette"
           confirmLabel="Delete"
+          returnFocusTo={gearRef}
           onConfirm={() => {
             removePalette(current.id);
             setSelected([]);

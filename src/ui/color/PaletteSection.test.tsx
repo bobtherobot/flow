@@ -367,6 +367,31 @@ describe("the palette gear menu", () => {
     expect(screen.getByRole("option", { name: "My colors" })).toBeInTheDocument();
   });
 
+  it("hands focus back to the gear when a dialog closes", () => {
+    // The menu item that opened the dialog unmounts in the very commit that
+    // mounts it — `openDialog` clears `menuOpen` and sets `dialog` in one
+    // batch. So a shell that restores focus to "whatever was focused when I
+    // opened" restores it to a detached node, which silently drops focus to
+    // <body> and leaves a keyboard user tabbing back in from the top of the
+    // document. The gear is the durable anchor and is what they pressed.
+    //
+    // Every `.focus()` here is explicit and load-bearing: jsdom's
+    // `fireEvent.click` does not move focus, so a click-only version of this
+    // test captures <body>, restores <body>, and passes against the bug.
+    setup();
+    const gear = screen.getByRole("button", { name: "Palette actions" });
+    gear.focus();
+    fireEvent.click(gear);
+
+    const item = screen.getByRole("menuitem", { name: "Rename palette…" });
+    item.focus();
+    fireEvent.click(item);
+    expect(document.activeElement).toBe(screen.getByLabelText("Palette name"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(document.activeElement).toBe(gear);
+  });
+
   it("no longer renames on double-click", () => {
     setup();
     fireEvent.doubleClick(screen.getByLabelText("Palette"));

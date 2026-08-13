@@ -18,6 +18,14 @@ interface PaletteDialogProps {
   confirmLabel: string;
   /** Native `disabled` on the confirm button, and blocks Enter-to-submit. */
   confirmDisabled?: boolean;
+  /**
+   * Where to send focus on dismissal, overriding "whatever was focused when
+   * this opened". Pass it whenever the thing that opened the dialog does not
+   * outlive it — a menu item that unmounts in the same commit that mounts the
+   * dialog is still the `document.activeElement` at capture time, and
+   * restoring to that detached node silently drops focus to `<body>`.
+   */
+  returnFocusTo?: React.RefObject<HTMLElement | null>;
   onConfirm: () => void;
   onCancel: () => void;
   children: React.ReactNode;
@@ -38,6 +46,7 @@ export function PaletteDialog({
   title,
   confirmLabel,
   confirmDisabled = false,
+  returnFocusTo,
   onConfirm,
   onCancel,
   children,
@@ -48,9 +57,22 @@ export function PaletteDialog({
     typeof document === "undefined" ? null : (document.activeElement as HTMLElement | null),
   );
   useEffect(() => {
-    const returnTo = opener.current;
-    return () => returnTo?.focus?.();
-  }, []);
+    const captured = opener.current;
+    return () => {
+      // `returnFocusTo` is read at teardown, not at mount: that is the whole
+      // point of taking a ref — the caller's durable anchor (PaletteSection's
+      // gear) is resolved when focus is actually handed back.
+      const target = returnFocusTo?.current ?? captured;
+      // Focusing a node React has already detached is a no-op that leaves the
+      // user on `<body>`, so decline rather than pretend. Belt and braces for
+      // the default path; callers whose opener is transient should pass
+      // `returnFocusTo` and not rely on this.
+      if (target && document.contains(target)) target.focus?.();
+    };
+    // A `RefObject` from `useRef` is stable for the caller's lifetime, so this
+    // dep never actually re-fires the effect — it is here to satisfy the
+    // exhaustive-deps rule honestly rather than by suppression.
+  }, [returnFocusTo]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
