@@ -201,10 +201,16 @@ automated thing standing between a rebase and a silently missing customization.
 
 ## The rail is 88px, and `box-sizing: border-box` is load-bearing
 
-`RAIL_WIDTH = 88` (`src/ui/toolbar/ToolBar.tsx`) — read it, never hardcode it;
-`App.tsx`'s canvas gutter and `--flow-toolbar-reserved` both follow the
-constant. Widening it from 48 (Task 15) surfaced two bugs that unit tests
-cannot see because jsdom does no layout:
+**Historical** — as of the 2026-08-12 toolbar/shapebar split (see
+`vertical-toolbar.md`), there is no single 88px rail or `RAIL_WIDTH` constant
+any more, and `ToolBar.tsx` no longer exists. The rail is now two: a 44px
+toolbar and an 80px shapebar, widths defined as `TOOL_RAIL_WIDTH` /
+`SHAPE_RAIL_WIDTH` in `src/ui/toolbar/rail-layout.ts`, combined via
+`railGutter(toolbar, shapebar)` — read that, never hardcode a width.
+`App.tsx`'s canvas gutter and `--flow-toolbar-reserved` both follow it. The
+bugs below were surfaced by Task 15 widening the (then-single) rail from 48 to
+88; the `box-sizing: border-box` fix they describe is still exactly what makes
+each rail's declared width and its border agree, on both rails today:
 
 - **The rail was rendering 89px, not 88**, because nothing in `src/` had
   `box-sizing: border-box` on the rail element and its `border-right: 1px`
@@ -220,8 +226,9 @@ cannot see because jsdom does no layout:
   `e2e/color-panel.spec.ts` (a real `boundingBox()` comparison against the
   canvas gutter), not just asserted by inspection.
 
-`shouldRedock` (`ToolBar.tsx`) tests the rail's **left edge**, not its width —
-it needed no retuning for the wider rail, despite the spec predicting it would.
+`shouldRedock` (`src/ui/toolbar/toolbar-state.ts`) tests the rail's **left
+edge**, not its width — it needed no retuning for the wider rail, despite the
+spec predicting it would.
 
 ## Layout of the code
 

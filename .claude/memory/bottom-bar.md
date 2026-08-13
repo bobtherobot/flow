@@ -65,16 +65,20 @@ Bar. Spec: `docs/superpowers/specs/2026-07-08-bottom-bar-design.md`. Shipped
   the drop shadow shows ONLY when detached. `.flow-bottombar--docked` squares the
   two attached (bottom + left) corners and drops their borders so it tucks into
   the corner. Detached stays a rounded, shadowed pill.
-- **Dock-left clears the tool rail via a prop, not a CSS-var read** (2026-07-09):
-  `BottomBar` takes `toolbarReserved` (App computes
-  `toolbar.visible && !toolbar.floating ? RAIL_WIDTH : 0`; `RAIL_WIDTH` now
-  exported from `ToolBar.tsx`). Docked x = `toolbarReserved + 1` (1px hairline
-  `RAIL_GAP` off the rail; 0 flush when the rail floats/hides). Replaced the old `getComputedStyle(--flow-toolbar-reserved)`
-  measurement, which had a mount-order bug: BottomBar's `useLayoutEffect` ran
-  before ToolBar's `useEffect` published the var, so it read 0 and the bar
-  overlapped the rail (the reported bug). Prop is render-time → deterministic,
-  no flicker, reactive to rail show/hide/float. `--flow-toolbar-reserved` still
-  drives the canvas inset in App; only the bottombar stopped reading it in JS.
+- **Dock-left clears the tool rail(s) via a prop, not a CSS-var read** (2026-07-09;
+  updated 2026-08-12 for the toolbar/shapebar split): `BottomBar` takes
+  `toolbarReserved` — App computes it as `railGutter(toolbar, shapebar)`
+  (`src/ui/toolbar/rail-layout.ts`), the same pure function `ToolRails` uses to
+  write `--flow-toolbar-reserved`, so the two never disagree. There is no more
+  `RAIL_WIDTH`/`ToolBar.tsx`; see `vertical-toolbar.md`'s split section. Docked
+  x = `toolbarReserved + 1` (1px hairline `RAIL_GAP` off the outermost docked
+  rail; 0 flush when both rails float/hide). Replaced the old
+  `getComputedStyle(--flow-toolbar-reserved)` measurement, which had a
+  mount-order bug: BottomBar's `useLayoutEffect` ran before the rail's own
+  `useEffect` published the var, so it read 0 and the bar overlapped the rail
+  (the reported bug). Prop is render-time → deterministic, no flicker, reactive
+  to rail show/hide/float. `--flow-toolbar-reserved` still drives the canvas
+  inset in App; only the bottombar stopped reading it in JS.
 - Redock fires when a dropped floating bar's bottom edge is within `REDOCK_MARGIN`
   of the viewport bottom (opposite edge vs quickbar's top-edge redock). Tightened
   48→**10px** 2026-07-09 (all three bars) so only a near-flush drop snaps back.

@@ -115,8 +115,11 @@ right. Docked and floating layouts are identical for both. Spec/plan:
   three brings back the original bug — a docked (viewport-tall) shell whose
   grid stretched to fill it, riding the color footer down to the bottom of the
   screen, while the floating shell hugged its content. Measured pre-fix:
-  538.5px docked vs 196px floating grid height, from `--flow-toolbar-reserved`
-  disagreeing with the visible dock width.
+  534.5px docked vs 196px floating grid height (`e2e/toolbar.spec.ts` still
+  names 534.5 in the comment at its height assertion) — caused by the
+  `flex: 1 1 auto` + `1fr` tracks + `margin-top: auto` combination named
+  above, NOT by `--flow-toolbar-reserved` disagreeing with the visible dock
+  width; that variable plays no part in the tool grid's own layout.
 - **`e2e/helpers/rails.ts`** (`railButton`/`pickTool`) scopes to `.flow-toolbar`
   rather than to either rail's `aria-label`, so one locator spans both rails —
   the reason the split only had to touch ten existing e2e specs once, instead
