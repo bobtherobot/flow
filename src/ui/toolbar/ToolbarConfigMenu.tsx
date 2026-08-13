@@ -1,5 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { clampMenuPosition, type MenuPoint } from "../panels/dock/menu-position";
+// TEMPORARY (Task 2 → removed in Task 7): the config menu still shows every tool so
+// this commit changes no UI. Task 7 hands each rail its own list as a prop.
 import { ALL_TOOLS } from "./tools";
 
 interface ToolbarConfigMenuProps {

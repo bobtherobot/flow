@@ -67,7 +67,28 @@ describe("the toolbar / shapebar split", () => {
   });
 
   it("keeps the arrow variants mapped to the arrow tool", () => {
+    const arrow = SHAPES.find((t) => t.id === "arrow");
     const curved = SHAPES.find((t) => t.id === "arrow-curved");
+    const elbow = SHAPES.find((t) => t.id === "arrow-elbow");
+
+    expect(arrow).toMatchObject({ id: "arrow", arrowType: "sharp", shortcut: "A" });
     expect(curved).toMatchObject({ toolType: "arrow", arrowType: "round", shortcut: "" });
+    expect(elbow).toMatchObject({ toolType: "arrow", arrowType: "elbow", shortcut: "" });
+  });
+
+  it("gives every shape tool a non-empty label", () => {
+    for (const t of SHAPES) {
+      expect(t.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("gives shape tools appropriate shortcuts (empty for arrow variants except sharp)", () => {
+    for (const t of SHAPES) {
+      if (t.id === "arrow-curved" || t.id === "arrow-elbow") {
+        expect(t.shortcut).toBe(""); // cycled via A, no dedicated key
+      } else {
+        expect(t.shortcut.length).toBeGreaterThan(0);
+      }
+    }
   });
 });
