@@ -19,6 +19,18 @@ export const DEFAULT_TOOLBAR_STATE: ToolbarState = {
   hiddenTools: [],
 };
 
+/** The shapebar's factory state. Structurally identical to the toolbar's, but a
+ *  separate object: Reset Layout copies each one independently, and the two are
+ *  free to diverge later without a shared literal to untangle. Visible by
+ *  default — anything else and the shape tools disappear on upgrade. */
+export const DEFAULT_SHAPEBAR_STATE: ToolbarState = {
+  visible: true,
+  floating: false,
+  x: 0,
+  y: 0,
+  hiddenTools: [],
+};
+
 /** Distance (px) from the left edge within which a dropped floating rail
  *  re-docks. Tight on purpose — only a near-flush drop should snap back. */
 const REDOCK_MARGIN = 10;

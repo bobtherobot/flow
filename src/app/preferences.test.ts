@@ -14,8 +14,10 @@ import {
   getRecentColors,
   getColorNumericMode,
   setColorNumericMode,
+  getShapebarState,
+  setShapebarState,
 } from "./preferences";
-import { DEFAULT_TOOLBAR_STATE } from "../ui/toolbar/toolbar-state";
+import { DEFAULT_TOOLBAR_STATE, DEFAULT_SHAPEBAR_STATE } from "../ui/toolbar/toolbar-state";
 import { DEFAULT_QUICKBAR_STATE } from "../ui/quickbar/quickbar-state";
 import { DEFAULT_LASER_HEX } from "../lib/laser-color";
 
@@ -273,5 +275,30 @@ describe("color numeric mode", () => {
   it("rejects an unknown stored mode", () => {
     localStorage.setItem("flow.colorNumericMode", "cmyk");
     expect(getColorNumericMode()).toBe("hsla");
+  });
+});
+
+describe("shapebar state", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to shown and docked so the shape tools never vanish on upgrade", () => {
+    expect(DEFAULT_SHAPEBAR_STATE).toMatchObject({ visible: true, floating: false });
+    expect(DEFAULT_SHAPEBAR_STATE.hiddenTools).toEqual([]);
+  });
+
+  it("round-trips through its own key", () => {
+    setShapebarState({ ...DEFAULT_SHAPEBAR_STATE, floating: true, x: 300, y: 120 });
+    expect(getShapebarState()).toMatchObject({ floating: true, x: 300, y: 120 });
+  });
+
+  it("does not share storage with the toolbar", () => {
+    setShapebarState({ ...DEFAULT_SHAPEBAR_STATE, hiddenTools: ["diamond"] });
+    expect(localStorage.getItem("flow.shapebar")).toContain("diamond");
+    expect(localStorage.getItem("flow.toolbar") ?? "").not.toContain("diamond");
+  });
+
+  it("falls back to the default on a junk payload", () => {
+    localStorage.setItem("flow.shapebar", "{not json");
+    expect(getShapebarState()).toEqual(DEFAULT_SHAPEBAR_STATE);
   });
 });

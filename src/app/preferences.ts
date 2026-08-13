@@ -93,6 +93,20 @@ export function setToolbarState(value: ToolbarState): void {
   writeJson(TOOLBAR_KEY, value);
 }
 
+const SHAPEBAR_KEY = "flow.shapebar";
+
+/** Read the persisted shapebar state, normalized (default on miss/parse error).
+ *  Same shape and normaliser as the toolbar's — the two rails differ in what
+ *  they contain, not in what they persist. */
+export function getShapebarState(): ToolbarState {
+  return normalizeToolbarState(readJson(SHAPEBAR_KEY));
+}
+
+/** Persist the shapebar state. */
+export function setShapebarState(value: ToolbarState): void {
+  writeJson(SHAPEBAR_KEY, value);
+}
+
 const QUICKBAR_KEY = "flow.quickbar";
 
 /** Read the persisted quick-actions-bar state, normalized (default on miss). */
