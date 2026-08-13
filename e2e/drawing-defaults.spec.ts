@@ -1,11 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
+import { pickTool } from "./helpers/rails";
 
 /** Draw a shape with a rail tool; the new element ends up selected. */
 async function draw(page: Page, tool: string, x2: number, y2: number) {
-  await page
-    .getByRole("toolbar", { name: "Tools" })
-    .getByRole("button", { name: tool, exact: true })
-    .click();
+  await pickTool(page, tool);
   await page.mouse.move(560, 340);
   await page.mouse.down();
   await page.mouse.move(x2, y2, { steps: 8 });
@@ -210,10 +208,7 @@ test("a zero stroke width does not break a curved arrow", async ({ page }) => {
   await expect(width).toHaveValue("0");
 
   // The 0 width drifts into the tool defaults, so the arrow inherits it.
-  await page
-    .getByRole("toolbar", { name: "Tools" })
-    .getByRole("button", { name: "Curved arrow", exact: true })
-    .click();
+  await pickTool(page, "Curved arrow");
   await page.mouse.move(300, 250);
   await page.mouse.down();
   await page.mouse.move(460, 420, { steps: 8 });

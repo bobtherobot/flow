@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { pickTool } from "./helpers/rails";
 
 /**
  * File ▸ New calls Excalidraw's `resetScene()`, which replaces the whole
@@ -39,10 +40,7 @@ test("a box drawn after File ▸ New gets the dragged dimensions", async ({ page
   await page.waitForSelector(".flow-pnl");
   await fileNew(page);
 
-  await page
-    .getByRole("toolbar", { name: "Tools" })
-    .getByRole("button", { name: "Rectangle", exact: true })
-    .click();
+  await pickTool(page, "Rectangle");
   await page.mouse.move(560, 340);
   await page.mouse.down();
   await page.mouse.move(760, 480, { steps: 8 });
@@ -78,10 +76,7 @@ test("File ▸ New still clears the canvas", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
 
-  await page
-    .getByRole("toolbar", { name: "Tools" })
-    .getByRole("button", { name: "Rectangle", exact: true })
-    .click();
+  await pickTool(page, "Rectangle");
   await page.mouse.move(560, 340);
   await page.mouse.down();
   await page.mouse.move(760, 480, { steps: 8 });

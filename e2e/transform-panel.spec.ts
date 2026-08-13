@@ -1,11 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
+import { pickTool } from "./helpers/rails";
 
 /** Draw a shape with a rail tool; the new element ends up selected. */
 async function draw(page: Page, tool: string, x2: number, y2: number) {
-  await page
-    .getByRole("toolbar", { name: "Tools" })
-    .getByRole("button", { name: tool, exact: true })
-    .click();
+  await pickTool(page, tool);
   await page.mouse.move(560, 340);
   await page.mouse.down();
   await page.mouse.move(x2, y2, { steps: 8 });
@@ -83,10 +81,7 @@ test.describe("Transform panel", () => {
     await page.goto("/");
     await page.waitForSelector(".flow-pnl");
     // Draw a text element, then commit it with Escape so it stays selected.
-    await page
-      .getByRole("toolbar", { name: "Tools" })
-      .getByRole("button", { name: "Text", exact: true })
-      .click();
+    await pickTool(page, "Text");
     await page.mouse.click(600, 360);
     await page.keyboard.type("hi");
     await page.keyboard.press("Escape");

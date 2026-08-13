@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { pickTool } from "./helpers/rails";
 
 /**
  * Non-overlapping footprints in the clear canvas region between the tool rail
@@ -23,10 +24,7 @@ const EMPTY_SPOT = [880, 550] as const;
 
 /** Draw with a rail tool; the new element ends up selected. */
 async function draw(page: Page, tool: string, x1: number, y1: number, x2: number, y2: number) {
-  await page
-    .getByRole("toolbar", { name: "Tools" })
-    .getByRole("button", { name: tool, exact: true })
-    .click();
+  await pickTool(page, tool);
   await page.mouse.move(x1, y1);
   await page.mouse.down();
   await page.mouse.move(x2, y2, { steps: 8 });
@@ -36,18 +34,12 @@ async function draw(page: Page, tool: string, x1: number, y1: number, x2: number
 /** Switch to the Selection tool. flow keeps the drawing tool active after a
  *  draw (permanent tool lock), so selecting must be explicit. */
 async function pickSelection(page: Page) {
-  await page
-    .getByRole("toolbar", { name: "Tools" })
-    .getByRole("button", { name: "Selection", exact: true })
-    .click();
+  await pickTool(page, "Selection");
 }
 
 /** Place a loose text element. Leaves the text tool having been active. */
 async function addText(page: Page, text: string) {
-  await page
-    .getByRole("toolbar", { name: "Tools" })
-    .getByRole("button", { name: "Text", exact: true })
-    .click();
+  await pickTool(page, "Text");
   await page.mouse.click(EMPTY_SPOT[0], EMPTY_SPOT[1]);
   await page.keyboard.type(text);
   // Commits the text edit; focus is in Excalidraw's own WYSIWYG textarea here,

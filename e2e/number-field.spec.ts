@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { pickTool } from "./helpers/rails";
 
 /**
  * The shared panel number field (src/ui/panels/controls/NumberInput.tsx), driven
@@ -12,10 +13,7 @@ import { test, expect, type Page } from "@playwright/test";
  */
 
 async function drawWith(page: Page, toolLabel: string, x2: number, y2: number) {
-  await page
-    .getByRole("toolbar", { name: "Tools" })
-    .getByRole("button", { name: toolLabel, exact: true })
-    .click();
+  await pickTool(page, toolLabel);
   await page.mouse.move(560, 320);
   await page.mouse.down();
   await page.mouse.move(x2, y2, { steps: 8 });

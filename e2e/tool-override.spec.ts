@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { pickTool } from "./helpers/rails";
 
 /**
  * The canvas region clear of the tool rail (left) and the docked controls panel
@@ -23,13 +24,6 @@ const readState = (page: Page) =>
 
 const selectedCount = async (page: Page) =>
   Object.keys((await readState(page))?.selectedElementIds ?? {}).length;
-
-async function pickTool(page: Page, name: string) {
-  await page
-    .getByRole("toolbar", { name: "Tools" })
-    .getByRole("button", { name, exact: true })
-    .click();
-}
 
 async function drawBox(page: Page) {
   await pickTool(page, "Rectangle");

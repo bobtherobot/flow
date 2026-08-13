@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { railButton } from "./helpers/rails";
 
 test.describe("vertical tool bar", () => {
   test("renders docked on the left, below the menu bar", async ({ page }) => {
@@ -13,16 +14,15 @@ test.describe("vertical tool bar", () => {
 
   test("selecting a tool marks it active", async ({ page }) => {
     await page.goto("/");
-    const rect = page.getByRole("button", { name: "Rectangle" });
+    const rect = railButton(page, "Rectangle");
     await rect.click();
     await expect(rect).toHaveAttribute("aria-pressed", "true");
   });
 
   test("each of the three arrow-shape tools activates the arrow tool", async ({ page }) => {
     await page.goto("/");
-    const rail = page.getByRole("toolbar", { name: "Tools" });
     for (const name of ["Arrow", "Curved arrow", "Elbow arrow"]) {
-      const btn = rail.getByRole("button", { name, exact: true });
+      const btn = railButton(page, name);
       await btn.click();
       // Only the clicked shape is highlighted (they share the "arrow" tool).
       await expect(btn).toHaveAttribute("aria-pressed", "true");
@@ -31,10 +31,9 @@ test.describe("vertical tool bar", () => {
 
   test("pressing A repeatedly cycles the highlighted arrow shape and wraps", async ({ page }) => {
     await page.goto("/");
-    const rail = page.getByRole("toolbar", { name: "Tools" });
-    const sharp = rail.getByRole("button", { name: "Arrow", exact: true });
-    const curved = rail.getByRole("button", { name: "Curved arrow" });
-    const elbow = rail.getByRole("button", { name: "Elbow arrow" });
+    const sharp = railButton(page, "Arrow");
+    const curved = railButton(page, "Curved arrow");
+    const elbow = railButton(page, "Elbow arrow");
 
     // Excalidraw's shortcut handler is bound to the canvas container, so focus it
     // with a harmless selection-tool click before driving the keyboard cycle.

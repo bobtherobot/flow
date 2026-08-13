@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { pickTool } from "./helpers/rails";
 
 /** Draw a rectangle at a fixed spot (bounds ≈ x[560,820] y[320,500]); leaves it
  *  selected. Mirrors the color-panel helper (native tool island is CSS-hidden). */
@@ -22,10 +23,7 @@ async function marquee(page: Page, x1: number, y1: number, x2: number, y2: numbe
  *  draw (permanent tool lock), so a subsequent click/drag meant to select or
  *  deselect — rather than draw another shape — must switch tools explicitly. */
 async function pickSelection(page: Page) {
-  await page
-    .getByRole("toolbar", { name: "Tools" })
-    .getByRole("button", { name: "Selection", exact: true })
-    .click();
+  await pickTool(page, "Selection");
 }
 
 async function setSelectionMode(page: Page, label: "marquee touch" | "marquee enclose") {
