@@ -10,6 +10,7 @@ import {
   addSwatch,
   removeSwatches,
   reorderSwatches,
+  copySwatchesTo,
 } from "../../lib/palette-store";
 import { RECENT_PALETTE_ID, nextSetName } from "../../lib/color-palettes";
 import type { MenuPoint } from "../panels/dock/menu-position";
@@ -57,11 +58,16 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [draftName, setDraftName] = useState("");
+  const [copyTarget, setCopyTarget] = useState("");
   const gearRef = useRef<HTMLButtonElement>(null);
 
   // Resolve defensively: defaultPaletteId can point at a just-deleted palette
   // for one render (e.g. right after removePalette reseeds).
   const current = palettes.find((p) => p.id === defaultPaletteId) ?? palettes[0];
+
+  // Every palette except the one being copied FROM — copying into itself is
+  // a no-op the store would swallow silently, so it should not be offerable.
+  const others = palettes.filter((p) => p.id !== current.id);
 
   const choosePalette = (id: string) => {
     setDefaultPalette(id);
@@ -242,12 +248,15 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
             setSelected([]);
             setMenuOpen(false);
           }}
-          onCopy={() => openDialog("copy")}
+          onCopy={() => {
+            setCopyTarget(others[0]?.id ?? "");
+            openDialog("copy");
+          }}
           onClose={() => setMenuOpen(false)}
         />
       )}
 
-      {/* All three pass `returnFocusTo={gearRef}`. The menu item that opened the
+      {/* All four pass `returnFocusTo={gearRef}`. The menu item that opened the
           dialog is gone by the time it mounts — `openDialog` clears `menuOpen`
           and sets `dialog` in one batch — so the shell's default "restore
           whatever was focused" would hand focus to a detached node and drop
@@ -315,6 +324,37 @@ export function PaletteSection({ currentColor, onPick }: PaletteSectionProps) {
           onCancel={() => setDialog(null)}
         >
           <p>Delete the &ldquo;{current.name}&rdquo; palette?</p>
+        </PaletteDialog>
+      )}
+
+      {dialog?.kind === "copy" && (
+        <PaletteDialog
+          title="Copy swatches to"
+          confirmLabel="Copy"
+          returnFocusTo={gearRef}
+          confirmDisabled={copyTarget === ""}
+          onConfirm={() => {
+            copySwatchesTo(copyTarget, selected.map((i) => current.colors[i]));
+            // The selection deliberately survives: copying is non-destructive
+            // and sending the same set to a second palette is a plausible
+            // next action.
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        >
+          <select
+            className="flow-clr-palette__select"
+            aria-label="Target palette"
+            autoFocus
+            value={copyTarget}
+            onChange={(e) => setCopyTarget(e.target.value)}
+          >
+            {others.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
         </PaletteDialog>
       )}
     </div>

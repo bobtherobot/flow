@@ -445,3 +445,95 @@ describe("the Recent palette", () => {
     );
   });
 });
+
+describe("copying swatches between palettes", () => {
+  // The seeded default palette (see "selects the default" above) — the
+  // fixed starting point every test in this block copies swatches out of.
+  const SOURCE_NAME = "Pastel";
+
+  /** Drives the Add-palette dialog end to end, mirroring "adds a palette AND
+   *  switches to it" above. */
+  function addPaletteNamed(name: string) {
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add palette…" }));
+    fireEvent.change(screen.getByLabelText("Palette name"), { target: { value: name } });
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+  }
+
+  /** The id of the "Target" palette every test in this block adds, resolved
+   *  the same way `selectPalette` resolves a name to an id. */
+  function targetId() {
+    return getSnapshot().palettes.find((p) => p.name === "Target")!.id;
+  }
+
+  /** Drives the copy dialog end to end: open it, choose `name` in the
+   *  target `<select>`, confirm. */
+  function copySelectedTo(name: string) {
+    const id = getSnapshot().palettes.find((p) => p.name === name)!.id;
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy selected swatches to…" }));
+    fireEvent.change(screen.getByLabelText("Target palette"), { target: { value: id } });
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+  }
+
+  it("copies the selected swatches into the chosen palette", () => {
+    setup();
+    addPaletteNamed("Target");
+    selectPalette(SOURCE_NAME);
+    selectFirstSwatch();
+    const hex = firstSwatchHex();
+
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy selected swatches to…" }));
+    fireEvent.change(screen.getByLabelText("Target palette"), { target: { value: targetId() } });
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+    selectPalette("Target");
+    expect(screen.getByRole("button", { name: `Swatch ${hex}` })).toBeInTheDocument();
+  });
+
+  it("leaves the source palette untouched", () => {
+    // Copy, not move. A "move" regression is invisible unless the source is
+    // re-checked after switching away and back.
+    setup();
+    addPaletteNamed("Target");
+    selectPalette(SOURCE_NAME);
+    selectFirstSwatch();
+    const hex = firstSwatchHex();
+    copySelectedTo("Target");
+    selectPalette(SOURCE_NAME);
+    expect(screen.getByRole("button", { name: `Swatch ${hex}` })).toBeInTheDocument();
+  });
+
+  it("keeps the selection after copying", () => {
+    setup();
+    addPaletteNamed("Target");
+    selectPalette(SOURCE_NAME);
+    selectFirstSwatch();
+    copySelectedTo("Target");
+    expect(screen.getAllByRole("button", { pressed: true }).length).toBe(1);
+  });
+
+  it("excludes the current palette from the target list", () => {
+    setup();
+    selectFirstSwatch();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy selected swatches to…" }));
+    const options = Array.from(
+      screen.getByLabelText("Target palette").querySelectorAll("option"),
+    ).map((o) => o.textContent);
+    expect(options).not.toContain(currentPaletteName());
+  });
+
+  it("copies nothing on Cancel", () => {
+    setup();
+    addPaletteNamed("Target");
+    selectPalette(SOURCE_NAME);
+    selectFirstSwatch();
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy selected swatches to…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    selectPalette("Target");
+    expect(screen.queryAllByRole("button", { name: /^Swatch #/ })).toHaveLength(0);
+  });
+});
