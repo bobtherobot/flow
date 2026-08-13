@@ -165,18 +165,9 @@ test.describe("vertical tool bar", () => {
     const dockedGrid = (await grid.boundingBox())!;
     const dockedColor = (await color.boundingBox())!;
 
-    // Tear off by the grip (the topbar's centre sits over the hamburger), scoped
-    // to this rail — the shapebar has a grip of its own. The grip glyph itself is
-    // `pointer-events: none` (so a drag started on it falls through to the topbar's
-    // own drag surface), which makes Playwright's `.hover()` actionability check
-    // spin forever waiting for the grip to receive pointer events; move to its
-    // bounding-box centre directly instead, as the sibling drag tests above do.
-    const grip = rail.locator(".flow-toolbar__grip");
-    const g = (await grip.boundingBox())!;
-    await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(400, 300, { steps: 10 });
-    await page.mouse.up();
+    // Tear off by the grip, scoped to this rail — the shapebar has a grip of
+    // its own (see dragGrip's own comment for why this isn't a plain `.hover()`).
+    await dragGrip(page, rail, 400, 300);
     await expect(rail).toHaveCSS("position", "fixed");
 
     const floatRail = (await rail.boundingBox())!;

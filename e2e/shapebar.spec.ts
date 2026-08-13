@@ -1,20 +1,5 @@
-import { test, expect, type Locator, type Page } from "@playwright/test";
-import { railButton } from "./helpers/rails";
-
-/**
- * Move to a locator's bounding-box centre and drag by mouse, rather than
- * Playwright's `.hover()` + drag pattern: the grip glyph is
- * `pointer-events: none` (drags fall through to the topbar's own drag
- * surface), which makes `.hover()`'s actionability check spin forever
- * waiting for the grip itself to receive pointer events.
- */
-async function dragGrip(page: Page, grip: Locator, toX: number, toY: number) {
-  const g = (await grip.boundingBox())!;
-  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(toX, toY, { steps: 10 });
-  await page.mouse.up();
-}
+import { test, expect } from "@playwright/test";
+import { railButton, dragGrip } from "./helpers/rails";
 
 test.describe("shapebar", () => {
   test("docks to the right of the toolbar, below the menu bar", async ({ page }) => {
@@ -62,15 +47,14 @@ test.describe("shapebar", () => {
   test("tears off and re-docks into its own slot", async ({ page }) => {
     await page.goto("/");
     const shapes = page.getByRole("toolbar", { name: "Shapes" });
-    const grip = shapes.locator(".flow-toolbar__grip");
 
-    await dragGrip(page, grip, 500, 320);
+    await dragGrip(page, shapes, 500, 320);
     let box = (await shapes.boundingBox())!;
     expect(box.x).toBeGreaterThan(200);
 
     // Dropping near its slot (x≈44, to the right of the docked toolbar) re-docks
     // it — the reason shouldRedock takes the slot rather than testing x < 10.
-    await dragGrip(page, grip, 46, 60);
+    await dragGrip(page, shapes, 46, 60);
     box = (await shapes.boundingBox())!;
     const t = (await page.getByRole("toolbar", { name: "Tools" }).boundingBox())!;
     expect(Math.round(box.x)).toBe(Math.round(t.x + t.width));
@@ -98,8 +82,7 @@ test.describe("shapebar", () => {
     await expect(page.getByRole("toolbar", { name: "Shapes" })).toBeVisible();
 
     // Float it, then let Reset Layout put it back in its slot.
-    const grip = page.getByRole("toolbar", { name: "Shapes" }).locator(".flow-toolbar__grip");
-    await dragGrip(page, grip, 600, 400);
+    await dragGrip(page, page.getByRole("toolbar", { name: "Shapes" }), 600, 400);
 
     await page.getByRole("menuitem", { name: "View" }).click();
     await page.getByRole("menuitem", { name: "Reset Layout" }).click();

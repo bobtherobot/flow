@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { RECENT_PALETTE_ID, RECENT_PALETTE_NAME } from "../src/lib/color-palettes";
+import { dragGrip } from "./helpers/rails";
 
 /** Draw a rectangle by dragging; leaves it selected. */
 async function drawRect(page: Page, x1: number, y1: number, x2: number, y2: number) {
@@ -507,21 +508,14 @@ test("the rail tears off and redocks at the new width", async ({ page }) => {
   // is a vertical flex column with the hamburger button directly beneath the
   // grip, and the header's own bounding-box centre falls inside that button
   // — a drag started there is silently rejected (`useDrag`'s `onStart`
-  // bails out of any press that starts on a `button`).
-  const grip = toolRail(page).locator(".flow-toolbar__grip");
-
-  const start = (await grip.boundingBox())!;
-  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(start.x + 320, start.y + 160, { steps: 10 });
-  await page.mouse.up();
+  // bails out of any press that starts on a `button`). `dragGrip` drags to
+  // an absolute point, so the target below is computed relative to the
+  // grip's own current position rather than passed as a fixed offset.
+  const start = (await toolRail(page).locator(".flow-toolbar__grip").boundingBox())!;
+  await dragGrip(page, toolRail(page), start.x + 320, start.y + 160);
   await expect(toolRail(page)).toHaveClass(/flow-toolbar--floating/);
 
-  const floated = (await grip.boundingBox())!;
-  await page.mouse.move(floated.x + floated.width / 2, floated.y + floated.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(4, 120, { steps: 10 });
-  await page.mouse.up();
+  await dragGrip(page, toolRail(page), 4, 120);
   await expect(toolRail(page)).toHaveClass(/flow-toolbar--docked/);
 });
 
