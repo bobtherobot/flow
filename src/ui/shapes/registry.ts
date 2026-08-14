@@ -1,5 +1,8 @@
 import type { FlowGeometry, FlowShapeKind, ShapeDef, ShapeParams } from "./types";
 import { triangle } from "./geometry/triangle";
+import { parallelogram } from "./geometry/parallelogram";
+import { trapezoid } from "./geometry/trapezoid";
+import { star } from "./geometry/star";
 
 /**
  * Every flow shape, keyed by kind. This is the single source of truth for
@@ -14,6 +17,27 @@ import { triangle } from "./geometry/triangle";
  */
 export const SHAPES_REGISTRY: Partial<Record<FlowShapeKind, ShapeDef>> = {
   triangle: { kind: "triangle", label: "Triangle", geometry: triangle, defaults: {}, handles: [] },
+  parallelogram: {
+    kind: "parallelogram",
+    label: "Parallelogram",
+    geometry: parallelogram,
+    defaults: { skew: 0.25 },
+    handles: [],
+  },
+  trapezoid: {
+    kind: "trapezoid",
+    label: "Trapezoid",
+    geometry: trapezoid,
+    defaults: { inset: 0.2 },
+    handles: [],
+  },
+  star: {
+    kind: "star",
+    label: "Star",
+    geometry: star,
+    defaults: { ir: 0.38, rot: 0 },
+    handles: [],
+  },
 };
 
 /** A fresh copy of a kind's starting parameters — callers mutate what they get. */

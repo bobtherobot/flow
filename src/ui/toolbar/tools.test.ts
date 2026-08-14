@@ -33,6 +33,9 @@ describe("the toolbar / shapebar split", () => {
       "diamond",
       "ellipse",
       "triangle",
+      "parallelogram",
+      "trapezoid",
+      "star",
     ]);
   });
 

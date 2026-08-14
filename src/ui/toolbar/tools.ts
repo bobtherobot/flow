@@ -18,7 +18,10 @@ export type ToolId =
   | "eraser"
   | "frame"
   | "laser"
-  | "triangle";
+  | "triangle"
+  | "parallelogram"
+  | "trapezoid"
+  | "star";
 
 /** New-arrow shape an arrow-variant rail tool applies (Excalidraw's ARROW_TYPE
  *  values). */
@@ -71,6 +74,15 @@ export const SHAPES: readonly ToolDef[] = [
   { id: "diamond", label: "Diamond", shortcut: "D" },
   { id: "ellipse", label: "Ellipse", shortcut: "O" },
   { id: "triangle", label: "Triangle", shortcut: "", toolType: "rectangle", flowShape: "triangle" },
+  {
+    id: "parallelogram",
+    label: "Parallelogram",
+    shortcut: "",
+    toolType: "rectangle",
+    flowShape: "parallelogram",
+  },
+  { id: "trapezoid", label: "Trapezoid", shortcut: "", toolType: "rectangle", flowShape: "trapezoid" },
+  { id: "star", label: "Star", shortcut: "", toolType: "rectangle", flowShape: "star" },
 ];
 
 /** Every tool flow surfaces, both rails. Consumers that care about the whole

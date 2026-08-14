@@ -48,6 +48,21 @@ export const TOOL_ICONS: Record<ToolId, ReactNode> = {
       <path d="M10 3 L17 17 L3 17 Z" />
     </Svg>
   ),
+  parallelogram: (
+    <Svg>
+      <path d="M6.75 5 L16.5 5 L13.25 15 L3.5 15 Z" />
+    </Svg>
+  ),
+  trapezoid: (
+    <Svg>
+      <path d="M6.1 5 L13.9 5 L16.5 15 L3.5 15 Z" />
+    </Svg>
+  ),
+  star: (
+    <Svg>
+      <path d="M10,0 L12.23,6.93 L19.51,6.91 L13.61,11.17 L15.88,18.09 L10,13.8 L4.12,18.09 L6.39,11.17 L0.49,6.91 L7.77,6.93 Z" />
+    </Svg>
+  ),
   ellipse: (
     <Svg>
       <ellipse cx="10" cy="10" rx="7" ry="5.5" />
