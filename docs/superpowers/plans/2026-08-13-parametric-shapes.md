@@ -16,7 +16,8 @@ Spec: `docs/superpowers/specs/2026-08-13-parametric-shapes-design.md`
 - **Parameters are fractions**, each clamped to `0..1`, stored in `customData.flowShape.p`. Never store absolute pixels.
 - **One carrier type**: `rectangle`. Not diamond, not ellipse, not line.
 - **`points` is mandatory in every geometry result**; `path` is optional. `points` is the hit-test outline and the fallback render; `path` is used for rendering when the shape has curves, and may contain multiple subpaths (`M … Z M … Z`) so inner detail like the cylinder's cap arc or the summing junction's cross is drawn without being hit-tested.
-- **Fork edits are limited to these five files**: `packages/common/src/flowShapes.ts` (new), `packages/element/src/shape.ts`, `packages/utils/src/shape.ts`, `packages/excalidraw/components/App.tsx`, `packages/excalidraw/{types.ts,appState.ts}`. Anything else needs to come back to the plan author.
+- **Fork edits are limited to these files**: `packages/common/src/flowShapes.ts` (new), `packages/common/src/index.ts`, `packages/element/src/shape.ts`, `packages/utils/src/shape.ts`, `packages/element/src/distance.ts`, `packages/element/src/collision.ts`, `packages/excalidraw/index.tsx` (re-exports), `packages/excalidraw/components/App.tsx`, `packages/excalidraw/{types.ts,appState.ts}`. Anything else needs to come back to the plan author.
+- **`deconstructRectanguloidElement` (`packages/element/src/utils.ts:210`) must NOT be patched**, tempting as it is as the one shared site. Its four callers include `bounds.ts:354` and `binding.ts:3075`, so changing it would shrink a star's *reported bounds* to its point extent — moving the resize handles off the element box and breaking the inscribed-geometry contract the handle overlay in Tasks 9-11 depends on. Element bounds stay the full box.
 - **After any `vendor/` change, run `npm run build:excalidraw`** before the flow tests will see it. This is a known gotcha in this repo — a stale build silently shows old behaviour.
 - Shape ids, labels and `shortcut: ""` are fixed by the spec's table. No shortcuts are assigned.
 - Conventional commits. Unit tests (`npx vitest run`) and `npm run typecheck` green at the end of every task; Playwright (`npx playwright test --workers=1`) green but for the 2 known pre-existing `e2e/text-panel.spec.ts` failures.
@@ -209,7 +210,9 @@ export function geometryFor(
 }
 ```
 
-The `as Record<...>` cast is deliberate and temporary: the registry is incomplete until Task 8 fills in all ten kinds. Task 8's final step removes the cast, at which point TypeScript enforces exhaustiveness — leave it in place until then.
+**Amended during execution:** the type above must be `Partial<Record<FlowShapeKind, ShapeDef>>` with **no type assertion at all**. A direct `as Record<FlowShapeKind, ShapeDef>` on a 1-of-10 literal does not typecheck under strict mode, and an `as unknown as` double assertion would also silence genuinely wrong entries. `Partial` is honest, needs no cast, and the accessors above already tolerate a missing entry via `?.` and `?? null`. Task 8 swaps `Partial<Record<…>>` for the full `Record<…>`, at which point TypeScript enforces exhaustiveness.
+
+Consequence for later tasks: `Object.values(SHAPES_REGISTRY)` and `Object.entries(...)` yield possibly-`undefined` values until Task 8, so iterating code needs `if (!def) continue;` or a type-guard filter.
 
 - [ ] **Step 5: Write the tests**
 
@@ -517,36 +520,27 @@ Note the `vendor/excalidraw` submodule pointer moves with this commit — that i
 Without this, a transparent triangle hit-tests on its invisible bounding-box edges: clicking the visible shape misses, clicking empty space hits.
 
 **Files:**
-- Modify: `vendor/excalidraw/packages/utils/src/shape.ts` (`getPolygonShape`, ~line 116)
+- Modify: `vendor/excalidraw/packages/element/src/distance.ts` (`distanceToRectanguloidElement`, ~line 74), `vendor/excalidraw/packages/element/src/collision.ts` (rectanguloid intersection, ~line 649), and optionally `vendor/excalidraw/packages/utils/src/shape.ts` (`getPolygonShape`, ~line 116)
 - Test: `e2e/shapes.spec.ts` (new)
 
 **Interfaces:**
 - Consumes: `getFlowShapeGeometry` from Task 2.
-- Produces: nothing new.
+- Produces: one shared "flow shape → line segments" helper used by both hit-test sites.
 
-- [ ] **Step 1: Add the branch**
+- [ ] **Step 1: Patch the two sites that actually hit-test**
 
-`getPolygonShape` already special-cases `element.type === "diamond"`, so this follows the established shape of that function. Import `getFlowShapeGeometry` from `@excalidraw/common` and add the flow branch before the existing diamond check:
+**Amended during execution.** The plan originally named `getPolygonShape` alone. That was wrong, and it was proved wrong empirically: a grid-scan probe against `app.getElementAtPosition` on a rebuilt dev build showed the hit region stayed a perfect box with that edit in place. `getPolygonShape` is not on the click-to-select path. The real path is `App.hitElement` → `distanceToElement` → `distanceToRectanguloidElement` (`distance.ts:63-80`), which builds its sides from `x/y/width/height`.
 
-```ts
-  let data: Polygon<Point>;
+Patch both consumers, and only these two:
 
-  // flow: a rectangle carrying customData.flowShape hit-tests on its real
-  // outline. Without this a transparent triangle would be selectable only along
-  // its bounding box's edges — i.e. exactly where it isn't drawn.
-  const flowGeom =
-    element.type === "rectangle" ? getFlowShapeGeometry(element) : null;
+- `distance.ts:74` inside `distanceToRectanguloidElement` — click-to-select.
+- `collision.ts:649` inside the rectanguloid intersection path — how an arrow finds where to attach, which Task 12's arrow-binds-to-a-triangle test depends on.
 
-  if (flowGeom) {
-    data = polygon(
-      ...flowGeom.points.map(([px, py]) =>
-        pointRotateRads(pointFrom<Point>(x + px, y + py), center, angle),
-      ),
-    );
-  } else if (element.type === "diamond") {
-```
+Both functions already inverse-rotate the test point about the element's centre and then work in unrotated element space, so flow's local points plus `element.x/y` are directly usable — **do not rotate the outline again** in these sites or the rotation applies twice. Factor the "flow shape → sides" conversion into one helper so the two sites cannot drift; `packages/common` already holds `getFlowShapeGeometry` and both files can import from there. Fall through to the existing `deconstructRectanguloidElement` behaviour whenever `getFlowShapeGeometry` returns null.
 
-Keep the rest of the function unchanged.
+`collision.ts:649` passes an `offset` to `deconstructRectanguloidElement`. Decide deliberately what that offset means for an arbitrary outline and record the decision — do not silently drop it.
+
+Keep or revert the `getPolygonShape` branch on its merits: it serves other consumers, but if it proves dead for our purposes, revert it rather than leaving a third site that does nothing.
 
 - [ ] **Step 2: Rebuild the vendor package**
 
@@ -599,6 +593,8 @@ test.describe("flow shape hit-testing", () => {
   });
 });
 ```
+
+**Amended during execution — these click points are wrong.** `(550, 370)` sits 30-127px from any real triangle edge, so it cannot discriminate box hit-testing from outline hit-testing in either direction. Choose points from the actual geometry: one clearly inside the drawn outline, one inside the bounding box but clearly outside the outline (the region above a hypotenuse), and include a **transparent** shape case, since that is where box hit-testing is most visibly wrong. The acceptance bar for whatever points you choose: **the test must fail against the unmodified vendor.** Record the actual failure output with the fix reverted, then the pass with it applied.
 
 - [ ] **Step 4: Run it**
 
@@ -1254,7 +1250,9 @@ Standard invariants across wide/tall/zero boxes, plus:
 
 - [ ] **Step 5: Complete the registry and let TypeScript enforce it**
 
-Add the last three entries — cube `{ dx: 0.25, dy: 0.2 }`, fatArrow `{ head: 0.4, stem: 0.4 }`, sumJunction `{}` — then **delete the `as Record<FlowShapeKind, ShapeDef>` cast** added in Task 1. With the cast gone, a missing kind becomes a compile error, which is the check that keeps the registry and the `FlowShapeKind` union in step forever after.
+Add the last three entries — cube `{ dx: 0.25, dy: 0.2 }`, fatArrow `{ head: 0.4, stem: 0.4 }`, sumJunction `{}` — then **change the registry's type from `Partial<Record<FlowShapeKind, ShapeDef>>` to `Record<FlowShapeKind, ShapeDef>`** (the `Partial` was Task 1's honest stand-in for an incomplete set). With `Partial` gone, a missing kind becomes a compile error, which is the check that keeps the registry and the `FlowShapeKind` union in step forever after.
+
+Removing `Partial` also makes `Object.values(SHAPES_REGISTRY)` yield `ShapeDef` rather than `ShapeDef | undefined`, so the `if (!def) continue;` guards that earlier tasks needed can come out. Search for them and remove the now-dead ones rather than leaving guards that can no longer fire.
 
 Add a test that the registry is exhaustive at runtime too:
 
