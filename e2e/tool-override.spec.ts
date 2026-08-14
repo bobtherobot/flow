@@ -114,3 +114,55 @@ test("a selection made while the modifier is held survives the release", async (
   await expect.poll(async () => (await readState(page))?.activeTool?.type).toBe("rectangle");
   expect(await selectedCount(page)).toBe(1);
 });
+
+test("holding the modifier lets you drag a shape to move it", async ({ page }) => {
+  // The override exists so a modifier press gives you the selection tool *and
+  // everything it does* — including moving. Upstream deliberately suppresses
+  // element dragging for any gesture whose pointerdown carried cmd/ctrl (it
+  // reserves that modifier for select-through), which silently made flow's
+  // override select-only. Nothing caught it: the tests above prove the tool
+  // switches and that a selection survives the release, but never that the
+  // thing you selected can actually be moved.
+  await drawBox(page); // leaves the box selected, which is the real scenario:
+                       // draw something, then hold the modifier to nudge it
+  const before = await page.evaluate(() => {
+    const el = (window as any).h.app.scene.getNonDeletedElements()[0];
+    return { x: el.x, y: el.y };
+  });
+
+  await page.keyboard.down("ControlOrMeta");
+  await expect.poll(async () => (await readState(page))?.activeTool?.type).toBe("selection");
+
+  const mid = { x: (BOX[0] + BOX[2]) / 2, y: (BOX[1] + BOX[3]) / 2 };
+  await page.mouse.move(mid.x, mid.y);
+  await page.mouse.down();
+  await page.mouse.move(mid.x + 120, mid.y + 90, { steps: 12 });
+  await page.mouse.up();
+  await page.keyboard.up("ControlOrMeta");
+
+  const after = await page.evaluate(() => {
+    const el = (window as any).h.app.scene.getNonDeletedElements()[0];
+    return { x: el.x, y: el.y };
+  });
+
+  expect(Math.round(after.x - before.x)).toBe(120);
+  expect(Math.round(after.y - before.y)).toBe(90);
+});
+
+test("the modifier still marquee-selects from empty canvas", async ({ page }) => {
+  // Guard on the other side of the fork edit: enabling drag-while-held must not
+  // turn an empty-canvas modifier drag into something other than a marquee.
+  await drawBox(page);
+  await pickTool(page, "Selection");
+  await page.mouse.click(900, 600); // deselect
+  expect(await selectedCount(page)).toBe(0);
+
+  await page.keyboard.down("ControlOrMeta");
+  await page.mouse.move(BOX[0] - 60, BOX[1] - 60);
+  await page.mouse.down();
+  await page.mouse.move(BOX[2] + 40, BOX[3] + 40, { steps: 12 });
+  await page.mouse.up();
+  await page.keyboard.up("ControlOrMeta");
+
+  expect(await selectedCount(page)).toBe(1);
+});

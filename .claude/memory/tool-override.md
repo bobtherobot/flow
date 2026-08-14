@@ -43,9 +43,35 @@ second corruption path; see "Corrective pass" below, which supersedes the
   `src/ui/toolbar/icons.tsx` once `LOCK_ID` was gone — see task-order note below.
 
 ## Key facts / gotchas
-- **ZERO fork edits for the override mechanism itself.** Everything routes
-  through `setActiveTool` / `getAppState` / `updateScene` / `onChange`. (The
-  *lock decoupling* below did need a fork edit — see next section.)
+- **The override mechanism routes through public API** — `setActiveTool` /
+  `getAppState` / `updateScene` / `onChange`. (The *lock decoupling* below,
+  and the drag fix immediately after, each needed a fork edit.)
+- **The modifier must not block dragging (fork edit, 2026-08-14).** Upstream
+  captures `withCmdOrCtrl` at pointerdown and used it to suppress element
+  dragging for the whole gesture — it reserves cmd/ctrl for select-through.
+  flow reserves the same modifier for *this* feature, so the two meanings
+  collided: holding it gave you the selection tool that could select and
+  resize but **never move**, which is the one thing people reach for it to
+  do. Fixed by dropping `!pointerDownState.withCmdOrCtrl` from the drag gate
+  in `App.tsx`'s pointer-move handler (~10906, marked with a `flow:` comment).
+  **This cannot be fixed above the fork** — `event.ctrlKey` is read-only, so
+  flow cannot strip the modifier from real events before Excalidraw sees it.
+  Marquee select-through is untouched: it runs on pointer-up (the other
+  `withCmdOrCtrl` use) and is only reached when the drag branch doesn't fire.
+  Covered by `tool-override.spec.ts` "holding the modifier lets you drag a
+  shape to move it" plus a marquee guard beside it; verified to fail with the
+  gate restored.
+- **This went unnoticed for a week because the tests asserted the wrong
+  thing.** The original suite proved the tool *switches* and that a selection
+  *survives the release* — never that the selected thing could be moved. A
+  feature's tests should exercise what the feature is *for*, not just its
+  state transitions.
+- **Transparent shapes hit on their stroke, not their interior** — worth
+  knowing when reproducing bugs here. A press inside an unfilled rectangle
+  hits nothing and starts a marquee, with or without the modifier; that is
+  Excalidraw behaviour, not a bug in this feature. Two reproduction attempts
+  chased it before the 2×2 (filled/transparent × modifier/none) matrix
+  isolated the real variable.
 - **The restore is two calls, in this order.** `setActiveTool` gives the right
   cursor but clears the selection for any non-selection tool (vendor
   `App.tsx`, the `nextActiveTool.type !== "selection"` guard inside
@@ -60,7 +86,8 @@ second corruption path; see "Corrective pass" below, which supersedes the
   tool for this reason.
 - **Don't engage mid-gesture.** The vendor reads Cmd during a drag to bypass
   grid snapping and to close elbow arrows, so `canEngage` bails on
-  `cursorButton === "down"`, `newElement`, and `multiElement`.
+  `cursorButton === "down"`, `newElement`, and `multiElement`. (It no longer
+  reads Cmd to suppress dragging — see the drag fix above.)
 - Related: [[vertical-toolbar]] (the rail this padlock left),
   [[quick-actions-bar]], [[view-menu-toggles]].
 
