@@ -164,13 +164,20 @@ right. Docked and floating layouts are identical for both. Spec/plan:
   grid's **height** exactly (that's the axis the real bug lived on) and
   allows ±1px on width and on both y-offsets, with this border asymmetry
   named in a comment at the assertion site.
-- **Shape extension: listing is additive, activation is not.** `ToolDef` carries
-  only `{id, label, shortcut, toolType?, arrowType?}`. Adding ten new shapes
-  as `line` elements with `polygon: true` will require a third optional field
-  (e.g., `shapeType?`) in `ToolDef` and a matching branch in `useActiveTool.setTool`
-  — same pattern as `arrowType`, so no architectural corners painted. Work lands in
-  activation, not in the shape list itself.
-- **Tripwire for new shapes: `src/ui/toolbar/tools.test.ts` checks every non-arrow
-  tool has a non-empty shortcut.** All ten new shapes will carry `shortcut: ""`,
-  so the assertion fails on the first additive entry. This is healthy tooling, not a
-  bug — widen the assertion deliberately rather than being surprised by it.
+- **Shape extension: shipped 2026-08-14, and NOT as `line`/`polygon: true`
+  elements.** See [[parametric-shapes]] for the full design and its ledger.
+  The ten new shapes turned out to need a `rectangle` carrier, not a polygon
+  `line`: `isBindableElement` excludes `line`, so a line-based shape could
+  never receive an arrow binding — the deciding factor, proven by an e2e test
+  that draws an arrow into a triangle and asserts the binding. `ToolDef`
+  gained a `flowShape?: FlowShapeKind` field (not the originally-guessed
+  `shapeType?`) — all ten map to the shared `"rectangle"` `toolType` and
+  differ only by which kind they arm via `currentItemFlowShape`, a new
+  appState field `useActiveTool.setTool` writes before calling
+  `setActiveTool`, mirroring the `arrowType` pattern this bullet originally
+  predicted. `SHAPES` now holds all 16 tools (arrow×3 + rectangle + diamond +
+  ellipse + the ten flow shapes); `TOOLS` (9) is unchanged.
+- **The shortcut tripwire predicted here fired exactly as expected**:
+  `src/ui/toolbar/tools.test.ts`'s "every non-arrow tool has a shortcut"
+  assertion was widened to also skip flow-shape tools (all ten carry
+  `shortcut: ""`), deliberately, not by surprise.
