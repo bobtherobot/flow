@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import { tape } from "./tape";
 import { expectInsideBox, expectClosed, expectPathSubpathsClosed } from "./invariants";
 
-const SAMPLES = 24;
-
 describe("tape geometry", () => {
   it.each([
     ["wide box", 200, 100],
@@ -25,8 +23,9 @@ describe("tape geometry", () => {
     const w = 200;
     const h = 100;
     const geom = tape(w, h, { amp: 0, wave: 0.5 });
-    const top = geom.points.slice(0, SAMPLES + 1);
-    const bottom = geom.points.slice(SAMPLES + 1);
+    const half = geom.points.length / 2;
+    const top = geom.points.slice(0, half);
+    const bottom = geom.points.slice(half);
     for (const [, y] of top) {
       expect(y).toBeCloseTo(0, 10);
     }
@@ -42,11 +41,13 @@ describe("tape geometry", () => {
       const h = 100;
       const geom = tape(w, h, { amp: ampFrac, wave: 0.5 });
       const expectedThickness = h - 2 * ampFrac * h;
+      const half = geom.points.length / 2;
       // Bottom index that shares the same `t` as top index `i` is
-      // `2*SAMPLES + 1 - i` (bottom is the reversed second half).
-      for (let i = 0; i <= SAMPLES; i++) {
+      // `length - 1 - i` (bottom is the reversed second half, so it walks
+      // the same `t` values back-to-front).
+      for (let i = 0; i < half; i++) {
         const topY = geom.points[i][1];
-        const bottomY = geom.points[2 * SAMPLES + 1 - i][1];
+        const bottomY = geom.points[geom.points.length - 1 - i][1];
         expect(bottomY - topY).toBeCloseTo(expectedThickness, 8);
       }
     },
@@ -57,7 +58,8 @@ describe("tape geometry", () => {
     const h = 100;
     const countSignChanges = (waveFrac: number): number => {
       const geom = tape(w, h, { amp: 0.12, wave: waveFrac });
-      const top = geom.points.slice(0, SAMPLES + 1);
+      const half = geom.points.length / 2;
+      const top = geom.points.slice(0, half);
       const amp = 0.12 * h;
       const signs = top.map(([, y]) => Math.sign(y - amp));
       let changes = 0;
@@ -71,6 +73,28 @@ describe("tape geometry", () => {
     const many = countSignChanges(0.15);
     const few = countSignChanges(1);
     expect(few).toBeLessThan(many);
+  });
+
+  it("samples every crest exactly, not just the nearest uniform grid point", () => {
+    // wave: 0.15 packs ~6.67 cycles into the box -- at the box's default
+    // 200x100 test size the first crest (t = wave/4 = 0.0375) falls between
+    // uniform grid samples 0 (t=0) and 1 (t=1/24 ~= 0.0417), so a
+    // grid-only polyline would cut the corner and under-draw the true
+    // amplitude there. This is exactly the case a browser check that only
+    // exercised amp: 0 (which zeroes any y-error) or wave: 1 (which happens
+    // to land on a grid sample) would miss.
+    const w = 200;
+    const h = 100;
+    const ampFrac = 0.4;
+    const waveFrac = 0.15;
+    const geom = tape(w, h, { amp: ampFrac, wave: waveFrac });
+    const amp = ampFrac * h;
+    const expectedX = (w * waveFrac) / 4;
+    const expectedY = 2 * amp;
+    const onOutline = geom.points.some(
+      ([x, y]) => Math.abs(x - expectedX) < 1e-6 && Math.abs(y - expectedY) < 1e-6,
+    );
+    expect(onOutline).toBe(true);
   });
 
   it("clamps amp to 0..0.4 and wave to 0.15..1", () => {

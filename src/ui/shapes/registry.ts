@@ -156,13 +156,15 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
       {
         // The first crest of the top edge. `y = amp*h + sin(t*2*PI*cycles)*amp*h`
         // with `cycles = 1/wave` peaks at `t = wave/4`, giving `x = w*wave/4`,
-        // `y = 2*amp*h`. This is the continuous formula the geometry samples
-        // from (24 straight segments across the width) — the handle sits on
-        // the true sine peak, which can differ from the polyline by a
-        // sub-pixel amount between samples (worse at low `wave`, where the
-        // geometry's own comment already documents aliasing from too few
-        // samples per cycle). That's the geometry's known sampling
-        // limitation, not a handle defect, and needs no change here.
+        // `y = 2*amp*h`. tape.ts's `edge()` samples this exact `t` (and every
+        // other crest) explicitly, alongside its uniform grid, so this point
+        // is a literal member of the drawn polyline for every `wave`/`amp` —
+        // not just an analytic point that happens to be near it. (Before that
+        // fix, at low `wave` the true crest could fall between two grid
+        // samples and the handle would sit up to several percent of the box
+        // height off the drawn edge — e.g. `wave: 0.15, amp: 0.4` was off by
+        // ~4.5% of height. Fixed in the geometry, not here, so the shape
+        // itself stops under-drawing its own amplitude too.)
         //
         // Degenerate-clamp check: `amp` (0..0.4) and `wave` (0.15..1) are
         // both bounded by the geometry itself with no degenerate value
