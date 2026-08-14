@@ -43,6 +43,11 @@ export function flowSeedAppState({
     laserColor,
     // Seed the marquee selection mode at init (same fork-field rationale).
     selectionMode,
+    // flow: no shape tool armed at startup. Seeded (not merely defaulted) for
+    // the same reason as the fields above — File ▸ New replaces the whole
+    // appState, and an unseeded field there means a stale shape could survive
+    // into a brand new document.
+    currentItemFlowShape: null,
     // Seed the grid size at init so the grid renders at the preferred cell size
     // on first paint (native field; no cast needed).
     gridSize,
@@ -84,6 +89,7 @@ export const FLOW_GLOBAL_APP_STATE_KEYS = [
   "laserColor",
   "selectionMode",
   "gridSize",
+  "currentItemFlowShape",
 ] as const;
 
 type FlowGlobalAppStateKey = (typeof FLOW_GLOBAL_APP_STATE_KEYS)[number];

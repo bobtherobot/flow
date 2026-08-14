@@ -52,6 +52,20 @@ describe("flowSeedAppState", () => {
       expect(seed).toHaveProperty(key);
     }
   });
+
+  it("seeds no armed shape", () => {
+    expect(flowSeedAppState({ ...PREFS })).toMatchObject({ currentItemFlowShape: null });
+  });
+
+  it("treats the armed shape as a flow global, so an opened document cannot arm one", () => {
+    expect(FLOW_GLOBAL_APP_STATE_KEYS).toContain("currentItemFlowShape");
+    const stripped = withoutFlowGlobals({
+      currentItemFlowShape: { kind: "triangle", p: {} },
+      viewBackgroundColor: "#fff",
+    });
+    expect("currentItemFlowShape" in stripped).toBe(false);
+    expect(stripped.viewBackgroundColor).toBe("#fff");
+  });
 });
 
 describe("withoutFlowGlobals", () => {
