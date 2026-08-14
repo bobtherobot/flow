@@ -769,9 +769,15 @@ In `src/ui/toolbar/useActiveTool.ts`, extend the return type with `flowShapeKind
   };
 ```
 
-- [ ] **Step 3: Fix the highlight rule**
+- [ ] **Step 3: Pass the armed shape from the rail, and fix the highlight rule**
 
-In `src/ui/toolbar/ToolRail.tsx`, all ten shapes share `toolType: "rectangle"`, so without this every shape button and the plain rectangle would light up together. Extend the existing composite rule:
+`ToolRail.tsx` currently calls `setTool(toolType, t.arrowType)`. It must pass the third argument too, or the field is never armed and every shape tool draws a plain rectangle:
+
+```tsx
+              onClick={() => setTool(toolType, t.arrowType, t.flowShape)}
+```
+
+Then the highlight: all ten shapes share `toolType: "rectangle"`, so without this every shape button and the plain rectangle would light up together. Extend the existing composite rule:
 
 ```ts
             const active =
