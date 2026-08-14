@@ -36,6 +36,9 @@ describe("the toolbar / shapebar split", () => {
       "parallelogram",
       "trapezoid",
       "star",
+      "cylinder",
+      "cloud",
+      "tape",
     ]);
   });
 

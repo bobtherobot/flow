@@ -3,6 +3,9 @@ import { triangle } from "./geometry/triangle";
 import { parallelogram } from "./geometry/parallelogram";
 import { trapezoid } from "./geometry/trapezoid";
 import { star } from "./geometry/star";
+import { cylinder } from "./geometry/cylinder";
+import { cloud } from "./geometry/cloud";
+import { tape } from "./geometry/tape";
 
 /**
  * Every flow shape, keyed by kind. This is the single source of truth for
@@ -36,6 +39,27 @@ export const SHAPES_REGISTRY: Partial<Record<FlowShapeKind, ShapeDef>> = {
     label: "Star",
     geometry: star,
     defaults: { ir: 0.38, rot: 0 },
+    handles: [],
+  },
+  cylinder: {
+    kind: "cylinder",
+    label: "Cylinder",
+    geometry: cylinder,
+    defaults: { cap: 0.18 },
+    handles: [],
+  },
+  cloud: {
+    kind: "cloud",
+    label: "Cloud",
+    geometry: cloud,
+    defaults: {},
+    handles: [],
+  },
+  tape: {
+    kind: "tape",
+    label: "Tape",
+    geometry: tape,
+    defaults: { amp: 0.12, wave: 0.5 },
     handles: [],
   },
 };
