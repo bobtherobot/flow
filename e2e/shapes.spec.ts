@@ -156,6 +156,47 @@ test("switching to another tool disarms the shape", async ({ page }) => {
   expect(kind).toBeUndefined();
 });
 
+// Finding 1 of the final review: `useActiveTool.setTool` (the shapebar's own
+// click handler) is the only *flow-side* code that clears
+// `currentItemFlowShape` -- but the vendor also activates tools directly from
+// the keyboard (`findShapeByKey` in App.tsx), bypassing that wrapper
+// entirely. Repro: arm Triangle from the shapebar, click the canvas (so the
+// keyboard shortcut handler -- bound to the canvas container -- actually
+// receives it), press R, drag. Before the vendor-side fix (a fifth fork
+// site, App.tsx's keyboard shape-shortcut branch), the drawn rectangle came
+// out stamped `kind: "triangle"` and the shapebar kept highlighting Triangle
+// even though R is the plain Rectangle tool's own shortcut.
+test("pressing a tool's keyboard shortcut disarms a previously-armed flow shape", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await pickTool(page, "Triangle");
+  // Plain `page.mouse.click`, not a locator-based click: the Controls dock's
+  // resize handle can overlap this point depending on which panels are open,
+  // and a locator click's strict actionability check fails on that overlap
+  // even though a real click here reaches the canvas fine (same pattern
+  // `drawFlowShape` above and other tests in this file already rely on).
+  await page.mouse.click(900, 500);
+  await page.keyboard.press("r");
+
+  await page.mouse.move(400, 200);
+  await page.mouse.down();
+  await page.mouse.move(700, 400, { steps: 8 });
+  await page.mouse.up();
+
+  const kind = await page.evaluate(
+    () => (window as any).h.app.scene.getNonDeletedElements().at(-1).customData?.flowShape?.kind,
+  );
+  expect(kind).toBeUndefined();
+
+  // The shapebar's own highlight must have followed the keyboard switch too
+  // (it reads the same `currentItemFlowShape` appState field).
+  const triangleBtn = page
+    .getByRole("toolbar", { name: "Shapes" })
+    .getByRole("button", { name: "Triangle", exact: true });
+  await expect(triangleBtn).not.toHaveAttribute("aria-pressed", "true");
+});
+
 // Data-driven over every flow-shape tool in the shapebar (read from the same
 // SHAPES list the rail renders from, not copy-pasted) — this is the test that
 // catches a tool wired to the wrong kind: pick it by its visible label, drag
@@ -319,9 +360,17 @@ test("an arrow ending inside a triangle binds to it", async ({ page }) => {
 
   await pickTool(page, "Arrow");
   // Start well outside the triangle's box entirely, end deep in its interior
-  // (near its centroid, ~(550,333) -- see the box-vs-outline comment above)
-  // so the drop can only bind via a real point-in-polygon test against the
-  // triangle's own outline, never a bounding-box guess.
+  // (near its centroid, ~(550,320)). Correction: this point sits inside both
+  // the triangle's real outline *and* its bounding box, so this assertion
+  // alone doesn't distinguish a real point-in-polygon test from a
+  // bounding-box guess -- proving that distinction is `distance.test.ts`/
+  // `collision.test.ts`'s job (vendor/excalidraw/packages/element/src),
+  // which probe points inside the box but outside the triangle's slanted
+  // edges. What this test actually proves, and the reason it exists: an
+  // arrow *can* bind to a flow-shape carrier at all -- that `rectangle` was
+  // the right element type to build these shapes on (see the fork-site
+  // comment above the test) -- exercised end-to-end through the real drawing
+  // and binding UI, not through a test hook.
   await page.mouse.move(150, 150);
   await page.mouse.down();
   await page.mouse.move(550, 320, { steps: 8 });
