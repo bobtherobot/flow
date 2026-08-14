@@ -1,6 +1,6 @@
 ---
 name: parametric-shapes
-description: "Ten flow shapes drawn as rectangle carriers with customData.flowShape — why rectangle, the four fork sites, and the hit-test/handle traps"
+description: "Ten flow shapes drawn as rectangle carriers with customData.flowShape — why rectangle, the ten fork sites, and the hit-test/handle/fill traps"
 metadata:
   type: project
 ---
@@ -9,8 +9,12 @@ metadata:
 
 Shipped 2026-08-14 (branch `feat/parametric-shapes`, 12 tasks). Spec:
 `docs/superpowers/specs/2026-08-13-parametric-shapes-design.md`. Plan:
-`docs/superpowers/plans/2026-08-13-parametric-shapes.md`. Full build ledger
-(now deleted): `.superpowers/sdd/2026-08-13-parametric-shapes/progress.md`.
+`docs/superpowers/plans/2026-08-13-parametric-shapes.md`. Full build ledger:
+`.superpowers/sdd/2026-08-13-parametric-shapes/progress.md`. **Final review
+pass, same day**: a whole-branch review found six IMPORTANT-severity gaps
+(this file's original "four fork sites" claim being one of them — see below)
+plus several minor ones; fixed in
+`.superpowers/sdd/2026-08-13-parametric-shapes/final-fix-report.md`.
 
 Ten shapes — triangle, star, cylinder, cube, parallelogram, fat arrow, cloud,
 trapezoid, tape, summing junction — added to the shapebar (`SHAPES` in
@@ -41,20 +45,66 @@ scene coordinates. Break this and bounds, snapping, export and selection
 chrome (which all read `x, y, width, height` and assume geometry lives
 inside it) go wrong silently, not loudly.
 
-## The four fork sites, by file
+## The ten fork sites, by file
+
+**Correction (final review pass):** this file originally said "the four fork
+sites" — that undercounted the real surface by more than half. A rebase
+reader following the old list would have missed six real vendor edits. The
+actual fork surface is ten files: the four geometry/hit-test sites below,
+plus five more that wire the `currentItemFlowShape` appState field through
+the app (types, re-exports, defaults, seeding, and two separate `App.tsx`
+edit sites — element creation and the keyboard-shortcut branch).
 
 1. `packages/common/src/flowShapes.ts` — the registry itself:
    `registerFlowShape`, `getFlowShapeGeometry` (returns `null` for anything
-   unregistered, absent `customData.flowShape`, a non-string `kind`, or
-   fewer than 3 resulting points — never throws), `clearFlowShapes`.
+   unregistered, absent `customData.flowShape`, a non-string `kind`, or fewer
+   than 3 resulting points), `clearFlowShapes`, and `getFlowShapeSides` (the
+   shared hit-test/binding-offset geometry sites 3 and 4 both dispatch
+   through). **Softening a claim in the previous version of this file: the
+   guards here don't *throw* on bad input, but the registered geometry
+   function itself is invoked unguarded** — a geometry function that throws
+   for some `(w, h, p)` combination will still crash the render, this module
+   just doesn't add a *second* way to crash on top of that.
 2. `packages/element/src/shape.ts` — render dispatch, the `rectangle` case
-   only (guarded so diamond/ellipse/embeddable are untouched).
+   only (guarded so diamond/ellipse/embeddable are untouched); the site that
+   turns a `flowShape`'s `points`/`path` into a rough.js drawable via
+   `generator.polygon`/`generator.path`.
 3. `packages/element/src/distance.ts` — outline hit-test
    (`distanceToRectanguloidElement`), used by click-to-select.
 4. `packages/element/src/collision.ts` — interior hit-test
    (`intersectRectanguloidWithLineSegment`, which backs both
    `isPointInElement` — arrow binding's real containment test — and the
    filled-shape click path).
+5. `packages/common/src/index.ts` — `export * from "./flowShapes"`, the
+   barrel re-export that makes site 1's exports reachable at all from outside
+   `packages/common`.
+6. `packages/excalidraw/index.tsx` — re-exports `registerFlowShape`,
+   `getFlowShapeGeometry`, `clearFlowShapes` at the public `@excalidraw/excalidraw`
+   entry point flow's `src/ui/shapes/register.ts` actually imports from.
+7. `packages/excalidraw/appState.ts` — `currentItemFlowShape: null` in the
+   default appState object, plus its entry in the export-filter map (browser/
+   export/server `false`) that keeps it out of serialized exports.
+8. `packages/excalidraw/types.ts` — the `currentItemFlowShape?: { kind:
+   string; p: Record<string, number> } | null` field declaration on
+   `AppState` itself.
+9. `packages/excalidraw/components/App.tsx`, **element-creation site**
+   (`newElement`'s call site, ~line 10412) — stamps a newly-drawn
+   `rectangle`'s `customData.flowShape` from `state.currentItemFlowShape`,
+   guarded to `elementType === "rectangle"` so embeddables/the selection
+   element are untouched. Deep-copies `{ kind, p: {...p} }` rather than
+   handing out the appState object by reference (final-review fix — see
+   below).
+10. `packages/excalidraw/components/App.tsx`, **keyboard-shortcut site**
+    (the `findShapeByKey` branch, ~line 5570) — a *fifth fork site added in
+    the final review pass*: clears `currentItemFlowShape` whenever a
+    keyboard shortcut activates a tool. Site 9 and flow's own
+    `useActiveTool.setTool` (`src/ui/toolbar/useActiveTool.ts`) were the only
+    two places that wrote this field before the review, and neither one is
+    reachable from `App.tsx`'s own keyboard handler — pressing `R` after
+    arming a shape from the shapebar left it armed, so the next plain
+    rectangle silently inherited the last shape's `kind`. See
+    `e2e/shapes.spec.ts`'s "pressing a tool's keyboard shortcut disarms a
+    previously-armed flow shape" test.
 
 Sites 3 and 4 both dispatch through one shared `getFlowShapeSides` helper in
 `packages/common`, so hit-testing and binding can't drift apart from each
@@ -94,15 +144,30 @@ handle's `at()` is defined in terms of the box, not the point extent).
 `distance.ts`/`collision.ts` were extended instead, leaving
 `deconstructRectanguloidElement` and `bounds.ts`/`binding.ts` untouched.
 
-## Known limitation: four features still see the box
+## Known gaps, not fixed
 
-`getElementLineSegments` (`bounds.ts`) tests `_isRectanguloidElement`
-*before* its polygon branch, and that predicate is true for every rectangle
-— so **bucket-fill, frame containment, lasso-select and eraser all still
-operate on the bounding box for flow shapes**, not the real outline. Fixing
-it means reordering that branch, which would newly route four unrelated
-features through flow outlines — a real behavior change, deliberately not
-taken in this project.
+Recorded here (final review pass) as the honest, current limitation list —
+none of these are fixed by this project, deliberately:
+
+- **Bucket-fill, frame containment, lasso-select and eraser all still operate
+  on the bounding box for flow shapes**, not the real outline.
+  `getElementLineSegments` (`bounds.ts`) tests `_isRectanguloidElement`
+  *before* its polygon branch, and that predicate is true for every
+  rectangle. Fixing it means reordering that branch, which would newly route
+  four unrelated features through flow outlines — a real behavior change,
+  deliberately not taken in this project.
+- **The concave binding-gap fallback** — see "The concave-offset gate" above:
+  four shapes (star, cloud, fat arrow, tape) get a box-shaped, not
+  outline-shaped, arrow-binding gap whenever the binding offset is non-zero.
+- **No keyboard route to any of the eight handle-driven parameters.** The
+  orange dots are `<button>` elements and are Tab-focusable (real DOM focus
+  order), but Enter/Space/arrow keys do nothing once focused — there is no
+  keyboard equivalent of a drag. Mouse/touch only.
+- **Flip (`Shift+H`) is a silent no-op on flow shapes.** The vendor's flip
+  action transforms `points` for line/arrow elements and swaps other
+  geometry-bearing fields for native shapes; it has no concept of
+  `customData.flowShape`, so it does nothing and reports no error — a user
+  pressing Shift+H on a triangle sees no visible change and no explanation.
 
 ## The concave-offset gate
 
@@ -115,6 +180,71 @@ cross-product sign changes and falls through to the plain box path whenever
 click-select) always gets the real outline regardless of convexity; only the
 binding-gap miter degrades.
 
+## Fill winding: multi-subpath `path` shapes fight the fill rule
+
+**Not "solid = nonzero, pattern = even-odd" — canvas rendering is even-odd
+for both.** roughjs's own canvas renderer (`roughjs/bin/canvas.js`,
+`RoughCanvas.draw`) fills *any* `generator.path(...)`-based shape —
+`fillStyle: "solid"` included — with `ctx.fill("evenodd")`; there is no
+nonzero code path for a shape whose `drawable.shape === "path"`. Under
+even-odd, an interior subpath (the cylinder's front-cap arc, the cube's
+front-face crease lines) can render as a hole in the surrounding fill the
+moment the shape has a non-transparent background — not just under pattern
+fills, as an earlier draft of the design assumed.
+
+- **Cylinder (fixed):** the front-cap subpath's point order is reversed
+  relative to the silhouette's own direction through their two shared points
+  (`cylinder.ts`) — verified in a real browser (Chromium, both default
+  roughness and `roughness: 0` with a fixed seed, ruling out sketchy-fill
+  jitter) to turn the cap-lens hole into a correct fill at the default `cap`.
+  **This is an empirical fix, not a proven one** — a naive ray-casting
+  argument says point order can't matter under even-odd, and it doesn't for
+  a *fully isolated* interior subpath (verified separately — see cube,
+  below); the cylinder's two subpaths touch the silhouette at exactly two
+  points, and that specific topology is where the empirical result and the
+  naive theory diverge. **Known remaining gap:** near `cap`'s upper bound
+  (verified at `cap: 0.42`), the front-cap lens grows tall enough to overlap
+  the *bottom* cap too — a third subpath interaction this fix doesn't
+  address — and a large fill gap reappears, identically regardless of point
+  order. Only the common case (lens touching just the silhouette) is fixed.
+- **Cube (not fixed, corrected finding):** the front face's own comment
+  originally claimed solid fill was fine here (matching winding sign,
+  nonzero theory) and only pattern fill excluded the front face. **Verified
+  wrong by screenshotting a filled cube in-app: the front face is a hole
+  under solid fill too.** Reversing the front subpath, reversing the
+  silhouette, rotating the front subpath's starting vertex, and insetting it
+  20px so it shares *no* vertex or edge with the silhouette at all were all
+  tried; every variant still rendered a hole. A fully isolated interior
+  subpath under even-odd is a hole, full stop, independent of winding — the
+  cylinder's fix rides a topology-specific coincidence (two shared points)
+  that the cube's front face doesn't have (its closing edge is the *same
+  line segment* as one of the silhouette's own edges, not just two touching
+  points). Left as a known, documented gap — see cube.ts's fill-winding
+  comment for the full investigation.
+
+Takeaway for any future shape with interior detail: don't assume a
+matching-winding-sign subpath renders correctly under solid fill just
+because it would under a textbook nonzero rule. Verify in a real browser.
+
+## Cloud degenerates at non-square aspect ratios (fixed)
+
+`cloud.ts`'s bump radius used to be a single scalar (`Math.min(rx, ry) *
+0.32`) tied to the box's *short* axis, while the nine bump centres are placed
+at equal *parametric* angle around the box's own aspect ratio. On a wide box,
+consecutive centres near the long axis drift apart (their spacing scales with
+the long axis) while a short-axis-derived radius stayed too small to bridge
+the gap — the longest chord between consecutive outline points grew without
+bound as the box widened (95.8px at 400x100, 180.6px at 600x60), a visibly
+spiky polygon with flat notches. This is a **different defect** from the
+"cloud facets under-sample at large sizes" note below — more samples cannot
+close a 96px gap, because the underlying geometry has a real gap to close,
+not an under-sampling artifact. Fixed by making the bump radius **per-axis**
+(`bumpRx = rx * 0.32`, `bumpRy = ry * 0.32`) — at `w === h` this is pixel-
+identical to the old formula, and at any aspect ratio it keeps the longest
+chord proportional to the box's own perimeter instead of unbounded (verified
+numerically and pinned by a `cloud.test.ts` assertion across square/wide/very
+wide boxes).
+
 ## The `ShapeCache` trap
 
 `mutateElement` calls `ShapeCache.delete(element)` **only** when
@@ -126,6 +256,19 @@ handle drag mints a fresh element object (`newElementWith` /
 `updateScene({ elements: [...] })` with a new object literal) instead — a new
 object is simply absent from the `WeakMap`, so this is a guaranteed cache
 miss, not a fix for a bug that could otherwise be triggered.
+
+**Grab offset (final review pass, `useHandleDrag.ts`).** The parameter used
+to be derived straight from the pointer's absolute local position on every
+move, with no memory of *where on the dot* the drag actually started —
+pressing a few px off the dot's exact centre (still within its 10px hit
+area) snapped the shape toward the pointer on the very first move instead of
+preserving the grab point, the way dragging a real UI handle never
+"teleports" the dragged thing to the cursor. Fixed by capturing the offset
+between the pointer-down point and the dot's true `handle.at(...)` position
+once, in `useDrag`'s `onStart`, and subtracting it from every subsequent
+move. A dead-centre press yields a zero offset, so every existing drag test
+(all of which happen to start dead-centre) was unaffected — the new test
+specifically presses off-centre to exercise the fix.
 
 ## The handle lesson
 
@@ -145,6 +288,35 @@ which was proven to fail against the old (wrong) cylinder handle by
 reverting it and confirming the new test alone catches it. This generalizes
 to every future shape automatically.
 
+**Sampled at defaults only is still structurally blind — a second class of
+bug (final review pass).** The on-outline test above originally evaluated
+`at()` at `def.defaults` only, so it never covered a handle that's only
+*sometimes* wrong: deleting tape's crest-sampling fix (`crestTs` in
+`tape.ts`) left the test green, because the default `wave: 0.5` happens to
+put the crest exactly on `tape.ts`'s own uniform sample grid — most *other*
+`wave` values then drift off the drawn outline by several percent of the box
+height, untested. Fixed by sweeping every parameter a handle owns over
+min/mid/max of its bounds (now readable as exported constants per geometry
+module — see the clamp-bounds fix below) and asserting on-outline at every
+combination (32 tests → 66). Verified to fail against both known-bad
+handles: the tape regression above, and reverting the cylinder `cap` handle
+back to the plan's dead `[w/2, cap*h]` formula.
+
+**Clamp bounds used to be duplicated 2-3× per parameter** (the geometry
+function's own clamp, plus the matching handle's `at`/`from`, sometimes
+duplicated again in a comment) — ~20 duplicated literal pairs across eight
+handles. Narrowing a geometry clamp without also updating its handle would
+silently desync the dot from the drawn edge. Fixed by hoisting each
+parameter's bounds into its geometry module as an exported constant (e.g.
+`CYLINDER_BOUNDS`, `TAPE_BOUNDS`) plus a shared `clamp()` helper
+(`geometry/bounds.ts`); `registry.ts`'s handles and `handles.test.ts`'s
+parameter sweep both read the same constants. Parallelogram's `skew` is the
+one deliberate exception: its handle clamps to a UI-only `SKEW_UI_MAX` (0.9)
+tighter than the geometry's own 1.0 bound, kept as a separate named constant
+rather than folded into `PARALLELOGRAM_BOUNDS` so the two different
+decisions (true valid range vs. drag-reachability limit) stay visibly
+distinct.
+
 ## The two `appState` traps
 
 Adding `currentItemFlowShape` (the shape a newly-armed shapebar tool stamps
@@ -158,7 +330,29 @@ new rectangles with) required both:
 
 And **every non-shape tool must explicitly clear `currentItemFlowShape`**,
 or the next plain rectangle drawn after using a flow-shape tool gets stamped
-with the previous shape's `kind` by accident.
+with the previous shape's `kind` by accident. Two sites write this field:
+`useActiveTool.setTool` (the shapebar's own click handler) and, since the
+final review pass, the vendor's keyboard-shortcut branch (fork site 10
+above) — `findShapeByKey`-driven tool switches bypass `setTool` entirely, so
+without that vendor edit a shape armed from the shapebar stayed armed after
+pressing a plain tool's shortcut key.
+
+## The quickbar had its own, separate arming bug (final review pass)
+
+`src/ui/quickbar/actions.ts`'s `TOOL_ITEMS` — the quickbar's opt-in tool
+buttons, built from the same `ALL_TOOLS` list the rails render from — dropped
+`toolType`/`arrowType`/`flowShape` when mapping `ToolDef` to `QuickItem`.
+Enabling a flow shape (or `arrow-curved`/`arrow-elbow`, pre-existing before
+this project) from the quickbar's hamburger menu and clicking it called
+`setActiveTool({ type: "triangle" })` — not a real Excalidraw tool type,
+since every flow shape shares the vendor's `"rectangle"` tool and differs
+only by the `currentItemFlowShape` kind — arming an inert tool that drew
+nothing. Fixed by carrying `toolType`/`arrowType`/`flowShape` through
+`QuickItem` and having `useQuickActions`' `trigger` call `useActiveTool`'s
+own `setTool` (a second, independent subscription — safe because it's a pure
+reactive read of `api`, not owned state) instead of duplicating the arming
+logic. `useQuickActions.test.tsx` and `e2e/quickbar.spec.ts` both cover one
+flow shape and one arrow variant end to end.
 
 ## Two pre-existing bugs found along the way (not caused by this project)
 
@@ -174,7 +368,10 @@ with the previous shape's `kind` by accident.
 - **Cloud facets under-sample at large sizes** (6 samples per bump). Worth
   revisiting because `points` doubles as the hit-test outline, so more
   samples would improve fidelity and hit accuracy together, not just visual
-  smoothness.
+  smoothness. **Still open** — distinct from the aspect-ratio bug fixed above
+  (that one was a real geometric gap no sample count could close; this one is
+  a genuine faceting/resolution issue, present even on a square box, that
+  more samples *would* improve).
 
 ## e2e coordinate gotcha: page-viewport ≠ scene coordinates
 
