@@ -165,12 +165,12 @@ right. Docked and floating layouts are identical for both. Spec/plan:
   allows ±1px on width and on both y-offsets, with this border asymmetry
   named in a comment at the assertion site.
 - **Shape extension: listing is additive, activation is not.** `ToolDef` carries
-  only `{id, label, shortcut, toolType?, arrowType?}`. Adding eleven new shapes
+  only `{id, label, shortcut, toolType?, arrowType?}`. Adding ten new shapes
   as `line` elements with `polygon: true` will require a third optional field
   (e.g., `shapeType?`) in `ToolDef` and a matching branch in `useActiveTool.setTool`
   — same pattern as `arrowType`, so no architectural corners painted. Work lands in
   activation, not in the shape list itself.
 - **Tripwire for new shapes: `src/ui/toolbar/tools.test.ts` checks every non-arrow
-  tool has a non-empty shortcut.** All eleven new shapes will carry `shortcut: ""`,
+  tool has a non-empty shortcut.** All ten new shapes will carry `shortcut: ""`,
   so the assertion fails on the first additive entry. This is healthy tooling, not a
   bug — widen the assertion deliberately rather than being surprised by it.

@@ -9,7 +9,7 @@ The left tool rail splits into two rails built from one component: a slim 44px
 identically, and — new — both lay out their contents the same way whether docked
 or floating.
 
-This is the first of two specs. The eleven new parametric shapes (triangle,
+This is the first of two specs. The ten new parametric shapes (triangle,
 star, cylinder, cube, parallelogram, fat arrow, cloud, trapezoid, tape, summing
 junction) are a separate, much larger project; see [Out of scope](#out-of-scope).
 
@@ -32,7 +32,7 @@ Three complaints about the single rail as it stands.
    `1fr` grid tracks resize with the shell for the same reason.
 
 3. **One rail cannot hold the shapes that are coming.** Six shape tools today,
-   seventeen after the second spec. Mixed in with the nine everyday tools that
+   sixteen after the second spec. Mixed in with the nine everyday tools that
    is an undifferentiated column of two dozen buttons.
 
 ## The shape
@@ -126,7 +126,7 @@ comes from. What changes is that the contents no longer stretch into it:
 
 - A content wrapper (tool grid + footer) is `flex: 0 1 auto; overflow-y: auto`.
   It hugs its content, and scrolls only when content exceeds available height —
-  so a 17-tool shapebar on a short screen degrades to a scroll rather than
+  so a 16-tool shapebar on a short screen degrades to a scroll rather than
   overflowing.
 - The grid goes from `repeat(2, 1fr)` to `repeat(var(--flow-rail-cols), 36px)`
   with `justify-content: center`. Fixed tracks cannot resize with the shell.
@@ -224,7 +224,7 @@ e2e — the parts jsdom cannot reach (drag, dock geometry, layout):
 
 ## Out of scope
 
-The eleven new shapes and their orange parametric handles. They need a shape
+The ten new shapes and their orange parametric handles. They need a shape
 representation, a handle-drag overlay, geometry generation per shape, and a
 stored parameter that survives resize, undo and save — none of which exists
 upstream (transform handles are 8 directions plus rotation, and there is no
@@ -236,4 +236,4 @@ supports closed fillable polylines — `packages/element/src/types.ts:358`)
 carrying a flow-owned parameter, with the orange dots drawn as a DOM overlay
 positioned from `scrollX`/`scrollY`/`zoom` rather than as new vendor transform
 handles. The shapebar needs only `{id, label, shortcut, icon}` per entry, so
-those eleven arrive as additive list entries here.
+those ten arrive as additive list entries here.

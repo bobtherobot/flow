@@ -6,8 +6,8 @@ import type { ToolbarState } from "./toolbar-state";
 export const TOOL_RAIL_WIDTH = 44;
 
 /** Docked shapebar width: two 36px button columns plus 4px padding each side.
- *  Two columns because the shapebar grows to seventeen tools once the new
- *  parametric shapes land, and a single column of seventeen runs off a laptop
+ *  Two columns because the shapebar grows to sixteen tools once the new
+ *  parametric shapes land, and a single column of sixteen runs off a laptop
  *  screen. */
 export const SHAPE_RAIL_WIDTH = 80;
 

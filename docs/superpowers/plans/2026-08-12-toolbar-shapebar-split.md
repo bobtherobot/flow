@@ -31,7 +31,7 @@ Spec: `docs/superpowers/specs/2026-08-12-toolbar-shapebar-split-design.md`
 Ten e2e specs each reach rail tools through their own copy of
 `page.getByRole("toolbar", { name: "Tools" }).getByRole("button", { name, exact: true })`.
 Once the shapes move to a second rail, every one of those breaks. Centralise
-first, so the split changes one file instead of ten — and so Spec 2's eleven new
+first, so the split changes one file instead of ten — and so Spec 2's ten new
 shapes don't reintroduce the fan-out.
 
 **Files:**
@@ -428,8 +428,8 @@ import type { ToolbarState } from "./toolbar-state";
 export const TOOL_RAIL_WIDTH = 44;
 
 /** Docked shapebar width: two 36px button columns plus 4px padding each side.
- *  Two columns because the shapebar grows to seventeen tools once the new
- *  parametric shapes land, and a single column of seventeen runs off a laptop
+ *  Two columns because the shapebar grows to sixteen tools once the new
+ *  parametric shapes land, and a single column of sixteen runs off a laptop
  *  screen. */
 export const SHAPE_RAIL_WIDTH = 80;
 
