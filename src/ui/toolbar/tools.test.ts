@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TOOLS, SHAPES, ALL_TOOLS } from "./tools";
 import { TOOL_ICONS } from "./icons";
-import { SHAPES_REGISTRY } from "../shapes/registry";
 
 describe("TOOLS", () => {
   it("lists the nine non-shape tools in order", () => {
@@ -37,8 +36,11 @@ describe("the toolbar / shapebar split", () => {
       "trapezoid",
       "star",
       "cylinder",
+      "cube",
+      "fatArrow",
       "cloud",
       "tape",
+      "sumJunction",
     ]);
   });
 
@@ -82,11 +84,14 @@ describe("the toolbar / shapebar split", () => {
     }
   });
 
-  it("gives every flow-shape tool the rectangle carrier and a registry entry", () => {
+  it("gives every flow-shape tool the rectangle carrier and no shortcut", () => {
+    // Every kind referenced here has a real SHAPES_REGISTRY entry by
+    // construction: `flowShape` is typed `FlowShapeKind`, and the registry is
+    // `Record<FlowShapeKind, ShapeDef>` — TypeScript rejects the file if any
+    // kind is missing, so there is nothing left to check for that at runtime.
     for (const t of SHAPES.filter((s) => s.flowShape)) {
       expect(t.toolType).toBe("rectangle");
       expect(t.shortcut).toBe("");
-      expect(SHAPES_REGISTRY[t.flowShape!]).toBeTruthy();
     }
   });
 });

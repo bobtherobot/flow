@@ -6,6 +6,9 @@ import { star } from "./geometry/star";
 import { cylinder } from "./geometry/cylinder";
 import { cloud } from "./geometry/cloud";
 import { tape } from "./geometry/tape";
+import { cube } from "./geometry/cube";
+import { fatArrow } from "./geometry/fatArrow";
+import { sumJunction } from "./geometry/sumJunction";
 
 /**
  * Every flow shape, keyed by kind. This is the single source of truth for
@@ -13,12 +16,11 @@ import { tape } from "./geometry/tape";
  * it, the vendor registry is populated from it, and the handle overlay reads
  * its `handles`.
  *
- * `Partial` only because the set is incomplete until every kind lands — Task 8
- * of this plan swaps it for the full `Record<FlowShapeKind, ShapeDef>`, at which
- * point TypeScript enforces exhaustiveness and a missing shape is a compile
- * error. The accessors below already tolerate a missing entry.
+ * Typed `Record<FlowShapeKind, ShapeDef>` (not `Partial`), so a kind missing
+ * from this object literal is a compile error — that's what keeps this
+ * registry and the `FlowShapeKind` union in step forever after.
  */
-export const SHAPES_REGISTRY: Partial<Record<FlowShapeKind, ShapeDef>> = {
+export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
   triangle: { kind: "triangle", label: "Triangle", geometry: triangle, defaults: {}, handles: [] },
   parallelogram: {
     kind: "parallelogram",
@@ -62,6 +64,27 @@ export const SHAPES_REGISTRY: Partial<Record<FlowShapeKind, ShapeDef>> = {
     defaults: { amp: 0.12, wave: 0.5 },
     handles: [],
   },
+  cube: {
+    kind: "cube",
+    label: "Cube",
+    geometry: cube,
+    defaults: { dx: 0.25, dy: 0.2 },
+    handles: [],
+  },
+  fatArrow: {
+    kind: "fatArrow",
+    label: "Fat Arrow",
+    geometry: fatArrow,
+    defaults: { head: 0.4, stem: 0.4 },
+    handles: [],
+  },
+  sumJunction: {
+    kind: "sumJunction",
+    label: "Summing Junction",
+    geometry: sumJunction,
+    defaults: {},
+    handles: [],
+  },
 };
 
 /** A fresh copy of a kind's starting parameters — callers mutate what they get. */
@@ -69,7 +92,17 @@ export function defaultsFor(kind: FlowShapeKind): ShapeParams {
   return { ...SHAPES_REGISTRY[kind]?.defaults };
 }
 
-/** Geometry for a kind, or null when the kind is unknown. */
+/**
+ * Geometry for a kind, or null when the kind is unknown.
+ *
+ * `SHAPES_REGISTRY` is now typed `Record<FlowShapeKind, ShapeDef>`, so any
+ * value that actually type-checks as `FlowShapeKind` resolves to a real
+ * entry. The `?.`/`?? null` here still guard the runtime case a bad value is
+ * smuggled past the type system (an `as never` cast, external/untrusted
+ * data) — unlike the `Object.values` iteration in `register.ts`, this is a
+ * keyed lookup on a caller-supplied value, so it can't lean on the object
+ * literal having been built with every key.
+ */
 export function geometryFor(
   kind: FlowShapeKind,
   w: number,

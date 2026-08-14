@@ -9,20 +9,13 @@ import { SHAPES_REGISTRY } from "./registry";
  * plain box. `src/main.tsx` imports this module for its side effect, at module
  * scope, which is what guarantees the ordering.
  *
- * `SHAPES_REGISTRY` is typed `Partial<Record<FlowShapeKind, ShapeDef>>` (Task 8
- * completes the set and drops the `Partial`), so `Object.values` types each
- * entry as `ShapeDef | undefined`. In practice every key present on the object
- * literal has a real value — `undefined` here would mean the registry itself
- * was built wrong, not that a kind is merely unimplemented yet. Fail loudly
- * rather than silently skipping registration for that kind.
+ * `SHAPES_REGISTRY` is typed `Record<FlowShapeKind, ShapeDef>`, so
+ * `Object.values` types each entry as `ShapeDef` — every key present on the
+ * object literal has a real value, and TypeScript enforces that the literal
+ * covers every `FlowShapeKind`.
  */
 export function registerAllFlowShapes(): void {
   for (const def of Object.values(SHAPES_REGISTRY)) {
-    if (!def) {
-      throw new Error(
-        "SHAPES_REGISTRY contains an undefined entry; every key present on it must map to a real ShapeDef",
-      );
-    }
     registerFlowShape(def.kind, def.geometry);
   }
 }

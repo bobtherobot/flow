@@ -71,6 +71,18 @@ export const TOOL_ICONS: Record<ToolId, ReactNode> = {
       <path d="M3.5 14.5 A 6.5 2.2 0 0 0 16.5 14.5" />
     </Svg>
   ),
+  cube: (
+    <Svg>
+      <path d="M3.5 6.5 L8 3.5 L16.5 3.5 L16.5 11.5 L12 14.5 L3.5 14.5 Z" />
+      <path d="M3.5 6.5 L12 6.5 L12 14.5" />
+      <path d="M12 6.5 L16.5 3.5" />
+    </Svg>
+  ),
+  fatArrow: (
+    <Svg>
+      <path d="M3 7.5 L11 7.5 L11 4 L17.5 10 L11 16 L11 12.5 L3 12.5 Z" />
+    </Svg>
+  ),
   cloud: (
     <Svg>
       <path d="M5.5 14 A3 3 0 0 1 5.9 8.02 A3.6 3.6 0 0 1 12.7 6.4 A3.2 3.2 0 0 1 16.3 10.9 A2.8 2.8 0 0 1 15.5 14 Z" />
@@ -82,6 +94,13 @@ export const TOOL_ICONS: Record<ToolId, ReactNode> = {
       <path d="M2.5 14 C5 16.5 8 11.5 10 14 C12 16.5 15 11.5 17.5 14" />
       <path d="M2.5 6 L2.5 14" />
       <path d="M17.5 6 L17.5 14" />
+    </Svg>
+  ),
+  sumJunction: (
+    <Svg>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M10 3 L10 17" />
+      <path d="M3 10 L17 10" />
     </Svg>
   ),
   ellipse: (

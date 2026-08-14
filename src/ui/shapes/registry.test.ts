@@ -1,18 +1,25 @@
 import { describe, it, expect } from "vitest";
+import type { FlowShapeKind } from "./types";
 import { SHAPES_REGISTRY, defaultsFor, geometryFor } from "./registry";
 
 describe("the shape registry", () => {
+  it("has an entry for every kind, and every kind is a real entry", () => {
+    const kinds: FlowShapeKind[] = [
+      "triangle", "star", "cylinder", "cube", "parallelogram",
+      "fatArrow", "cloud", "trapezoid", "tape", "sumJunction",
+    ];
+    expect(Object.keys(SHAPES_REGISTRY).sort()).toEqual([...kinds].sort());
+  });
+
   it("gives each entry a kind matching its key", () => {
     for (const [key, def] of Object.entries(SHAPES_REGISTRY)) {
-      expect(def, `${key} has no definition`).toBeDefined();
-      expect(def!.kind).toBe(key);
+      expect(def.kind).toBe(key);
     }
   });
 
   it("gives each entry a non-empty label", () => {
     for (const [key, def] of Object.entries(SHAPES_REGISTRY)) {
-      expect(def, `${key} has no definition`).toBeDefined();
-      expect(def!.label.length).toBeGreaterThan(0);
+      expect(def.label.length, `${key} has an empty label`).toBeGreaterThan(0);
     }
   });
 

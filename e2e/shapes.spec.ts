@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
+import { SHAPES } from "../src/ui/toolbar/tools";
 
 /**
  * Draw a rectangle from (400,200) to (700,400) and turn it into a flow shape.
@@ -153,4 +154,30 @@ test("switching to another tool disarms the shape", async ({ page }) => {
     () => (window as any).h.app.scene.getNonDeletedElements().at(-1).customData?.flowShape?.kind,
   );
   expect(kind).toBeUndefined();
+});
+
+// Data-driven over every flow-shape tool in the shapebar (read from the same
+// SHAPES list the rail renders from, not copy-pasted) — this is the test that
+// catches a tool wired to the wrong kind: pick it by its visible label, drag
+// a box, and assert the created element is a rectangle stamped with exactly
+// that kind.
+const FLOW_SHAPE_TOOLS = SHAPES.filter((t) => t.flowShape);
+
+test.describe("every shapebar tool draws its own kind", () => {
+  for (const tool of FLOW_SHAPE_TOOLS) {
+    test(`${tool.label} draws a rectangle stamped with "${tool.flowShape}"`, async ({ page }) => {
+      await page.goto("/");
+      await pickTool(page, tool.label);
+      await page.mouse.move(400, 200);
+      await page.mouse.down();
+      await page.mouse.move(700, 400, { steps: 8 });
+      await page.mouse.up();
+
+      const stamped = await page.evaluate(() => {
+        const el = (window as any).h.app.scene.getNonDeletedElements().at(-1);
+        return { type: el.type, kind: el.customData?.flowShape?.kind };
+      });
+      expect(stamped).toEqual({ type: "rectangle", kind: tool.flowShape });
+    });
+  }
 });

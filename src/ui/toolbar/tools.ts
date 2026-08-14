@@ -23,8 +23,11 @@ export type ToolId =
   | "trapezoid"
   | "star"
   | "cylinder"
+  | "cube"
+  | "fatArrow"
   | "cloud"
-  | "tape";
+  | "tape"
+  | "sumJunction";
 
 /** New-arrow shape an arrow-variant rail tool applies (Excalidraw's ARROW_TYPE
  *  values). */
@@ -87,8 +90,23 @@ export const SHAPES: readonly ToolDef[] = [
   { id: "trapezoid", label: "Trapezoid", shortcut: "", toolType: "rectangle", flowShape: "trapezoid" },
   { id: "star", label: "Star", shortcut: "", toolType: "rectangle", flowShape: "star" },
   { id: "cylinder", label: "Cylinder", shortcut: "", toolType: "rectangle", flowShape: "cylinder" },
+  { id: "cube", label: "Cube", shortcut: "", toolType: "rectangle", flowShape: "cube" },
+  {
+    id: "fatArrow",
+    label: "Fat Arrow",
+    shortcut: "",
+    toolType: "rectangle",
+    flowShape: "fatArrow",
+  },
   { id: "cloud", label: "Cloud", shortcut: "", toolType: "rectangle", flowShape: "cloud" },
   { id: "tape", label: "Tape", shortcut: "", toolType: "rectangle", flowShape: "tape" },
+  {
+    id: "sumJunction",
+    label: "Summing Junction",
+    shortcut: "",
+    toolType: "rectangle",
+    flowShape: "sumJunction",
+  },
 ];
 
 /** Every tool flow surfaces, both rails. Consumers that care about the whole
