@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { TOOLS, SHAPES, ALL_TOOLS } from "./tools";
 import { TOOL_ICONS } from "./icons";
+import { SHAPES_REGISTRY } from "../shapes/registry";
 
 describe("TOOLS", () => {
   it("lists the nine non-shape tools in order", () => {
@@ -23,7 +24,7 @@ describe("TOOLS", () => {
 });
 
 describe("the toolbar / shapebar split", () => {
-  it("puts the six shape tools in SHAPES, arrows first", () => {
+  it("puts the shape tools in SHAPES, arrows first, flow shapes last", () => {
     expect(SHAPES.map((t) => t.id)).toEqual([
       "arrow",
       "arrow-curved",
@@ -31,6 +32,7 @@ describe("the toolbar / shapebar split", () => {
       "rectangle",
       "diamond",
       "ellipse",
+      "triangle",
     ]);
   });
 
@@ -66,13 +68,19 @@ describe("the toolbar / shapebar split", () => {
     }
   });
 
-  it("gives shape tools appropriate shortcuts (empty for arrow variants except sharp)", () => {
+  it("gives shape tools a shortcut unless they are arrow variants or flow shapes", () => {
     for (const t of SHAPES) {
-      if (t.id === "arrow-curved" || t.id === "arrow-elbow") {
-        expect(t.shortcut).toBe(""); // cycled via A, no dedicated key
-      } else {
-        expect(t.shortcut.length).toBeGreaterThan(0);
-      }
+      if (t.arrowType && t.id !== "arrow") continue; // curved/elbow cycle via A
+      if (t.flowShape) continue; // flow's parametric shapes carry no shortcut
+      expect(t.shortcut.length, `${t.id} should have a shortcut`).toBeGreaterThan(0);
+    }
+  });
+
+  it("gives every flow-shape tool the rectangle carrier and a registry entry", () => {
+    for (const t of SHAPES.filter((s) => s.flowShape)) {
+      expect(t.toolType).toBe("rectangle");
+      expect(t.shortcut).toBe("");
+      expect(SHAPES_REGISTRY[t.flowShape!]).toBeTruthy();
     }
   });
 });

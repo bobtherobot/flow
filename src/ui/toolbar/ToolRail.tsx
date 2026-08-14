@@ -68,7 +68,7 @@ export function ToolRail({
   onChange,
   footer,
 }: ToolRailProps) {
-  const { activeType, arrowType, setTool } = useActiveTool(api);
+  const { activeType, arrowType, flowShapeKind, setTool } = useActiveTool(api);
   const [menuOpen, setMenuOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const origin = useRef({ x: 0, y: 0 });
@@ -170,10 +170,15 @@ export function ToolRail({
             .filter((t) => !state.hiddenTools.includes(t.id))
             .map((t) => {
               const toolType = t.toolType ?? t.id;
-              // Arrow variants share activeType "arrow"; disambiguate on the shape.
+              // Arrow variants share activeType "arrow"; disambiguate on the
+              // shape. Flow's parametric shapes all share activeType
+              // "rectangle" too; disambiguate on the armed kind. `?? null`
+              // matters: plain Rectangle has no `flowShape`, so it highlights
+              // only when nothing is armed.
               const active =
                 activeType === toolType &&
-                (t.arrowType === undefined || arrowType === t.arrowType);
+                (t.arrowType === undefined || arrowType === t.arrowType) &&
+                (t.flowShape ?? null) === flowShapeKind;
               return (
                 <ToolButton
                   key={t.id}
@@ -181,7 +186,7 @@ export function ToolRail({
                   label={t.label}
                   shortcut={t.shortcut}
                   active={active}
-                  onClick={() => setTool(toolType, t.arrowType)}
+                  onClick={() => setTool(toolType, t.arrowType, t.flowShape)}
                 />
               );
             })}

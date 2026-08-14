@@ -45,15 +45,36 @@ describe("useActiveTool", () => {
     const { result } = renderHook(() => useActiveTool(api));
     act(() => result.current.setTool("arrow", "round"));
     expect(api.updateScene).toHaveBeenCalledWith({
-      appState: { currentItemArrowType: "round" },
+      appState: { currentItemFlowShape: null, currentItemArrowType: "round" },
     });
     expect(api.setActiveTool).toHaveBeenCalledWith({ type: "arrow" });
   });
 
-  it("setTool without an arrow shape leaves the scene untouched", () => {
+  it("setTool without an arrow or flow shape still clears the armed shape", () => {
     const api = fakeApi({ type: "selection", locked: false });
     const { result } = renderHook(() => useActiveTool(api));
     act(() => result.current.setTool("rectangle"));
-    expect(api.updateScene).not.toHaveBeenCalled();
+    expect(api.updateScene).toHaveBeenCalledWith({
+      appState: { currentItemFlowShape: null },
+    });
+  });
+
+  it("arms the shape with its default params and activates the rectangle tool", async () => {
+    const api = fakeApi({ type: "selection", locked: false });
+    const { result } = renderHook(() => useActiveTool(api));
+    act(() => result.current.setTool("rectangle", undefined, "triangle"));
+    expect(api.updateScene).toHaveBeenCalledWith({
+      appState: { currentItemFlowShape: { kind: "triangle", p: {} } },
+    });
+    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "rectangle" });
+  });
+
+  it("clears the armed shape when a non-shape tool is picked", () => {
+    const api = fakeApi({ type: "selection", locked: false });
+    const { result } = renderHook(() => useActiveTool(api));
+    act(() => result.current.setTool("line"));
+    expect(api.updateScene).toHaveBeenCalledWith({
+      appState: { currentItemFlowShape: null },
+    });
   });
 });

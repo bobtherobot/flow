@@ -1,3 +1,5 @@
+import type { FlowShapeKind } from "../shapes/types";
+
 /** The Excalidraw tool types flow surfaces in the rail (subset of the fork's
  *  ToolType). Kept as a local union so the module stays free of vendor imports. */
 export type ToolId =
@@ -15,7 +17,8 @@ export type ToolId =
   | "image"
   | "eraser"
   | "frame"
-  | "laser";
+  | "laser"
+  | "triangle";
 
 /** New-arrow shape an arrow-variant rail tool applies (Excalidraw's ARROW_TYPE
  *  values). */
@@ -34,6 +37,9 @@ export interface ToolDef {
   /** For arrow variants: the `currentItemArrowType` default this tool sets so
    *  new arrows are drawn with that shape. */
   arrowType?: ArrowType;
+  /** For flow's parametric shapes: the geometry this tool arms. All of them
+   *  activate the shared `"rectangle"` tool and differ only by this kind. */
+  flowShape?: FlowShapeKind;
 }
 
 /** The toolbar's tools, rendered top-to-bottom. Everything that isn't a shape:
@@ -64,6 +70,7 @@ export const SHAPES: readonly ToolDef[] = [
   { id: "rectangle", label: "Rectangle", shortcut: "R" },
   { id: "diamond", label: "Diamond", shortcut: "D" },
   { id: "ellipse", label: "Ellipse", shortcut: "O" },
+  { id: "triangle", label: "Triangle", shortcut: "", toolType: "rectangle", flowShape: "triangle" },
 ];
 
 /** Every tool flow surfaces, both rails. Consumers that care about the whole

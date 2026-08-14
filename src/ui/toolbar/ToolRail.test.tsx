@@ -11,7 +11,12 @@ import {
 } from "./toolbar-state";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
-function fakeApi(type = "selection", locked = false, currentItemArrowType = "sharp") {
+function fakeApi(
+  type = "selection",
+  locked = false,
+  currentItemArrowType = "sharp",
+  currentItemFlowShape: { kind: string; p: Record<string, number> } | null = null,
+) {
   return {
     // Task 16's RailColorControl derives its own selection-style bridge from
     // this same api (useSelectionStyle), so the fake needs the scene/appState
@@ -20,6 +25,7 @@ function fakeApi(type = "selection", locked = false, currentItemArrowType = "sha
     getAppState: () => ({
       activeTool: { type, locked },
       currentItemArrowType,
+      currentItemFlowShape,
       currentItemBackgroundColor: "transparent",
       currentItemStrokeColor: "#1e1e1e",
       currentItemTextColor: "#1e1e1e",
@@ -90,7 +96,7 @@ describe("ToolRail", () => {
     renderRail(DEFAULT_TOOLBAR_STATE, api);
     await user.click(screen.getByRole("button", { name: "Curved arrow" }));
     expect(api.updateScene).toHaveBeenCalledWith({
-      appState: { currentItemArrowType: "round" },
+      appState: { currentItemFlowShape: null, currentItemArrowType: "round" },
     });
     expect(api.setActiveTool).toHaveBeenCalledWith({ type: "arrow" });
   });
@@ -103,6 +109,46 @@ describe("ToolRail", () => {
     );
     expect(screen.getByRole("button", { name: "Arrow" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Curved arrow" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("arms the triangle shape and activates the rectangle tool when clicked", async () => {
+    const user = userEvent.setup();
+    const api = fakeApi();
+    renderRail(DEFAULT_SHAPEBAR_STATE, api, () => {}, SHAPES);
+    await user.click(screen.getByRole("button", { name: "Triangle" }));
+    expect(api.updateScene).toHaveBeenCalledWith({
+      appState: { currentItemFlowShape: { kind: "triangle", p: {} } },
+    });
+    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "rectangle" });
+  });
+
+  it("highlights only the shape tool matching the armed flow shape", () => {
+    renderRail(
+      DEFAULT_SHAPEBAR_STATE,
+      fakeApi("rectangle", false, "sharp", { kind: "triangle", p: {} }),
+      () => {},
+      SHAPES,
+    );
+    expect(screen.getByRole("button", { name: "Triangle" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Rectangle" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("highlights plain Rectangle, not Triangle, when nothing is armed", () => {
+    renderRail(DEFAULT_SHAPEBAR_STATE, fakeApi("rectangle"), () => {}, SHAPES);
+    expect(screen.getByRole("button", { name: "Rectangle" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Triangle" })).toHaveAttribute(
       "aria-pressed",
       "false",
     );

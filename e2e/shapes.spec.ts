@@ -124,3 +124,33 @@ test.describe("flow shape hit-testing", () => {
     expect(await selectedCount(page)).toBe(1);
   });
 });
+
+test("the shapebar's Triangle tool draws a stamped rectangle", async ({ page }) => {
+  await page.goto("/");
+  await pickTool(page, "Triangle");
+  await page.mouse.move(400, 200);
+  await page.mouse.down();
+  await page.mouse.move(700, 400, { steps: 8 });
+  await page.mouse.up();
+
+  const stamped = await page.evaluate(() => {
+    const el = (window as any).h.app.scene.getNonDeletedElements().at(-1);
+    return { type: el.type, kind: el.customData?.flowShape?.kind };
+  });
+  expect(stamped).toEqual({ type: "rectangle", kind: "triangle" });
+});
+
+test("switching to another tool disarms the shape", async ({ page }) => {
+  await page.goto("/");
+  await pickTool(page, "Triangle");
+  await pickTool(page, "Rectangle");
+  await page.mouse.move(400, 200);
+  await page.mouse.down();
+  await page.mouse.move(700, 400, { steps: 8 });
+  await page.mouse.up();
+
+  const kind = await page.evaluate(
+    () => (window as any).h.app.scene.getNonDeletedElements().at(-1).customData?.flowShape?.kind,
+  );
+  expect(kind).toBeUndefined();
+});

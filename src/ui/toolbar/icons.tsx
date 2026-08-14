@@ -43,6 +43,11 @@ export const TOOL_ICONS: Record<ToolId, ReactNode> = {
       <path d="M10 3l7 7-7 7-7-7z" />
     </Svg>
   ),
+  triangle: (
+    <Svg>
+      <path d="M10 3 L17 17 L3 17 Z" />
+    </Svg>
+  ),
   ellipse: (
     <Svg>
       <ellipse cx="10" cy="10" rx="7" ry="5.5" />
