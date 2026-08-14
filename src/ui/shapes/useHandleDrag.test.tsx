@@ -31,7 +31,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 }));
 
 import { useHandleDrag } from "./useHandleDrag";
-import { resetDeferred } from "../../lib/deferred-commit";
+import { resetDeferred, consumeDeferred } from "../../lib/deferred-commit";
 import { SHAPES_REGISTRY } from "./registry";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
@@ -197,5 +197,45 @@ describe("useHandleDrag", () => {
     act(() => fireWindow("pointerup", 25, 0));
 
     expect(api.updateScene).not.toHaveBeenCalled();
+  });
+
+  it("releases the deferred-commit flag if the gesture is interrupted before its commit write", () => {
+    // Models Escape deselecting the element mid-drag: `useShapeSelection`
+    // drops the selection immediately, unmounting `ShapeHandleDot` (and this
+    // hook with it) before pointerup ever fires. `useDrag`'s own unmount
+    // cleanup only strips its window listeners -- it has no synthetic onEnd
+    // to run the commit -- so without this hook's own unmount release, the
+    // deferred-commit bit `markDeferred()` set during the move would stay
+    // true forever, and the next unrelated scene write would wrongly inherit
+    // its uncommitted-element-filter bypass.
+    const el = parallelogram();
+    const api = makeApi(el);
+    const { result, unmount } = renderHook(() =>
+      useHandleDrag({ api, element: el, handle: skewHandle }),
+    );
+
+    act(() => result.current(pointerDown(25, 0)));
+    act(() => fireWindow("pointermove", 60, 0));
+
+    // Sanity check: the move really did emit a transient write (this test is
+    // only meaningful if the flag is actually set going into the unmount) --
+    // read without consuming, since consumeDeferred() resets on read and the
+    // unmount cleanup below is what's actually under test.
+    const beforeUnmount = api.updateScene.mock.calls.map(
+      ([args]: [{ captureUpdate: string }]) => args,
+    );
+    expect(beforeUnmount.some((c) => c.captureUpdate === "EVENTUALLY")).toBe(true);
+
+    unmount();
+
+    // The unmount cleanup released the flag itself -- consumeDeferred() (which
+    // resets on read) now reports nothing pending.
+    expect(consumeDeferred()).toBe(false);
+    // No IMMEDIATELY write either -- the gesture was interrupted, not
+    // completed, so it never should have committed.
+    const afterUnmount = api.updateScene.mock.calls.map(
+      ([args]: [{ captureUpdate: string }]) => args,
+    );
+    expect(afterUnmount.some((c) => c.captureUpdate === "IMMEDIATELY")).toBe(false);
   });
 });

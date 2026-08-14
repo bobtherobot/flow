@@ -1,6 +1,7 @@
+import { useEffect, useRef } from "react";
 import { CaptureUpdateAction, newElementWith, viewportCoordsToSceneCoords } from "@excalidraw/excalidraw";
 import { useDrag } from "../panels/dock/useDrag";
-import { markDeferred, consumeDeferred } from "../../lib/deferred-commit";
+import { markDeferred, consumeDeferred, resetDeferred } from "../../lib/deferred-commit";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { SceneElement } from "./useShapeSelection";
 import type { FlowShape, HandleDef, ShapeParams } from "./types";
@@ -49,7 +50,14 @@ function unrotateAboutCenter(
  * every move is `CaptureUpdateAction.EVENTUALLY` (deferred, marked via
  * `markDeferred`), and the pointer-up write is a single
  * `CaptureUpdateAction.IMMEDIATELY` with `commitDeferredChanges` so the whole
- * drag lands in undo/redo as one entry, not one per frame.
+ * drag lands in undo/redo as one entry, not one per frame. If the gesture
+ * ends *without* that commit — the dot unmounts mid-drag because the
+ * selection changed underneath it (e.g. Escape) — an unmount effect below
+ * releases the deferred-commit bit itself, the same release
+ * `SliderInput.tsx`/`NumberInput.tsx`/`useNumberField.ts` already perform for
+ * their own interruptible gestures, and for the same reason: a leaked bit
+ * would let the next, unrelated scene write inherit its uncommitted-element
+ * bypass.
  *
  * Every write goes through `newElementWith` to mint a **new** element object,
  * never `mutateElement`/an in-place patch. Two independent reasons converge
@@ -68,6 +76,29 @@ export function useHandleDrag({
   handle,
 }: UseHandleDragArgs): (e: React.PointerEvent) => void {
   const elementId = element.id;
+
+  // Whether *this* gesture has left the deferred-commit bit set (a move
+  // fired, marking it, with no committing write yet to clear it). Guards the
+  // unmount cleanup below so it can only ever release a flag this instance
+  // itself set — never one belonging to some unrelated control's live
+  // gesture.
+  const pendingRef = useRef(false);
+
+  // A drag interrupted before its commit write — e.g. Escape deselecting the
+  // element mid-drag, which unmounts this dot (`useShapeSelection` drops the
+  // selection the moment it stops being exactly one element) — would
+  // otherwise leave the deferred-commit bit set forever. `useDrag`'s own
+  // cleanup only strips its window listeners; it has no synthetic `onEnd` to
+  // fire on unmount. Mirrors `SliderInput.tsx`'s unmount-only release (that
+  // component's docstring explains why unmount-only, not a dependency-keyed
+  // effect: there's no in-between "gesture ended" signal to key off besides
+  // the commit itself and unmounting).
+  useEffect(
+    () => () => {
+      if (pendingRef.current) resetDeferred();
+    },
+    [],
+  );
 
   const applyDrag = (clientX: number, clientY: number, commit: boolean): void => {
     if (!api) return;
@@ -104,7 +135,12 @@ export function useHandleDrag({
         : el,
     );
 
-    if (!commit) markDeferred();
+    if (!commit) {
+      markDeferred();
+      pendingRef.current = true;
+    } else {
+      pendingRef.current = false;
+    }
     api.updateScene({
       elements: nextElements,
       captureUpdate: commit ? CaptureUpdateAction.IMMEDIATELY : CaptureUpdateAction.EVENTUALLY,
