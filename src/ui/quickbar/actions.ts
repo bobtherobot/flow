@@ -1,7 +1,8 @@
 /** The quick-actions bar's item registry — the single source of truth for what
  *  the bar can contain, in render order. Kept free of vendor imports (mirrors
  *  toolbar/tools.ts); the reactive bridge maps these to Excalidraw calls. */
-import { ALL_TOOLS, type ToolId } from "../toolbar/tools";
+import { ALL_TOOLS, type ArrowType, type ToolId } from "../toolbar/tools";
+import type { FlowShapeKind } from "../shapes/types";
 
 /** How an item behaves. `action` = fire-and-forget; `toggle` = reflects an
  *  on/off state; `tool` = selects a drawing tool (opt-in, hidden by default). */
@@ -26,19 +27,41 @@ export interface QuickItem {
   toggleFlag?: "objectsSnapModeEnabled" | "zenModeEnabled" | "gridModeEnabled";
   /** Shown in the tooltip when present. */
   shortcut?: string;
+  /** For `tool` items only, carried straight from `ToolDef` (tools.ts) — the
+   *  underlying Excalidraw tool type an arrow variant or flow shape activates
+   *  (defaults to `id` when absent, same convention as `ToolDef`). Without
+   *  this, arming e.g. "Triangle" from the quickbar called `setActiveTool({
+   *  type: "triangle" })` — not a real Excalidraw tool type, since flow's
+   *  shapes all share the vendor's `"rectangle"` tool and differ only by the
+   *  `flowShape` kind stamped into appState — which silently armed an inert
+   *  tool that drew nothing. */
+  toolType?: ToolId;
+  /** For arrow-variant `tool` items: the `currentItemArrowType` default to
+   *  apply before activating the tool. */
+  arrowType?: ArrowType;
+  /** For flow-shape `tool` items: the kind to arm via `currentItemFlowShape`
+   *  before activating the shared `"rectangle"` tool. */
+  flowShape?: FlowShapeKind;
 }
 
 /** Membership id for the specially-handled arrow-binding toggle. */
 export const BINDING_ID = "binding";
 
 /** Tool items derived from the rails' ALL_TOOLS (DRY) — same ids/labels/
- *  shortcuts, spanning the toolbar and the shapebar. */
+ *  shortcuts, spanning the toolbar and the shapebar. Also carries `toolType`/
+ *  `arrowType`/`flowShape` through: dropping them here is what made enabling
+ *  an arrow variant or any flow shape from the quickbar arm a tool id
+ *  (`"triangle"`, `"arrow-curved"`, ...) that isn't a real Excalidraw tool
+ *  type, rather than the underlying tool + default the rail itself arms. */
 const TOOL_ITEMS: readonly QuickItem[] = ALL_TOOLS.map((t) => ({
   id: t.id,
   label: t.label,
   kind: "tool" as const,
   group: "tool" as const,
   shortcut: t.shortcut,
+  toolType: t.toolType,
+  arrowType: t.arrowType,
+  flowShape: t.flowShape,
 }));
 
 /** The ids of every tool item — hidden by default (tools are opt-in). */

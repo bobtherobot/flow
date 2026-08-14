@@ -68,6 +68,37 @@ test.describe("quick-actions bar", () => {
     await expect(bar.getByRole("button", { name: "Rectangle" })).toBeVisible();
   });
 
+  // Finding 6 of the final review: TOOL_ITEMS (actions.ts) used to drop
+  // `toolType`/`flowShape` when deriving quickbar items from ALL_TOOLS, so
+  // triggering a flow shape's quickbar button called
+  // `setActiveTool({ type: "triangle" })` -- not a real Excalidraw tool type,
+  // since every flow shape shares the vendor's "rectangle" tool and differs
+  // only by the `currentItemFlowShape` kind stamped into appState -- which
+  // armed an inert tool that drew nothing. Enabling "Triangle" from the
+  // config menu and drawing with it must produce a real, stamped rectangle,
+  // the same as picking it from the shapebar would.
+  test("enabling a flow shape from the config menu draws the real shape", async ({ page }) => {
+    await page.goto("/");
+    const bar = page.getByRole("toolbar", { name: "Quick actions" });
+
+    await page.getByRole("button", { name: "Quick actions options" }).click();
+    await bar.getByRole("checkbox", { name: "Triangle" }).check();
+    const triangleBtn = bar.getByRole("button", { name: "Triangle" });
+    await expect(triangleBtn).toBeVisible();
+
+    await triangleBtn.click();
+    await page.mouse.move(400, 200);
+    await page.mouse.down();
+    await page.mouse.move(700, 400, { steps: 8 });
+    await page.mouse.up();
+
+    const stamped = await page.evaluate(() => {
+      const el = (window as any).h.app.scene.getNonDeletedElements().at(-1);
+      return { type: el.type, kind: el.customData?.flowShape?.kind };
+    });
+    expect(stamped).toEqual({ type: "rectangle", kind: "triangle" });
+  });
+
   test("tearing off the handle floats the bar", async ({ page }) => {
     await page.goto("/");
     const bar = page.getByRole("toolbar", { name: "Quick actions" });

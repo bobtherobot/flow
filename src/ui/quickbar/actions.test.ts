@@ -49,6 +49,19 @@ describe("QUICK_ITEMS registry", () => {
   it("returns undefined for an unknown id", () => {
     expect(quickItem("nope")).toBeUndefined();
   });
+
+  // Finding 6: TOOL_ITEMS used to drop toolType/arrowType/flowShape entirely,
+  // so arming a flow shape or an arrow variant from the quickbar activated a
+  // tool id that isn't a real Excalidraw tool type. Every tool item must
+  // carry the same fields its ALL_TOOLS source ToolDef does.
+  it("carries toolType/arrowType/flowShape through from ALL_TOOLS", () => {
+    for (const t of ALL_TOOLS) {
+      const qi = quickItem(t.id);
+      expect(qi?.toolType).toBe(t.toolType);
+      expect(qi?.arrowType).toBe(t.arrowType);
+      expect(qi?.flowShape).toBe(t.flowShape);
+    }
+  });
 });
 
 it("offers every tool from both rails as a quickbar item", () => {
