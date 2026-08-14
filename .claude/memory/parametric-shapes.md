@@ -192,39 +192,39 @@ front-face crease lines) can render as a hole in the surrounding fill the
 moment the shape has a non-transparent background — not just under pattern
 fills, as an earlier draft of the design assumed.
 
-- **Cylinder (fixed):** the front-cap subpath's point order is reversed
-  relative to the silhouette's own direction through their two shared points
-  (`cylinder.ts`) — verified in a real browser (Chromium, both default
-  roughness and `roughness: 0` with a fixed seed, ruling out sketchy-fill
-  jitter) to turn the cap-lens hole into a correct fill at the default `cap`.
-  **This is an empirical fix, not a proven one** — a naive ray-casting
-  argument says point order can't matter under even-odd, and it doesn't for
-  a *fully isolated* interior subpath (verified separately — see cube,
-  below); the cylinder's two subpaths touch the silhouette at exactly two
-  points, and that specific topology is where the empirical result and the
-  naive theory diverge. **Known remaining gap:** near `cap`'s upper bound
-  (verified at `cap: 0.42`), the front-cap lens grows tall enough to overlap
-  the *bottom* cap too — a third subpath interaction this fix doesn't
-  address — and a large fill gap reappears, identically regardless of point
-  order. Only the common case (lens touching just the silhouette) is fixed.
-- **Cube (not fixed, corrected finding):** the front face's own comment
-  originally claimed solid fill was fine here (matching winding sign,
-  nonzero theory) and only pattern fill excluded the front face. **Verified
-  wrong by screenshotting a filled cube in-app: the front face is a hole
-  under solid fill too.** Reversing the front subpath, reversing the
-  silhouette, rotating the front subpath's starting vertex, and insetting it
-  20px so it shares *no* vertex or edge with the silhouette at all were all
-  tried; every variant still rendered a hole. A fully isolated interior
-  subpath under even-odd is a hole, full stop, independent of winding — the
-  cylinder's fix rides a topology-specific coincidence (two shared points)
-  that the cube's front face doesn't have (its closing edge is the *same
-  line segment* as one of the silhouette's own edges, not just two touching
-  points). Left as a known, documented gap — see cube.ts's fill-winding
-  comment for the full investigation.
+**The fix, for both shapes: retrace interior detail so it encloses zero
+area** (2026-08-14). An interior subpath only subtracts from an even-odd fill
+if it *bounds* a region. Walk each interior line out and back over the
+identical points and it bounds nothing: even-odd crosses every interior point
+an even number of times and subtracts nothing, while the line still strokes
+(twice, which under roughjs's sketchy stroke reads as a slightly firmer line,
+not a doubled one). `cylinder.ts` emits its front cap as
+`[...front, ...front.slice(0, -1).reverse()]`; `cube.ts` emits all three
+interior lines as one retraced polyline. Both verified filled, hole-free, in
+a real browser.
 
-Takeaway for any future shape with interior detail: don't assume a
-matching-winding-sign subpath renders correctly under solid fill just
-because it would under a textbook nonzero rule. Verify in a real browser.
+This superseded two earlier attempts worth knowing about, because both are
+dead ends:
+
+- **Point-order reversal (cylinder).** Reversing the front-cap subpath
+  relative to the silhouette appeared to fix the cap-lens hole and was
+  shipped that way. It was never a proven fix — a naive ray-casting argument
+  says point order cannot matter under even-odd — and it left a gap near
+  `cap`'s upper bound (verified at `cap: 0.42`) where the lens overlaps the
+  bottom cap and a large fill gap reappears regardless of order. The retrace
+  makes point order irrelevant.
+- **Everything tried on the cube.** Reversing the front subpath, reversing
+  the silhouette, rotating its starting vertex, and insetting it 20px so it
+  shared no vertex or edge with the silhouette — every variant still rendered
+  a hole, which is correct: a *closed* interior subpath is a hole under
+  even-odd no matter how it winds. The mistake was trying to fix the winding
+  of a bounded region instead of not bounding one.
+
+Takeaway for any future shape with interior detail: **never close an interior
+subpath.** Retrace it. Winding is the wrong lever; enclosed area is the right
+one. And verify in a real browser — a filled render is the only thing that
+shows this class of bug, and no unit test in this project would have caught
+it.
 
 ## Cloud degenerates at non-square aspect ratios (fixed)
 

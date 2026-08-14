@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { expectInsideBox, expectClosed, expectPathSubpathsClosed } from "./invariants";
+import { expectInsideBox, expectClosed, expectPathOutlineClosed } from "./invariants";
 import type { FlowGeometry } from "../types";
 
 describe("expectInsideBox", () => {
@@ -84,13 +84,13 @@ describe("expectClosed", () => {
   });
 });
 
-describe("expectPathSubpathsClosed", () => {
+describe("expectPathOutlineClosed", () => {
   it("passes for a two-subpath string with both closed", () => {
     const geom: FlowGeometry = {
       points: [[0, 0]],
       path: "M 0 0 L 1 0 Z M 2 2 L 3 3 Z",
     };
-    expect(() => expectPathSubpathsClosed(geom)).not.toThrow();
+    expect(() => expectPathOutlineClosed(geom)).not.toThrow();
   });
 
   it("throws when the first subpath lacks Z", () => {
@@ -98,19 +98,22 @@ describe("expectPathSubpathsClosed", () => {
       points: [[0, 0]],
       path: "M 0 0 L 1 0 M 2 2 L 3 3 Z",
     };
-    expect(() => expectPathSubpathsClosed(geom)).toThrow();
+    expect(() => expectPathOutlineClosed(geom)).toThrow();
   });
 
-  it("throws when the second subpath lacks Z", () => {
+  it("allows an interior subpath to stay open", () => {
+    // Interior detail is stroke, not boundary: the cylinder's front cap must be
+    // an open arc, because closing it strokes a chord straight across the top
+    // ellipse. Only the outline needs to close.
     const geom: FlowGeometry = {
       points: [[0, 0]],
       path: "M 0 0 L 1 0 Z M 2 2 L 3 3",
     };
-    expect(() => expectPathSubpathsClosed(geom)).toThrow();
+    expect(() => expectPathOutlineClosed(geom)).not.toThrow();
   });
 
   it("passes trivially when path is absent", () => {
     const geom: FlowGeometry = { points: [[0, 0]] };
-    expect(() => expectPathSubpathsClosed(geom)).not.toThrow();
+    expect(() => expectPathOutlineClosed(geom)).not.toThrow();
   });
 });

@@ -24,13 +24,22 @@ export function expectClosed(geom: FlowGeometry): void {
 }
 
 /** Every subpath in a `path` string must be explicitly closed with Z. */
-export function expectPathSubpathsClosed(geom: FlowGeometry): void {
+/**
+ * The **outline** subpath — always the first one — must close, or the shape has
+ * no watertight boundary to fill or hit-test against.
+ *
+ * Later subpaths are interior detail (the cylinder's front cap, the cube's
+ * creases, the summing junction's cross) and are deliberately NOT required to
+ * close. This used to demand `Z` on every subpath, which is what put a straight
+ * chord across the cylinder's top ellipse: closing an arc strokes the line back
+ * from its end to its start. An interior arc that should read as a curve must
+ * be left open.
+ */
+export function expectPathOutlineClosed(geom: FlowGeometry): void {
   if (!geom.path) return;
   const subpaths = geom.path.split(/(?=M)/).filter((s) => s.trim().length > 0);
   expect(subpaths.length).toBeGreaterThan(0);
-  for (const sub of subpaths) {
-    expect(sub.trim().toUpperCase().endsWith("Z")).toBe(true);
-  }
+  expect(subpaths[0].trim().toUpperCase().endsWith("Z")).toBe(true);
 }
 
 /**

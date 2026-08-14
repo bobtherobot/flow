@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { tape } from "./tape";
-import { expectInsideBox, expectClosed, expectPathSubpathsClosed } from "./invariants";
+import { expectInsideBox, expectClosed, expectPathOutlineClosed } from "./invariants";
 
 describe("tape geometry", () => {
   it.each([
@@ -10,13 +10,13 @@ describe("tape geometry", () => {
     const geom = tape(w, h, { amp: 0.12, wave: 0.5 });
     expectClosed(geom);
     expectInsideBox(geom, w, h);
-    expectPathSubpathsClosed(geom);
+    expectPathOutlineClosed(geom);
   });
 
   it("degrades safely at zero size", () => {
     const geom = tape(0, 0, { amp: 0.12, wave: 0.5 });
     expectInsideBox(geom, 0, 0);
-    expectPathSubpathsClosed(geom);
+    expectPathOutlineClosed(geom);
   });
 
   it("yields two straight parallel edges when amp is 0", () => {

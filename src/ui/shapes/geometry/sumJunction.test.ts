@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sumJunction } from "./sumJunction";
-import { expectInsideBox, expectClosed, expectPathSubpathsClosed } from "./invariants";
+import { expectInsideBox, expectClosed, expectPathOutlineClosed } from "./invariants";
 
 const SEGMENTS = 32;
 
@@ -16,13 +16,13 @@ describe("summing junction geometry", () => {
     const geom = sumJunction(w, h, {});
     expectClosed(geom);
     expectInsideBox(geom, w, h);
-    expectPathSubpathsClosed(geom);
+    expectPathOutlineClosed(geom);
   });
 
   it("degrades safely at zero size", () => {
     const geom = sumJunction(0, 0, {});
     expectInsideBox(geom, 0, 0);
-    expectPathSubpathsClosed(geom);
+    expectPathOutlineClosed(geom);
   });
 
   it(`has exactly SEGMENTS (${SEGMENTS}) points`, () => {

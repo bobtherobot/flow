@@ -32,44 +32,24 @@ const d = (pts: LocalPt[]) =>
  * second, separately-closed subpath for the front arc of the top cap, so the
  * cylinder reads as a 3D shape without that inner line joining the hit area.
  *
- * Fill winding matters here, not just the stroke — but the mechanism is more
- * subtle than "solid = nonzero, pattern = even-odd". roughjs's own canvas
- * renderer (`roughjs/bin/canvas.js`, `RoughCanvas.draw`) fills **any**
- * `generator.path(...)`-based shape — solid fill included — with
- * `ctx.fill("evenodd")`; there is no nonzero code path for a shape whose
- * `drawable.shape === "path"`. A naive even-odd analysis (count boundary
- * crossings on a ray from a point to infinity, ignore direction) predicts
- * the front-cap subpath's traversal order can't matter at all — and empirically,
- * for a *fully separated* interior subpath (verified by insetting a second
- * shape's interior subpath so it shares no vertex with its silhouette; see
- * the equivalent investigation in cube.ts), it doesn't.
+ * Interior detail must never *bound* a region. roughjs's canvas renderer
+ * (`roughjs/bin/canvas.js`, `RoughCanvas.draw`) fills any
+ * `generator.path(...)` shape — solid fill included — with
+ * `ctx.fill("evenodd")`, and pattern fills go through `patternFillPolygons`,
+ * which is even-odd too. Under even-odd, a closed interior subpath is
+ * subtracted from the fill: give the shape a background and the cap lens
+ * becomes a hole.
  *
- * This subpath is different: it touches the silhouette at exactly two
- * points — `(0, top)` and `(w, top)`, both literal members of the
- * silhouette's own `points` — rather than sharing a full edge or floating
- * fully clear of it. At that specific topology, empirically verified in a
- * real browser (Chromium, both default roughness and `roughness: 0` with a
- * fixed seed, ruling out sketchy-fill jitter as the cause), the traversal
- * direction of the front-cap subpath *relative to* the silhouette's own
- * direction through those same two points determines whether the cap lens
- * renders filled or as a hole. `[...arc(...)].reverse()` below flips that
- * relative direction without changing the curve drawn (same points, opposite
- * traversal) — verified to turn the hole into a correct fill at the default
- * `cap`. This project does not have a clean ray-casting proof for *why*;
- * take the empirical result, not the geometric argument, as authoritative.
+ * So the front cap is drawn out and back over itself, enclosing zero area.
+ * Every interior point is then crossed an even number of times and nothing is
+ * subtracted, while the arc still strokes. Verified in a real browser, solid
+ * and hachure, at both the default `cap` and its 0.45 upper bound.
  *
- * **Known remaining gap, not fixed by this change:** near the `cap` upper
- * bound (verified at `cap: 0.42`), the front-cap lens grows tall enough to
- * overlap the *bottom* cap's own boundary — a third subpath interaction this
- * fix doesn't address — and a large fill gap reappears, identically whether
- * or not this subpath is reversed (confirmed by testing both). Only the
- * common case (the lens touching just the silhouette) is fixed here.
- *
- * Pattern fills (hachure/cross-hatch/zigzag) go through a different roughjs
- * function, `patternFillPolygons`, which is unambiguously even-odd with no
- * nonzero variant to fall back on — so the front cap unavoidably renders
- * unfilled/unhatched under a pattern background regardless of point order.
- * That part *is* inherent to even-odd fill and is not attempted here.
+ * Two earlier attempts are recorded in `.claude/memory/parametric-shapes.md`
+ * as dead ends: closing the arc with `Z` (strokes a chord across the ellipse)
+ * and reversing its point order relative to the silhouette (appeared to fix
+ * the hole, but winding cannot matter under even-odd — it was masking the
+ * problem, and it left a fill gap near `cap`'s upper bound).
  */
 export const cylinder: GeometryFn = (w, h, p) => {
   const capH = clamp(p.cap ?? 0.18, CYLINDER_BOUNDS.cap) * h;
@@ -83,13 +63,28 @@ export const cylinder: GeometryFn = (w, h, p) => {
     ...arc(rx, rx, bottom, capH, 1).reverse(),
   ];
 
+  const front = arc(rx, rx, top, capH, 1);
+
   return {
     points,
-    // Outline, then the front arc of the top cap as a separate closed
-    // subpath — reversed relative to the silhouette's own direction through
-    // their two shared points, verified in-browser to fill correctly at the
-    // default cap (see the fill-winding comment above); the curve drawn is
-    // identical either way.
-    path: `${d(points)} Z ${d([...arc(rx, rx, top, capH, 1)].reverse())} Z`,
+    // Outline (closed), then the front arc of the top cap drawn out and back
+    // along itself.
+    //
+    // Two constraints have to hold at once, and each naive option breaks the
+    // other. Closing the arc with `Z` strokes a straight chord from its right
+    // end `(w, top)` back to its left end — a horizontal bar across the top
+    // ellipse that is not part of a cylinder. Leaving it open removes the bar
+    // but makes the cap lens render as a *hole* when the shape has a solid
+    // background, because Excalidraw fills every `generator.path` shape with
+    // `ctx.fill("evenodd")` and any interior region bounded by a subpath is a
+    // hole under even-odd.
+    //
+    // Retracing sidesteps both: the subpath goes left→right along the arc and
+    // then right→left back over the identical points, so it encloses zero
+    // area. Even-odd sees every interior point crossed an even number of
+    // times, so nothing is subtracted from the fill, and the only thing
+    // stroked is the arc itself. It is drawn twice, which under roughjs's
+    // sketchy stroke reads as a slightly firmer line, not a double line.
+    path: `${d(points)} Z ${d([...front, ...front.slice(0, -1).reverse()])}`,
   };
 };

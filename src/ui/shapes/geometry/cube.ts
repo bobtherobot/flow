@@ -1,8 +1,11 @@
 import type { GeometryFn, LocalPt } from "../types";
 import { clamp } from "./bounds";
 
-const d = (pts: LocalPt[]) =>
-  `${pts.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x} ${y}`).join(" ")} Z`;
+const dOpen = (pts: LocalPt[]) =>
+  pts.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x} ${y}`).join(" ");
+
+/** Closed subpath — for the outline, which must bound a fillable region. */
+const d = (pts: LocalPt[]) => `${dOpen(pts)} Z`;
 
 /** `dx`/`dy`'s bounds, shared with their handle in registry.ts. */
 export const CUBE_BOUNDS = { dx: [0.02, 0.6] as const, dy: [0.02, 0.6] as const };
@@ -16,39 +19,22 @@ export const CUBE_BOUNDS = { dx: [0.02, 0.6] as const, dy: [0.02, 0.6] as const 
  * what keeps the whole drawing inscribed.
  *
  * `points` is the silhouette: a 6-point hexagon (front face plus the two
- * visible side faces). `path` adds the front face's own two interior edges
- * as a second, separately-closed subpath, so the front/top and front/right
- * creases read as depth without joining the hit area.
+ * visible side faces). `path` adds the interior lines that give it depth.
  *
- * Fill winding — **correction, verified in a real browser**: an earlier
- * draft of this comment claimed the front face's subpath already wound the
- * same direction as the silhouette and therefore rendered correctly under a
- * solid background. That claim was wrong. Excalidraw's canvas renderer fills
- * every `generator.path(...)`-based shape (roughjs's `RoughCanvas.draw`,
- * `roughjs/bin/canvas.js`) with `ctx.fill("evenodd")` regardless of
- * `fillStyle`, and the front face's own subpath **does** render as a hole
- * under a solid background — not just under pattern fills — confirmed by
- * screenshotting a filled cube in-app.
+ * Interior detail must never *bound* a region. Excalidraw fills every
+ * `generator.path(...)` shape with `ctx.fill("evenodd")` regardless of
+ * `fillStyle` (roughjs's `RoughCanvas.draw`), and pattern fills are even-odd
+ * as well — so a closed interior subpath is subtracted from the fill. This
+ * used to draw the front face as a closed rectangle, which is exactly that:
+ * give the cube a background and its front face rendered as a hole. Every
+ * attempt to fix it by winding — reversing the subpath, reversing the
+ * silhouette, rotating the start vertex, insetting it so it shared no edge —
+ * failed, because winding is the wrong lever.
  *
- * The cylinder's equivalent front-cap subpath (cylinder.ts) *can* be fixed
- * by reordering its points, because it touches the silhouette at only two
- * isolated points. This one cannot: it was tested with the front subpath
- * reversed, with its starting vertex rotated to the one corner that isn't
- * shared with the silhouette, and — decisively — inset by 20px so it shares
- * *no* vertex or edge with the silhouette at all (an unambiguously "floating
- * free" interior subpath). Every variant still rendered its own interior as
- * a hole, in every point-order tried. A fully isolated interior subpath
- * under even-odd fill is a hole, full stop, independent of winding — the
- * cylinder's fix works on a topology-specific coincidence (two shared
- * points, not a shared edge or a duplicated boundary segment) that this
- * shape's front face doesn't have: its own closing edge from `[0, h]` back
- * to `[0, top]` is the *same line segment* as one of the silhouette's own
- * edges, not just two touching points.
- *
- * Net effect: the front face renders unfilled under both solid and pattern
- * backgrounds. Not fixed here — same "document honestly, don't fake a fix"
- * choice the spec makes for pattern fills generally, now known to be wider
- * than originally scoped.
+ * Retracing is the right one: the interior polyline walks each line out and
+ * back, enclosing zero area, so even-odd subtracts nothing and the lines
+ * still stroke. Verified in a real browser under both solid and hachure
+ * fills. See `.claude/memory/parametric-shapes.md`.
  */
 export const cube: GeometryFn = (w, h, p) => {
   const dx = clamp(p.dx ?? 0.25, CUBE_BOUNDS.dx) * w;
@@ -56,13 +42,6 @@ export const cube: GeometryFn = (w, h, p) => {
   const fw = w - dx; // front face width
   const fh = h - dy; // front face height
   const top = dy;
-
-  const front: LocalPt[] = [
-    [0, top],
-    [fw, top],
-    [fw, h],
-    [0, h],
-  ];
 
   // Silhouette for hit-testing: front face plus the two visible side faces.
   const points: LocalPt[] = [
@@ -74,9 +53,39 @@ export const cube: GeometryFn = (w, h, p) => {
     [0, h],
   ];
 
+  // Every interior line, walked out and back so the subpath encloses no area:
+  // along the top crease, down the right crease, back up it, out to the
+  // extrusion tip, back from it, then back along the top crease to the start.
+  const interior: LocalPt[] = [
+    [0, top],
+    [fw, top],
+    [fw, h],
+    [fw, top],
+    [w, 0],
+    [fw, top],
+    [0, top],
+  ];
+
   return {
     points,
-    // Silhouette, then the front face's two interior edges as their own subpath.
-    path: `${d(points)} ${d(front)}`,
+    // Silhouette, then all the interior detail as one zero-area retrace.
+    //
+    // Three lines are interior, so nothing draws them unless we do: the
+    // front/top crease, the front/right crease, and the edge joining the front
+    // face's top-right corner to the extrusion tip `[w, 0]`. That third one was
+    // missing entirely — without it the top and right faces share no drawn
+    // boundary and the shape reads as a flat hexagon with a rectangle inside
+    // it. (The silhouette supplies the other two front-to-back connectors
+    // implicitly: `[0, top]→[dx, 0]` and `[fw, h]→[w, fh]`.)
+    //
+    // Drawing them as a *closed* front-face rectangle — what this used to do —
+    // renders the front face as a hole whenever the shape has a background,
+    // because Excalidraw fills every `generator.path` shape with
+    // `ctx.fill("evenodd")` and any interior region bounded by a subpath is
+    // subtracted. Retracing instead encloses zero area, so even-odd crosses
+    // every interior point an even number of times and subtracts nothing. Each
+    // line is stroked twice, which under roughjs's sketchy stroke reads as a
+    // slightly firmer line rather than a doubled one.
+    path: `${d(points)} ${dOpen(interior)}`,
   };
 };

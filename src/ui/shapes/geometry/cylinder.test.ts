@@ -3,7 +3,7 @@ import { cylinder } from "./cylinder";
 import {
   expectInsideBox,
   expectClosed,
-  expectPathSubpathsClosed,
+  expectPathOutlineClosed,
   shoelaceSign,
   splitSubpaths,
   subpathVertices,
@@ -34,19 +34,29 @@ describe("cylinder geometry", () => {
     const geom = cylinder(w, h, { cap: 0.18 });
     expectClosed(geom);
     expectInsideBox(geom, w, h);
-    expectPathSubpathsClosed(geom);
+    expectPathOutlineClosed(geom);
   });
 
   it("degrades safely at zero size", () => {
     const geom = cylinder(0, 0, { cap: 0.18 });
     expectInsideBox(geom, 0, 0);
-    expectPathSubpathsClosed(geom);
+    expectPathOutlineClosed(geom);
   });
 
   it("draws exactly two subpaths: the silhouette and the front cap arc", () => {
     const geom = cylinder(200, 100, { cap: 0.18 });
     expect(geom.path).toBeDefined();
     expect(subpaths(geom.path!)).toHaveLength(2);
+  });
+
+  it("leaves the front cap arc open so no chord is stroked across the ellipse", () => {
+    // Closing this subpath draws a straight line from the arc's right end back
+    // to its left end — a horizontal bar across the top ellipse, which is not
+    // part of a cylinder. The outline itself must still close.
+    const geom = cylinder(200, 100, { cap: 0.18 });
+    const [silhouette, front] = subpaths(geom.path!);
+    expect(silhouette.trim().toUpperCase().endsWith("Z")).toBe(true);
+    expect(front.trim().toUpperCase().endsWith("Z")).toBe(false);
   });
 
   it("lowers the front cap arc's crest monotonically as cap grows", () => {
@@ -68,7 +78,7 @@ describe("cylinder geometry", () => {
     const atBound = cylinder(200, 100, { cap: 0.45 });
     expect(over.points).toEqual(atBound.points);
     expectInsideBox(over, 200, 100);
-    expectPathSubpathsClosed(over);
+    expectPathOutlineClosed(over);
   });
 
   it("clamps cap at its 0.02 floor", () => {

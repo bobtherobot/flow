@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { cloud } from "./cloud";
-import { expectInsideBox, expectClosed, expectPathSubpathsClosed } from "./invariants";
+import { expectInsideBox, expectClosed, expectPathOutlineClosed } from "./invariants";
 import type { LocalPt } from "../types";
 
 const BUMPS = 9;
@@ -26,13 +26,13 @@ describe("cloud geometry", () => {
     const geom = cloud(w, h, {});
     expectClosed(geom);
     expectInsideBox(geom, w, h);
-    expectPathSubpathsClosed(geom);
+    expectPathOutlineClosed(geom);
   });
 
   it("degrades safely at zero size", () => {
     const geom = cloud(0, 0, {});
     expectInsideBox(geom, 0, 0);
-    expectPathSubpathsClosed(geom);
+    expectPathOutlineClosed(geom);
   });
 
   it(`has BUMPS * (SAMPLES + 1) = ${BUMPS * (SAMPLES + 1)} points`, () => {
