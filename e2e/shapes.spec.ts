@@ -181,3 +181,113 @@ test.describe("every shapebar tool draws its own kind", () => {
     });
   }
 });
+
+// Draws a 300x200 parallelogram carrier at (400,200)-(700,400). Its default
+// skew (0.25) puts the "skew" handle dot at local (75,0) -> viewport
+// (475,200) at this app's 100% zoom / zero scroll-offset default, the same
+// 1:1 viewport-to-scene mapping the triangle-vertex math above this comment
+// already relies on. Dragging the dot to viewport (600,200) -- local
+// (200,0) -- clamps to skew = 200/300 = 0.6667.
+test.describe("dragging a handle", () => {
+  async function drawParallelogram(page: import("@playwright/test").Page) {
+    await pickTool(page, "Parallelogram");
+    await page.mouse.move(400, 200);
+    await page.mouse.down();
+    await page.mouse.move(700, 400, { steps: 8 });
+    await page.mouse.up();
+    // flow permanently locks the active tool (Illustrator-style) instead of
+    // reverting to Selection after a draw, unlike vanilla Excalidraw -- so a
+    // raw click on the canvas right now would arm another Parallelogram draw,
+    // not select/deselect the one just drawn. Switch back explicitly, same
+    // workaround `drawFlowShape` above uses. The just-drawn element stays
+    // selected across the switch.
+    await pickTool(page, "Selection");
+    // Clicking the toolbar's Selection button leaves *it* focused, not the
+    // canvas -- and since flow doesn't set Excalidraw's
+    // `handleKeyboardGlobally` prop, its keyboard shortcuts (Ctrl+Z
+    // included) only fire while focus is inside the excalidraw-container
+    // div, which the toolbar rails render outside of (onKeyDown is a React
+    // handler on that div, not a window listener). A real click on the
+    // shape -- on its already-selected top edge, a no-op for selection --
+    // returns focus to the canvas. Confirmed via a throwaway script that
+    // without this, a Ctrl+Z run right after switching tools silently
+    // no-ops (pre-existing app behavior, not something this feature
+    // introduced: our handle-drag's `onPointerDown` also calls
+    // `preventDefault`, mirroring `useDrag`'s existing contract, so it never
+    // moves focus off whatever was focused before the drag started either).
+    await page.mouse.click(650, 200);
+  }
+
+  async function flowParams(page: import("@playwright/test").Page) {
+    return page.evaluate(() => {
+      const el = (window as any).h.app.scene.getNonDeletedElements().at(-1);
+      return el.customData?.flowShape?.p as { skew: number };
+    });
+  }
+
+  async function dragSkewDot(page: import("@playwright/test").Page) {
+    const dot = page.getByRole("button", { name: /Parallelogram skew handle/i });
+    const box = (await dot.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(550, 200, { steps: 4 });
+    await page.mouse.move(600, 200, { steps: 4 });
+    await page.mouse.up();
+  }
+
+  test("dragging the skew dot changes the parameter and the outline hit-test follows the regenerated geometry", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await drawParallelogram(page);
+    expect((await flowParams(page)).skew).toBeCloseTo(0.25);
+
+    // Deselect, then confirm (500,300) -- local (100,100) -- is nowhere near
+    // the *default*-skew outline (interior only, no edge nearby) so it
+    // doesn't hit-test as a select. This is the "before" half of the
+    // regenerated-geometry proof below.
+    await page.mouse.click(900, 500);
+    expect(await selectedCount(page)).toBe(0);
+    await page.mouse.click(500, 300);
+    expect(await selectedCount(page)).toBe(0);
+
+    // Reselect by clicking a point that's on the top edge regardless of skew
+    // (the top edge's right endpoint (w,0) never moves).
+    await page.mouse.click(650, 200);
+    expect(await selectedCount(page)).toBe(1);
+
+    await dragSkewDot(page);
+
+    const dragged = await flowParams(page);
+    expect(dragged.skew).toBeGreaterThan(0.64);
+    expect(dragged.skew).toBeLessThan(0.69);
+
+    // "The geometry regenerated": at skew ~0.667 the new left edge runs from
+    // (0,200) to (200,0), which passes exactly through local (100,100) --
+    // scene/viewport (500,300), the same point that missed entirely at the
+    // default skew above. If the outline's geometry were still being read
+    // from stale data, this point would still miss.
+    await page.mouse.click(900, 500);
+    expect(await selectedCount(page)).toBe(0);
+    await page.mouse.click(500, 300);
+    expect(await selectedCount(page)).toBe(1);
+  });
+
+  test("a single Ctrl+Z undoes the whole drag, not one step of it", async ({ page }) => {
+    await page.goto("/");
+    await drawParallelogram(page);
+    expect((await flowParams(page)).skew).toBeCloseTo(0.25);
+
+    await dragSkewDot(page);
+    const dragged = await flowParams(page);
+    expect(dragged.skew).toBeGreaterThan(0.64);
+    expect(dragged.skew).toBeLessThan(0.69);
+
+    // Every intermediate frame of the drag was a deferred (EVENTUALLY),
+    // non-history write, and only the pointer-up write committed -- so one
+    // undo should land straight back on the pre-drag default, not one step
+    // closer to it.
+    await page.keyboard.press("Control+z");
+    expect((await flowParams(page)).skew).toBeCloseTo(0.25);
+  });
+});

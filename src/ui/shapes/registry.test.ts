@@ -36,4 +36,38 @@ describe("the shape registry", () => {
   it("returns null for an unknown kind rather than throwing", () => {
     expect(geometryFor("nope" as never, 10, 10, {})).toBeNull();
   });
+
+  describe("parallelogram's skew handle", () => {
+    const handle = SHAPES_REGISTRY.parallelogram.handles[0];
+
+    it("at/from round-trip for an in-range value", () => {
+      const [x, y] = handle.at(200, 100, { skew: 0.4 });
+      expect(handle.from(x, y, 200, 100, { skew: 0.4 })).toEqual({ skew: 0.4 });
+    });
+
+    it("clamps from() to a max of 0.9, short of the geometry's own 1.0 limit", () => {
+      expect(handle.from(1000, 0, 200, 100, {})).toEqual({ skew: 0.9 });
+    });
+
+    it("clamps from() to a min of 0", () => {
+      expect(handle.from(-1000, 0, 200, 100, {})).toEqual({ skew: 0 });
+    });
+  });
+
+  describe("trapezoid's inset handle", () => {
+    const handle = SHAPES_REGISTRY.trapezoid.handles[0];
+
+    it("at/from round-trip for an in-range value", () => {
+      const [x, y] = handle.at(200, 100, { inset: 0.3 });
+      expect(handle.from(x, y, 200, 100, { inset: 0.3 })).toEqual({ inset: 0.3 });
+    });
+
+    it("clamps from() to a max of 0.5, matching the geometry function's own limit", () => {
+      expect(handle.from(1000, 0, 200, 100, {})).toEqual({ inset: 0.5 });
+    });
+
+    it("clamps from() to a min of 0", () => {
+      expect(handle.from(-1000, 0, 200, 100, {})).toEqual({ inset: 0 });
+    });
+  });
 });

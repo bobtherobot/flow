@@ -50,7 +50,19 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
     label: "Trapezoid",
     geometry: trapezoid,
     defaults: { inset: 0.2 },
-    handles: [],
+    handles: [
+      {
+        id: "inset",
+        // Matches the geometry function's own clamp exactly (0..0.5) — unlike
+        // parallelogram's skew, inset === 0.5 (top edge collapsed to a point,
+        // an isoceles triangle) is a valid, non-degenerate shape, so there's
+        // no need for a UI-only margin short of the geometry's own limit.
+        at: (w, _h, p) => [Math.min(Math.max(p.inset ?? 0.2, 0), 0.5) * w, 0],
+        from: (x, _y, w) => ({
+          inset: w === 0 ? 0 : Math.min(Math.max(x / w, 0), 0.5),
+        }),
+      },
+    ],
   },
   star: {
     kind: "star",
