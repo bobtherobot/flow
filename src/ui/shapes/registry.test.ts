@@ -4,15 +4,15 @@ import { SHAPES_REGISTRY, defaultsFor, geometryFor } from "./registry";
 describe("the shape registry", () => {
   it("gives each entry a kind matching its key", () => {
     for (const [key, def] of Object.entries(SHAPES_REGISTRY)) {
-      if (!def) continue;
-      expect(def.kind).toBe(key);
+      expect(def, `${key} has no definition`).toBeDefined();
+      expect(def!.kind).toBe(key);
     }
   });
 
   it("gives each entry a non-empty label", () => {
-    for (const def of Object.values(SHAPES_REGISTRY)) {
-      if (!def) continue;
-      expect(def.label.length).toBeGreaterThan(0);
+    for (const [key, def] of Object.entries(SHAPES_REGISTRY)) {
+      expect(def, `${key} has no definition`).toBeDefined();
+      expect(def!.label.length).toBeGreaterThan(0);
     }
   });
 
