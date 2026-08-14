@@ -27,7 +27,23 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
     label: "Parallelogram",
     geometry: parallelogram,
     defaults: { skew: 0.25 },
-    handles: [],
+    handles: [
+      {
+        id: "skew",
+        // Clamped to 0.9, not the geometry function's own 1.0: skew === 1
+        // collapses the parallelogram to a zero-area line (top and bottom
+        // edges coincide), and nothing else catches that — the invariant
+        // helper (geometry/invariants.ts) only checks that the outline's
+        // first and last points differ, not that adjacent ones do. 0.9 is a
+        // UI reachability limit only; the geometry function's own 0..1 clamp
+        // is unchanged, so this just keeps a *dragged* handle from ever
+        // reaching the degenerate value.
+        at: (w, _h, p) => [Math.min(Math.max(p.skew ?? 0.25, 0), 0.9) * w, 0],
+        from: (x, _y, w) => ({
+          skew: w === 0 ? 0 : Math.min(Math.max(x / w, 0), 0.9),
+        }),
+      },
+    ],
   },
   trapezoid: {
     kind: "trapezoid",

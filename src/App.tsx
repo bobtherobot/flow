@@ -51,6 +51,7 @@ import { FLOW_DOCS_URL, FLOW_ISSUES_URL } from "./lib/links";
 import { MenuBar } from "./ui/menubar/MenuBar";
 import { PanelsRoot } from "./ui/panels/PanelsRoot";
 import { ToolRails } from "./ui/toolbar/ToolRails";
+import { ShapeHandles } from "./ui/shapes/ShapeHandles";
 import { railGutter } from "./ui/toolbar/rail-layout";
 import { DEFAULT_TOOLBAR_STATE, DEFAULT_SHAPEBAR_STATE, type ToolbarState } from "./ui/toolbar/toolbar-state";
 import { QuickBar } from "./ui/quickbar/QuickBar";
@@ -467,6 +468,8 @@ export default function App() {
         shapebar={shapebar}
         onShapebarChange={setShapebar}
       />
+
+      <ShapeHandles api={excalidrawApi} />
 
       <QuickBar
         api={excalidrawApi}

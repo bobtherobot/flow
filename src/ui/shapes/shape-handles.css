@@ -1,0 +1,45 @@
+/* src/ui/shapes/shape-handles.css
+ * The read-only handle overlay: one orange dot per draggable parameter on the
+ * single selected flow shape. Dragging itself is a later task; today this
+ * only positions the dots. */
+
+.flow-shape-handles {
+  position: fixed;
+  inset: 0;
+  /* The overlay must never steal canvas events — only the dots themselves
+     (pointer-events: auto below) intercept anything. */
+  pointer-events: none;
+  /* Above the canvas (which paints with no explicit z-index of its own), but
+     below both rail tiers (toolbar.css: 90 docked, 91 with a rail's menu
+     open) and the quickbar/bottombar (101, quickbar.css / bottombar.css) —
+     a handle should never draw on top of app chrome the user is actively
+     interacting with. */
+  z-index: 80;
+}
+
+.flow-shape-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #f76707;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  pointer-events: auto;
+  /* Positioned via `transform: translate(...)` (see ShapeHandles.tsx) so pan
+     and zoom stay compositor-friendly rather than triggering layout. */
+  will-change: transform;
+}
+
+.flow-shape-handle:hover,
+.flow-shape-handle:focus-visible {
+  background: #fd7e14;
+  outline: 2px solid #f76707;
+  outline-offset: 2px;
+}
