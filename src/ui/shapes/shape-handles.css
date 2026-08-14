@@ -1,7 +1,7 @@
 /* src/ui/shapes/shape-handles.css
- * The read-only handle overlay: one orange dot per draggable parameter on the
- * single selected flow shape. Dragging itself is a later task; today this
- * only positions the dots. */
+ * The handle overlay: one orange draggable dot per parameter on the single
+ * selected flow shape (positioning here, drag behaviour in
+ * useHandleDrag.ts). */
 
 .flow-shape-handles {
   position: fixed;
