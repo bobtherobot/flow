@@ -1,6 +1,10 @@
 import type { GeometryFn, LocalPt } from "../types";
+import { clamp } from "./bounds";
 
 const SAMPLES = 24;
+
+/** `amp`/`wave`'s bounds, shared with their handle in registry.ts. */
+export const TAPE_BOUNDS = { amp: [0, 0.4] as const, wave: [0.15, 1] as const };
 
 /**
  * Every `t` where `sin(t*2*PI*cycles)` peaks at +1 within `[0, 1]` —
@@ -40,8 +44,8 @@ function crestTs(cycles: number): number[] {
  * to 0.15..1 (below 0.15 the sampling would start aliasing the wave).
  */
 export const tape: GeometryFn = (w, h, p) => {
-  const amp = Math.min(Math.max(p.amp ?? 0.12, 0), 0.4) * h;
-  const cycles = 1 / Math.min(Math.max(p.wave ?? 0.5, 0.15), 1);
+  const amp = clamp(p.amp ?? 0.12, TAPE_BOUNDS.amp) * h;
+  const cycles = 1 / clamp(p.wave ?? 0.5, TAPE_BOUNDS.wave);
 
   // Union of the uniform grid and every crest `t`, sorted and de-duplicated
   // (a crest can land exactly on a grid point, e.g. wave: 1 puts the first

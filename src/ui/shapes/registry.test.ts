@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { FlowShapeKind } from "./types";
-import { SHAPES_REGISTRY, defaultsFor, geometryFor } from "./registry";
+import { SHAPES_REGISTRY, defaultsFor } from "./registry";
 
 describe("the shape registry", () => {
   it("has an entry for every kind, and every kind is a real entry", () => {
@@ -27,14 +27,6 @@ describe("the shape registry", () => {
     const a = defaultsFor("triangle");
     a.injected = 1;
     expect(defaultsFor("triangle").injected).toBeUndefined();
-  });
-
-  it("returns geometry for a known kind", () => {
-    expect(geometryFor("triangle", 10, 10, {})?.points).toHaveLength(3);
-  });
-
-  it("returns null for an unknown kind rather than throwing", () => {
-    expect(geometryFor("nope" as never, 10, 10, {})).toBeNull();
   });
 
   describe("parallelogram's skew handle", () => {

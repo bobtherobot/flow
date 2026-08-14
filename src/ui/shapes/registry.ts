@@ -1,14 +1,24 @@
-import type { FlowGeometry, FlowShapeKind, ShapeDef, ShapeParams } from "./types";
+import type { FlowShapeKind, ShapeDef, ShapeParams } from "./types";
 import { triangle } from "./geometry/triangle";
-import { parallelogram } from "./geometry/parallelogram";
-import { trapezoid } from "./geometry/trapezoid";
-import { star } from "./geometry/star";
-import { cylinder } from "./geometry/cylinder";
+import { parallelogram, PARALLELOGRAM_BOUNDS } from "./geometry/parallelogram";
+import { trapezoid, TRAPEZOID_BOUNDS } from "./geometry/trapezoid";
+import { star, STAR_BOUNDS } from "./geometry/star";
+import { cylinder, CYLINDER_BOUNDS } from "./geometry/cylinder";
 import { cloud } from "./geometry/cloud";
-import { tape } from "./geometry/tape";
-import { cube } from "./geometry/cube";
-import { fatArrow } from "./geometry/fatArrow";
+import { tape, TAPE_BOUNDS } from "./geometry/tape";
+import { cube, CUBE_BOUNDS } from "./geometry/cube";
+import { fatArrow, FAT_ARROW_BOUNDS } from "./geometry/fatArrow";
 import { sumJunction } from "./geometry/sumJunction";
+import { clamp } from "./geometry/bounds";
+
+/** `skew`'s UI-only reachability limit — tighter than the geometry's own
+ *  1.0 bound (`PARALLELOGRAM_BOUNDS.skew`, parallelogram.ts). `skew === 1`
+ *  collapses the parallelogram to a zero-area line, which the geometry's own
+ *  clamp alone doesn't prevent, so the handle stops short of it. This is
+ *  intentionally *not* folded into `PARALLELOGRAM_BOUNDS`: that constant is
+ *  the shape's true valid range, and this is a separate, narrower,
+ *  drag-reachability decision layered on top of it. */
+export const SKEW_UI_MAX = 0.9;
 
 /**
  * Every flow shape, keyed by kind. This is the single source of truth for
@@ -30,17 +40,18 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
     handles: [
       {
         id: "skew",
-        // Clamped to 0.9, not the geometry function's own 1.0: skew === 1
-        // collapses the parallelogram to a zero-area line (top and bottom
-        // edges coincide), and nothing else catches that — the invariant
-        // helper (geometry/invariants.ts) only checks that the outline's
-        // first and last points differ, not that adjacent ones do. 0.9 is a
-        // UI reachability limit only; the geometry function's own 0..1 clamp
-        // is unchanged, so this just keeps a *dragged* handle from ever
+        // Clamped to SKEW_UI_MAX (0.9), not the geometry function's own 1.0
+        // (PARALLELOGRAM_BOUNDS.skew): skew === 1 collapses the
+        // parallelogram to a zero-area line (top and bottom edges coincide),
+        // and nothing else catches that — the invariant helper
+        // (geometry/invariants.ts) only checks that the outline's first and
+        // last points differ, not that adjacent ones do. SKEW_UI_MAX is a UI
+        // reachability limit only; the geometry function's own 0..1 clamp is
+        // unchanged, so this just keeps a *dragged* handle from ever
         // reaching the degenerate value.
-        at: (w, _h, p) => [Math.min(Math.max(p.skew ?? 0.25, 0), 0.9) * w, 0],
+        at: (w, _h, p) => [clamp(p.skew ?? 0.25, [PARALLELOGRAM_BOUNDS.skew[0], SKEW_UI_MAX]) * w, 0],
         from: (x, _y, w) => ({
-          skew: w === 0 ? 0 : Math.min(Math.max(x / w, 0), 0.9),
+          skew: w === 0 ? 0 : clamp(x / w, [PARALLELOGRAM_BOUNDS.skew[0], SKEW_UI_MAX]),
         }),
       },
     ],
@@ -53,13 +64,16 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
     handles: [
       {
         id: "inset",
-        // Matches the geometry function's own clamp exactly (0..0.5) — unlike
-        // parallelogram's skew, inset === 0.5 (top edge collapsed to a point,
-        // an isoceles triangle) is a valid, non-degenerate shape, so there's
-        // no need for a UI-only margin short of the geometry's own limit.
-        at: (w, _h, p) => [Math.min(Math.max(p.inset ?? 0.2, 0), 0.5) * w, 0],
+        // Matches the geometry function's own clamp exactly (TRAPEZOID_BOUNDS,
+        // 0..0.5) — unlike parallelogram's skew, inset === 0.5 (top edge
+        // collapsed to a point, an isoceles triangle) is a valid,
+        // non-degenerate shape (same class of harmless adjacent-duplicate-
+        // point condition as fatArrow's head/stem extreme below — trapezoid.ts
+        // has the full note), so there's no need for a UI-only margin short
+        // of the geometry's own limit.
+        at: (w, _h, p) => [clamp(p.inset ?? 0.2, TRAPEZOID_BOUNDS.inset) * w, 0],
         from: (x, _y, w) => ({
-          inset: w === 0 ? 0 : Math.min(Math.max(x / w, 0), 0.5),
+          inset: w === 0 ? 0 : clamp(x / w, TRAPEZOID_BOUNDS.inset),
         }),
       },
     ],
@@ -75,8 +89,8 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
         // at once: its distance from centre is `ir`, its angle is `rot`.
         //
         // Degenerate-clamp check: neither bound needs a UI-only margin short
-        // of the geometry's own clamp. `ir` is bounded 0.05..0.95 by the
-        // geometry itself — at 0.95 the inner and outer vertices simply sit
+        // of the geometry's own clamp. `ir` is bounded by STAR_BOUNDS
+        // (0.05..0.95) — at 0.95 the inner and outer vertices simply sit
         // close together (a near-decagon, still non-zero area, still
         // simple/non-self-intersecting since the ten vertices are visited at
         // strictly increasing angle); at 0.05 the points are sharp but the
@@ -84,7 +98,7 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
         // degenerate value at all. So no parallelogram-style extra clamp.
         id: "inner",
         at: (w, h, p) => {
-          const ir = Math.min(Math.max(p.ir ?? 0.38, 0.05), 0.95);
+          const ir = clamp(p.ir ?? 0.38, STAR_BOUNDS.ir);
           const a = -Math.PI / 2 + (p.rot ?? 0) * Math.PI * 2 + Math.PI / 5;
           return [w / 2 + Math.cos(a) * (w / 2) * ir, h / 2 + Math.sin(a) * (h / 2) * ir];
         },
@@ -94,7 +108,7 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
           const uy = h === 0 ? 0 : (y - h / 2) / (h / 2);
           const turn = (v: number) => ((v % 1) + 1) % 1; // keep rot in 0..1
           return {
-            ir: Math.min(Math.max(Math.hypot(ux, uy), 0.05), 0.95),
+            ir: clamp(Math.hypot(ux, uy), STAR_BOUNDS.ir),
             rot: turn((Math.atan2(uy, ux) + Math.PI / 2 - Math.PI / 5) / (Math.PI * 2)),
           };
         },
@@ -127,15 +141,15 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
         // `cap = 0.45` → y = 0.9h — both inside the box, both below the
         // silhouette peak, matching what's on screen.
         //
-        // Degenerate-clamp check: `cap` is already bounded 0.02..0.45 by the
-        // geometry itself specifically so the two cap ellipses never cross
-        // (see cylinder.ts's own comment); the handle reuses that bound
-        // as-is rather than narrowing it further, since 0.45 itself is
-        // already the safe boundary, not a degenerate one.
+        // Degenerate-clamp check: `cap` is already bounded by CYLINDER_BOUNDS
+        // (0.02..0.45) specifically so the two cap ellipses never cross (see
+        // cylinder.ts's own comment); the handle reuses that bound as-is
+        // rather than narrowing it further, since 0.45 itself is already the
+        // safe boundary, not a degenerate one.
         id: "cap",
-        at: (w, h, p) => [w / 2, 2 * Math.min(Math.max(p.cap ?? 0.18, 0.02), 0.45) * h],
+        at: (w, h, p) => [w / 2, 2 * clamp(p.cap ?? 0.18, CYLINDER_BOUNDS.cap) * h],
         from: (_x, y, _w, h) => ({
-          cap: h === 0 ? 0.02 : Math.min(Math.max(y / (2 * h), 0.02), 0.45),
+          cap: h === 0 ? CYLINDER_BOUNDS.cap[0] : clamp(y / (2 * h), CYLINDER_BOUNDS.cap),
         }),
       },
     ],
@@ -166,20 +180,20 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
         // ~4.5% of height. Fixed in the geometry, not here, so the shape
         // itself stops under-drawing its own amplitude too.)
         //
-        // Degenerate-clamp check: `amp` (0..0.4) and `wave` (0.15..1) are
-        // both bounded by the geometry itself with no degenerate value
-        // inside that range — at `amp = 0` the band flattens to a straight
+        // Degenerate-clamp check: `amp` and `wave` (TAPE_BOUNDS) are both
+        // bounded by the geometry itself with no degenerate value inside
+        // that range — at `amp = 0` the band flattens to a straight
         // rectangle (still positive area), and top/bottom edges never touch
         // even at max amplitude (insets keep them `h - 2*amp = 0.2h` apart).
         // No extra clamp needed.
         id: "wave",
         at: (w, h, p) => [
-          (w * Math.min(Math.max(p.wave ?? 0.5, 0.15), 1)) / 4,
-          2 * Math.min(Math.max(p.amp ?? 0.12, 0), 0.4) * h,
+          (w * clamp(p.wave ?? 0.5, TAPE_BOUNDS.wave)) / 4,
+          2 * clamp(p.amp ?? 0.12, TAPE_BOUNDS.amp) * h,
         ],
         from: (x, y, w, h) => ({
-          wave: w === 0 ? 0.15 : Math.min(Math.max((4 * x) / w, 0.15), 1),
-          amp: h === 0 ? 0 : Math.min(Math.max(y / (2 * h), 0), 0.4),
+          wave: w === 0 ? TAPE_BOUNDS.wave[0] : clamp((4 * x) / w, TAPE_BOUNDS.wave),
+          amp: h === 0 ? 0 : clamp(y / (2 * h), TAPE_BOUNDS.amp),
         }),
       },
     ],
@@ -196,17 +210,17 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
         // `[w - dx*w, ...]`, so that corner is exactly `[w*(1-dx), h*dy]`,
         // part of the front face's own interior-edge subpath in `path`.
         //
-        // Degenerate-clamp check: `dx`/`dy` are bounded 0.02..0.6 by the
-        // geometry itself; at the max, the front face is still `0.4w x 0.4h`
+        // Degenerate-clamp check: `dx`/`dy` are bounded by CUBE_BOUNDS
+        // (0.02..0.6); at the max, the front face is still `0.4w x 0.4h`
         // — comfortably non-degenerate. No extra clamp needed.
         id: "depth",
         at: (w, h, p) => [
-          w * (1 - Math.min(Math.max(p.dx ?? 0.25, 0.02), 0.6)),
-          h * Math.min(Math.max(p.dy ?? 0.2, 0.02), 0.6),
+          w * (1 - clamp(p.dx ?? 0.25, CUBE_BOUNDS.dx)),
+          h * clamp(p.dy ?? 0.2, CUBE_BOUNDS.dy),
         ],
         from: (x, y, w, h) => ({
-          dx: w === 0 ? 0.02 : Math.min(Math.max(1 - x / w, 0.02), 0.6),
-          dy: h === 0 ? 0.02 : Math.min(Math.max(y / h, 0.02), 0.6),
+          dx: w === 0 ? CUBE_BOUNDS.dx[0] : clamp(1 - x / w, CUBE_BOUNDS.dx),
+          dy: h === 0 ? CUBE_BOUNDS.dy[0] : clamp(y / h, CUBE_BOUNDS.dy),
         }),
       },
     ],
@@ -221,27 +235,29 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
         // The head's shoulder — geometry.ts's `[x, 0]` where `x = w - head`,
         // a literal member of `points`.
         //
-        // Degenerate-clamp check: `head` is bounded 0.05..0.95 by the
-        // geometry itself; even at 0.95 the shaft keeps `0.05w` of width. No
-        // extra clamp needed.
+        // Degenerate-clamp check: `head` is bounded by FAT_ARROW_BOUNDS
+        // (0.05..0.95); even at 0.95 the shaft keeps `0.05w` of width. No
+        // extra clamp needed. (At the *simultaneous* extreme with `stem: 1`,
+        // this and the stem handle produce a harmless adjacent-duplicate
+        // point — see fatArrow.ts.)
         id: "head",
-        at: (w, _h, p) => [w * (1 - Math.min(Math.max(p.head ?? 0.4, 0.05), 0.95)), 0],
+        at: (w, _h, p) => [w * (1 - clamp(p.head ?? 0.4, FAT_ARROW_BOUNDS.head)), 0],
         from: (x, _y, w) => ({
-          head: w === 0 ? 0.05 : Math.min(Math.max(1 - x / w, 0.05), 0.95),
+          head: w === 0 ? FAT_ARROW_BOUNDS.head[0] : clamp(1 - x / w, FAT_ARROW_BOUNDS.head),
         }),
       },
       {
         // The stem's top edge — geometry.ts's `[0, top]` where
         // `top = (h - stem) / 2`, a literal member of `points`.
         //
-        // Degenerate-clamp check: `stem` is bounded 0.05..1 by the geometry
-        // itself; at 1 the stem spans the full height without inverting
+        // Degenerate-clamp check: `stem` is bounded by FAT_ARROW_BOUNDS
+        // (0.05..1); at 1 the stem spans the full height without inverting
         // top/bottom (documented in fatArrow.ts as intentional, not
         // degenerate — it's a valid, thick arrow). No extra clamp needed.
         id: "stem",
-        at: (_w, h, p) => [0, (h * (1 - Math.min(Math.max(p.stem ?? 0.4, 0.05), 1))) / 2],
+        at: (_w, h, p) => [0, (h * (1 - clamp(p.stem ?? 0.4, FAT_ARROW_BOUNDS.stem))) / 2],
         from: (_x, y, _w, h) => ({
-          stem: h === 0 ? 0.05 : Math.min(Math.max(1 - (2 * y) / h, 0.05), 1),
+          stem: h === 0 ? FAT_ARROW_BOUNDS.stem[0] : clamp(1 - (2 * y) / h, FAT_ARROW_BOUNDS.stem),
         }),
       },
     ],
@@ -258,24 +274,4 @@ export const SHAPES_REGISTRY: Record<FlowShapeKind, ShapeDef> = {
 /** A fresh copy of a kind's starting parameters — callers mutate what they get. */
 export function defaultsFor(kind: FlowShapeKind): ShapeParams {
   return { ...SHAPES_REGISTRY[kind]?.defaults };
-}
-
-/**
- * Geometry for a kind, or null when the kind is unknown.
- *
- * `SHAPES_REGISTRY` is now typed `Record<FlowShapeKind, ShapeDef>`, so any
- * value that actually type-checks as `FlowShapeKind` resolves to a real
- * entry. The `?.`/`?? null` here still guard the runtime case a bad value is
- * smuggled past the type system (an `as never` cast, external/untrusted
- * data) — unlike the `Object.values` iteration in `register.ts`, this is a
- * keyed lookup on a caller-supplied value, so it can't lean on the object
- * literal having been built with every key.
- */
-export function geometryFor(
-  kind: FlowShapeKind,
-  w: number,
-  h: number,
-  p: ShapeParams,
-): FlowGeometry | null {
-  return SHAPES_REGISTRY[kind]?.geometry(w, h, p) ?? null;
 }
