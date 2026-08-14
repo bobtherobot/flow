@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { cylinder } from "./cylinder";
-import { expectInsideBox, expectClosed, expectPathSubpathsClosed } from "./invariants";
+import {
+  expectInsideBox,
+  expectClosed,
+  expectPathSubpathsClosed,
+  shoelaceSign,
+  splitSubpaths,
+  subpathVertices,
+} from "./invariants";
 
 /** Parses `M x y L x y ... Z` into its list of y-coordinates. */
 function subpathYs(subpath: string): number[] {
@@ -68,5 +75,25 @@ describe("cylinder geometry", () => {
     const under = cylinder(200, 100, { cap: -1 });
     const atFloor = cylinder(200, 100, { cap: 0.02 });
     expect(under.points).toEqual(atFloor.points);
+  });
+
+  // Fill-winding regression lock: this is a *pin*, not a proof — see
+  // cylinder.ts's fill-winding comment for why. Empirically (verified in a
+  // real browser, not derivable from a simple ray-casting argument), the
+  // front-cap subpath must traverse its two points shared with the
+  // silhouette in the same relative direction the silhouette does, or the
+  // cap lens renders as a hole through to the canvas the moment the shape
+  // has a non-transparent fill. This test pins the shoelace-sign
+  // relationship that was verified (browser, `cap: 0.18`, both default and
+  // zero roughness) to render correctly, so a future edit can't silently
+  // flip it back.
+  it("winds the front-cap subpath the same direction as the silhouette", () => {
+    const geom = cylinder(200, 100, { cap: 0.18 });
+    const silhouetteSign = shoelaceSign(geom.points);
+    const [, frontCapSubpath] = splitSubpaths(geom.path!);
+    const frontCapSign = shoelaceSign(subpathVertices(frontCapSubpath));
+    expect(silhouetteSign).not.toBe(0);
+    expect(frontCapSign).not.toBe(0);
+    expect(frontCapSign).toBe(silhouetteSign);
   });
 });

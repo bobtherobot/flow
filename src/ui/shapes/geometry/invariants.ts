@@ -32,3 +32,43 @@ export function expectPathSubpathsClosed(geom: FlowGeometry): void {
     expect(sub.trim().toUpperCase().endsWith("Z")).toBe(true);
   }
 }
+
+/**
+ * Signed area via the shoelace formula — sign only matters here, not
+ * magnitude. Its sign is the winding direction of a closed polygon, in the
+ * same y-down convention every geometry function's points are already in.
+ * Two subpaths sharing a sign wind the same direction; nonzero-rule fills
+ * (roughjs's `solidFillPolygon`) union same-signed overlapping subpaths and
+ * cancel opposite-signed ones into a hole — see the fill-winding comment in
+ * cylinder.ts.
+ */
+export function shoelaceSign(points: readonly (readonly [number, number])[]): 1 | -1 | 0 {
+  let sum = 0;
+  for (let i = 0; i < points.length; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
+    sum += x1 * y2 - x2 * y1;
+  }
+  if (sum > 0) return 1;
+  if (sum < 0) return -1;
+  return 0;
+}
+
+/** Split a `path` string into its `M ... Z` subpaths (each element includes
+ *  its own leading `M`), the same convention every geometry test that
+ *  inspects subpaths individually already uses. */
+export function splitSubpaths(path: string): string[] {
+  return path.split(/(?=M)/).filter((s) => s.trim().length > 0);
+}
+
+/** Every `M`/`L` coordinate pair in one subpath, in order. Coordinates can be
+ *  plain decimals or JS's exponential notation. */
+export function subpathVertices(subpath: string): (readonly [number, number])[] {
+  const pts: (readonly [number, number])[] = [];
+  const re = /[ML]\s+(-?[0-9.]+(?:e-?\d+)?)\s+(-?[0-9.]+(?:e-?\d+)?)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(subpath))) {
+    pts.push([Number(m[1]), Number(m[2])]);
+  }
+  return pts;
+}

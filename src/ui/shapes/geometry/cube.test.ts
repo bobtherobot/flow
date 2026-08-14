@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { cube } from "./cube";
-import { expectInsideBox, expectClosed, expectPathSubpathsClosed } from "./invariants";
+import {
+  expectInsideBox,
+  expectClosed,
+  expectPathSubpathsClosed,
+  shoelaceSign,
+  splitSubpaths,
+  subpathVertices,
+} from "./invariants";
 
 function subpaths(path: string): string[] {
   return path.split(/(?=M)/).filter((s) => s.trim().length > 0);
@@ -60,5 +67,25 @@ describe("cube geometry", () => {
     const under = cube(200, 100, { dx: -1, dy: -1 });
     const atFloor = cube(200, 100, { dx: 0.02, dy: 0.02 });
     expect(under.points).toEqual(atFloor.points);
+  });
+
+  // Fill-winding sign, pinned for its own sake — NOT a correctness claim.
+  // Verified in a real browser (see cube.ts's fill-winding comment, which
+  // corrects an earlier wrong claim here) that the front face renders as a
+  // hole under a solid background regardless of this sign or of point order
+  // generally — canvas fills every `generator.path`-based shape with
+  // even-odd, and a fully interior subpath is a hole under even-odd no
+  // matter which way it winds. This assertion just locks the current
+  // (unfixed) point order's shoelace sign so a future edit changing it is a
+  // visible, deliberate diff rather than a silent one — it does not mean
+  // the shape renders correctly.
+  it("winds the front face's interior subpath the same direction as the silhouette", () => {
+    const geom = cube(200, 100, { dx: 0.25, dy: 0.2 });
+    const silhouetteSign = shoelaceSign(geom.points);
+    const [, frontFaceSubpath] = splitSubpaths(geom.path!);
+    const frontFaceSign = shoelaceSign(subpathVertices(frontFaceSubpath));
+    expect(silhouetteSign).not.toBe(0);
+    expect(frontFaceSign).not.toBe(0);
+    expect(frontFaceSign).toBe(silhouetteSign);
   });
 });
