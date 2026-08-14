@@ -106,6 +106,24 @@ const parallelogram = (over: Partial<El> = {}): El => ({
 // this test honest against whatever clamp the registry actually ships.
 const skewHandle = SHAPES_REGISTRY.parallelogram.handles[0];
 
+// 200x100 box, head 0.4 / stem 0.4 -> head handle.at gives local (120, 0),
+// stem handle.at gives local (0, 30). Matches fatArrow.test.ts's fixture box.
+const fatArrow = (over: Partial<El> = {}): El => ({
+  id: "b",
+  type: "rectangle",
+  x: 0,
+  y: 0,
+  width: 200,
+  height: 100,
+  angle: 0,
+  version: 1,
+  customData: { flowShape: { kind: "fatArrow", p: { head: 0.4, stem: 0.4 } } },
+  ...over,
+});
+
+const headHandle = SHAPES_REGISTRY.fatArrow.handles[0];
+const stemHandle = SHAPES_REGISTRY.fatArrow.handles[1];
+
 function flowParams(api: ExcalidrawAPI, id: string): Record<string, number> {
   const el = api.getSceneElements().find((e) => e.id === id) as unknown as El;
   return (el.customData as { flowShape: { p: Record<string, number> } }).flowShape.p;
@@ -237,5 +255,45 @@ describe("useHandleDrag", () => {
       ([args]: [{ captureUpdate: string }]) => args,
     );
     expect(afterUnmount.some((c) => c.captureUpdate === "IMMEDIATELY")).toBe(false);
+  });
+
+  // The fat arrow is the first two-handle shape, which is what makes this
+  // test possible: dragging one handle must merge over the params object
+  // (`{ ...p, ...handle.from(...) }` in useHandleDrag's applyDrag) rather
+  // than replace it, or the handle not being dragged would silently reset to
+  // undefined/its default the moment the other one moves. No prior shape had
+  // two handles to prove this with — deferred from Task 10 to here.
+  describe("merge preservation (fat arrow's two handles)", () => {
+    it("dragging the head handle leaves stem untouched", () => {
+      const el = fatArrow();
+      const api = makeApi(el);
+      const { result } = renderHook(() =>
+        useHandleDrag({ api, element: el, handle: headHandle }),
+      );
+
+      act(() => result.current(pointerDown(120, 0)));
+      act(() => fireWindow("pointermove", 60, 0));
+      act(() => fireWindow("pointerup", 60, 0));
+
+      const p = flowParams(api, "b");
+      expect(p.head).toBeCloseTo(0.7);
+      expect(p.stem).toBe(0.4);
+    });
+
+    it("dragging the stem handle leaves head untouched", () => {
+      const el = fatArrow();
+      const api = makeApi(el);
+      const { result } = renderHook(() =>
+        useHandleDrag({ api, element: el, handle: stemHandle }),
+      );
+
+      act(() => result.current(pointerDown(0, 30)));
+      act(() => fireWindow("pointermove", 0, 20));
+      act(() => fireWindow("pointerup", 0, 20));
+
+      const p = flowParams(api, "b");
+      expect(p.stem).toBeCloseTo(0.6);
+      expect(p.head).toBe(0.4);
+    });
   });
 });
