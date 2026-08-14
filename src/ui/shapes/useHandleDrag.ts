@@ -100,6 +100,17 @@ export function useHandleDrag({
     [],
   );
 
+  // The offset between where the pointer actually went down and the dot's
+  // true position (`handle.at(...)`), captured once at gesture start and
+  // subtracted from every subsequent local point. Without it, the parameter
+  // is derived from the raw pointer position, so pressing anywhere but the
+  // dot's exact centre snaps the shape up to the dot's own radius (~5px) on
+  // the very first move — the dot jumps to the pointer instead of the shape
+  // reshaping relative to where it was actually grabbed. A click dead-centre
+  // on the dot yields offset (0, 0), so this changes nothing for that case
+  // (and every existing test drags from the dot's exact position).
+  const grabOffsetRef = useRef<readonly [number, number]>([0, 0]);
+
   const applyDrag = (clientX: number, clientY: number, commit: boolean): void => {
     if (!api) return;
     const current = api.getSceneElements().find((el) => el.id === elementId);
@@ -111,13 +122,16 @@ export function useHandleDrag({
 
     const appState = api.getAppState();
     const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords({ clientX, clientY }, appState);
-    const [lx, ly] = unrotateAboutCenter(
+    const [rawLx, rawLy] = unrotateAboutCenter(
       sceneX - current.x,
       sceneY - current.y,
       current.width,
       current.height,
       current.angle,
     );
+    const [offX, offY] = grabOffsetRef.current;
+    const lx = rawLx - offX;
+    const ly = rawLy - offY;
 
     const nextParams: ShapeParams = {
       ...flowShape.p,
@@ -149,6 +163,30 @@ export function useHandleDrag({
   };
 
   return useDrag({
+    onStart: (e) => {
+      grabOffsetRef.current = [0, 0];
+      if (!api) return;
+      const current = api.getSceneElements().find((el) => el.id === elementId);
+      if (!current) return;
+      const raw = current.customData as { flowShape?: FlowShape } | undefined;
+      const flowShape = raw?.flowShape;
+      if (!flowShape) return;
+
+      const appState = api.getAppState();
+      const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
+        { clientX: e.clientX, clientY: e.clientY },
+        appState,
+      );
+      const [lx, ly] = unrotateAboutCenter(
+        sceneX - current.x,
+        sceneY - current.y,
+        current.width,
+        current.height,
+        current.angle,
+      );
+      const [ax, ay] = handle.at(current.width, current.height, flowShape.p);
+      grabOffsetRef.current = [lx - ax, ly - ay];
+    },
     onMove: (m) => applyDrag(m.x, m.y, false),
     onEnd: (m) => {
       // The pointer never crossed useDrag's movement threshold, so onMove

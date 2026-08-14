@@ -164,6 +164,31 @@ describe("useHandleDrag", () => {
     expect(flowParams(api, "a").skew).toBe(0);
   });
 
+  // Grab offset: pressing a few px off the dot's exact centre (still within
+  // the 10px dot, well under useDrag's movement threshold so it counts as
+  // "the same press") must not snap the shape to the pointer -- the offset
+  // between the press point and the dot's true position should be preserved
+  // for the rest of the gesture, the same way dragging a real UI handle
+  // never "grab-teleports" the dragged thing to the cursor.
+  it("preserves the offset between where the pointer went down and the dot's true position", () => {
+    const el = parallelogram();
+    const api = makeApi(el);
+    const { result } = renderHook(() => useHandleDrag({ api, element: el, handle: skewHandle }));
+
+    // The dot's true position for skew: 0.25 on a 100x50 box is local (25, 0)
+    // (matches the fixture comment above). Press 3px off-centre instead of
+    // dead-on.
+    act(() => result.current(pointerDown(28, 3)));
+    // Move the same delta (+35, 0) a dead-centre press would use to land on
+    // skew 0.6 (see the very first test in this file) -- the offset grab
+    // should reproduce that same result, not skew toward the pointer's own
+    // absolute position (which would be skew: (28+35)/100 = 0.63).
+    act(() => fireWindow("pointermove", 63, 3));
+    act(() => fireWindow("pointerup", 63, 3));
+
+    expect(flowParams(api, "a").skew).toBeCloseTo(0.6);
+  });
+
   it("maps a drag on a rotated element as if it were unrotated", () => {
     // angle = PI/2 about the box centre (50, 25). A drag targeting local
     // (60, 0) — which should produce skew 0.6 — sits, once rotated, at scene
