@@ -291,3 +291,218 @@ test.describe("dragging a handle", () => {
     expect((await flowParams(page)).skew).toBeCloseTo(0.25);
   });
 });
+
+/**
+ * Task 12: the end-to-end proof that the architecture works, plus the three
+ * persistence/rendering guarantees the spec promises.
+ */
+
+// This is the test that earns the whole design. Flow's ten shapes are drawn
+// on an ordinary `rectangle` element (customData.flowShape), specifically
+// because `isBindableElement` (vendor/excalidraw/packages/element/src/
+// typeChecks.ts) covers "rectangle" and excludes "line" -- the rejected
+// alternative design (a closed polygon `line` carrier) would have needed
+// zero fork edits anywhere, but an arrow could never bind to it. If the
+// carrier were ever swapped for a line, this test is the one that would
+// fail.
+test("an arrow ending inside a triangle binds to it", async ({ page }) => {
+  await page.goto("/");
+  await pickTool(page, "Triangle");
+  await page.mouse.move(400, 200);
+  await page.mouse.down();
+  await page.mouse.move(700, 400, { steps: 8 });
+  await page.mouse.up();
+
+  const triangleId = await page.evaluate(
+    () => (window as any).h.app.scene.getNonDeletedElements().at(-1).id,
+  );
+
+  await pickTool(page, "Arrow");
+  // Start well outside the triangle's box entirely, end deep in its interior
+  // (near its centroid, ~(550,333) -- see the box-vs-outline comment above)
+  // so the drop can only bind via a real point-in-polygon test against the
+  // triangle's own outline, never a bounding-box guess.
+  await page.mouse.move(150, 150);
+  await page.mouse.down();
+  await page.mouse.move(550, 320, { steps: 8 });
+  await page.mouse.up();
+
+  const endBinding = await page.evaluate(
+    () => (window as any).h.app.scene.getNonDeletedElements().at(-1).endBinding,
+  );
+  expect(endBinding?.elementId).toBe(triangleId);
+});
+
+test.describe("persistence, resize and graceful degradation", () => {
+  test("saving, reloading and reopening preserves a dragged shape parameter", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await pickTool(page, "Cylinder");
+    await page.mouse.move(400, 200);
+    await page.mouse.down();
+    await page.mouse.move(700, 400, { steps: 8 });
+    await page.mouse.up();
+    // Flow's tool lock keeps Cylinder armed after drawing, so switch to
+    // Selection before interacting further -- but do NOT click the canvas to
+    // do it (unlike the drag-a-handle tests above): this shape's default
+    // background is transparent, so it only hit-tests on its real outline,
+    // and a click that misses it would deselect instead of refocusing. The
+    // just-drawn element stays selected across a tool switch on its own
+    // (same fact `drawParallelogram` above relies on), and this test never
+    // needs keyboard focus on the canvas, so there's nothing the click would
+    // have bought.
+    await pickTool(page, "Selection");
+
+    const dot = page.getByRole("button", { name: /Cylinder cap handle/i });
+    const box = (await dot.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    // Cylinder's box is 300x200 at (400,200)-(700,400); the cap dot sits at
+    // local (w/2, 2*cap*h) -- viewport (550,272) at the 0.18 default. Drag it
+    // down to local y=150 (viewport 550,350), i.e. cap = 150/(2*200) = 0.375,
+    // comfortably inside the geometry's own 0.02..0.45 clamp.
+    await page.mouse.move(550, 350, { steps: 4 });
+    await page.mouse.up();
+
+    const dragged = await page.evaluate(() => {
+      const el = (window as any).h.app.scene.getNonDeletedElements().at(-1);
+      return el.customData?.flowShape?.p as { cap: number };
+    });
+    expect(dragged.cap).toBeGreaterThan(0.3);
+
+    // Persist for real: File > Save > Store internally (IndexedDB -- flow's
+    // scene isn't restored from a bare reload, unlike the appState prefs
+    // other e2e specs reload-test, so round-tripping through Save/Open is
+    // what actually proves customData.flowShape survives serialization).
+    const docName = `flow-shapes-e2e-cylinder-${Date.now()}`;
+    await page.getByRole("menuitem", { name: "File" }).click();
+    await page.getByRole("menuitem", { name: "Save…" }).click();
+    await page.getByLabel("Name").fill(docName);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+
+    await page.reload();
+
+    await page.getByRole("menuitem", { name: "File" }).click();
+    await page.getByRole("menuitem", { name: "Open…" }).click();
+    await page.getByRole("option", { name: new RegExp(docName) }).click();
+
+    const restored = await page.evaluate(() => {
+      const el = (window as any).h.app.scene
+        .getNonDeletedElements()
+        .find((e: any) => e.customData?.flowShape?.kind === "cylinder");
+      return el ? (el.customData.flowShape as { kind: string; p: { cap: number } }) : null;
+    });
+    expect(restored?.kind).toBe("cylinder");
+    expect(restored?.p.cap).toBeCloseTo(dragged.cap, 5);
+  });
+
+  test("resizing a star via a corner transform handle keeps it a flow shape", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await pickTool(page, "Star");
+    await page.mouse.move(400, 200);
+    await page.mouse.down();
+    await page.mouse.move(700, 400, { steps: 8 });
+    await page.mouse.up();
+
+    const before = await page.evaluate(() => {
+      const el = (window as any).h.app.scene.getNonDeletedElements().at(-1);
+      return {
+        id: el.id,
+        type: el.type,
+        width: el.width,
+        height: el.height,
+        flowShape: el.customData?.flowShape,
+      };
+    });
+    expect(before.type).toBe("rectangle");
+    expect(before.flowShape?.kind).toBe("star");
+
+    // Flow's tool lock keeps Star armed after drawing (Illustrator-style,
+    // unlike vanilla Excalidraw) -- switch to Selection first, or the next
+    // drag draws a second, smaller star instead of resizing this one. No
+    // reselect click needed: the just-drawn element stays selected across
+    // the switch on its own (see the cylinder test above for the same fact,
+    // and why a click isn't used to prove it here either).
+    await pickTool(page, "Selection");
+
+    // Drag the native bottom-right resize handle (vendor chrome, not one of
+    // flow's own orange dots -- this proves shapes need zero resize code of
+    // their own because parameters are normalized 0..1 fractions of the box).
+    // SELECTION_SPACING is 0 (flow's tight-chrome fork edit, see
+    // drawing-defaults.md), so the 8px handle is centered exactly on the
+    // element's own bounding corner (700,400), the point the box was drawn to.
+    await page.mouse.move(700, 400);
+    await page.mouse.down();
+    await page.mouse.move(800, 500, { steps: 8 });
+    await page.mouse.up();
+
+    const after = await page.evaluate((id) => {
+      const el = (window as any).h.app.scene
+        .getNonDeletedElements()
+        .find((e: any) => e.id === id);
+      return {
+        type: el.type,
+        width: el.width,
+        height: el.height,
+        flowShape: el.customData?.flowShape,
+      };
+    }, before.id);
+
+    expect(after.type).toBe("rectangle");
+    expect(after.width).toBeGreaterThan(before.width);
+    expect(after.height).toBeGreaterThan(before.height);
+    // customData is untouched by resize -- normalized parameters don't need
+    // to change when the box they're a fraction of does.
+    expect(after.flowShape).toEqual(before.flowShape);
+  });
+
+  test("an unregistered shape kind degrades to a selectable plain box instead of crashing", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await pickTool(page, "Rectangle");
+    await page.mouse.move(400, 200);
+    await page.mouse.down();
+    await page.mouse.move(700, 400, { steps: 8 });
+    await page.mouse.up();
+
+    // Stamp a kind the registry has never heard of, through the same vendor
+    // test hook `drawFlowShape` uses -- getFlowShapeGeometry (register.test.ts)
+    // returns null for it, so the renderer must fall back to the plain
+    // rectangle carrier rather than throwing.
+    const id = await page.evaluate(() => {
+      const app = (window as any).h.app;
+      const el = app.scene.getNonDeletedElements().at(-1);
+      app.updateScene({
+        elements: app.scene.getNonDeletedElements().map((e: any) =>
+          e.id === el.id
+            ? {
+                ...e,
+                customData: { flowShape: { kind: "not-a-shape", p: {} } },
+                version: e.version + 1,
+                versionNonce: Math.floor(Math.random() * 2 ** 31),
+              }
+            : e,
+        ),
+      });
+      return el.id;
+    });
+
+    // The page is still alive and interactive rather than crashed white.
+    await expect(page.getByRole("toolbar", { name: "Tools" })).toBeVisible();
+
+    // Still selectable -- clicking its (box) outline hits it like any plain
+    // rectangle would, proving the fallback isn't just inert paint.
+    await pickTool(page, "Selection");
+    await page.mouse.click(900, 500);
+    expect(await selectedCount(page)).toBe(0);
+    await page.mouse.click(400, 300);
+    const selected = await page.evaluate(() =>
+      Object.keys((window as any).h.state.selectedElementIds ?? {}),
+    );
+    expect(selected).toEqual([id]);
+  });
+});
