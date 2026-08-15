@@ -836,3 +836,10 @@ Before calling this done:
 - [ ] `npx playwright test` — no new failures vs `main` (2 pre-existing `text-panel.spec.ts` failures expected)
 - [ ] Manual: grid recolors live, bold lines lighter than thin, survives reload and `File ▸ New`
 - [ ] `git -C vendor/excalidraw diff --stat main...HEAD` — 3 files changed by this feature, all additive
+
+> **SUPERSEDED during execution:** the fork edit is **4 files**, not 3. A 4th,
+> `packages/excalidraw/components/canvases/StaticCanvas.tsx`, adds
+> `gridColor` / `gridColorBold` to `getRelevantAppStateProps` — the `React.memo`
+> comparator's input. Without it an appState-only `updateScene` never repaints
+> and the grid holds its old color until the next pan/zoom/edit. Still all
+> additive. Expect 4 files from that `--stat`.
