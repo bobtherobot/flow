@@ -248,3 +248,55 @@ test("modifier + shift-drag moves the selection instead of deselecting", async (
   );
   expect(after).toBeGreaterThan(before);
 });
+
+/** Read how many object-snap guide lines the canvas is currently showing. */
+const snapLineCount = (page: Page) =>
+  page.evaluate(
+    () =>
+      (window as unknown as { h?: { state?: { snapLines?: unknown[] } } }).h
+        ?.state?.snapLines?.length ?? 0,
+  );
+
+/** Turn "Snap to Objects" off via the real View menu if it is currently on. */
+async function ensureObjectSnapOff(page: Page) {
+  const enabled = await page.evaluate(
+    () =>
+      (window as unknown as { h?: { state?: { objectsSnapModeEnabled?: boolean } } })
+        .h?.state?.objectsSnapModeEnabled ?? false,
+  );
+  if (!enabled) {
+    return;
+  }
+  await page.getByRole("menuitem", { name: "View" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Snap to Objects" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { h?: { state?: { objectsSnapModeEnabled?: boolean } } })
+            .h?.state?.objectsSnapModeEnabled ?? false,
+      ),
+    )
+    .toBe(false);
+}
+
+test("holding the modifier does not turn object snapping on", async ({ page }) => {
+  await ensureObjectSnapOff(page);
+  await drawBox(page);
+  await drawSecondBox(page);
+  await page.locator("canvas.interactive").first().click({ position: { x: 5, y: 5 } });
+  await pickTool(page, "Rectangle");
+
+  // Grab the second box with the modifier held and drag it until its edges are
+  // near the first box's — the alignment that would produce snap guides.
+  await page.keyboard.down("ControlOrMeta");
+  await page.mouse.move(BOX2_EDGE[0], BOX2_EDGE[1]);
+  await page.mouse.down();
+  await page.mouse.move(BOX_EDGE[0] + 2, BOX_EDGE[1] + 2, { steps: 12 });
+
+  // Snap mode is OFF, so no guides may appear regardless of the held modifier.
+  expect(await snapLineCount(page)).toBe(0);
+
+  await page.mouse.up();
+  await page.keyboard.up("ControlOrMeta");
+});
