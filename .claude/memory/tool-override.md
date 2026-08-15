@@ -539,7 +539,9 @@ of reading as done.**
   documents for `e2e/quickbar.spec.ts`'s arrow-binding persistence test.
 - Accepted trade-offs (from the spec, all still true): Cmd+drag with a
   *shape* tool no longer draws snap-free; Cmd-hold + click always drills into
-  groups (vendor `App.tsx:7223`, `if (event[KEYS.CTRL_OR_CMD])` inside the
-  pointerdown hit-test handler — drilling into groups regardless of a normal
-  click's group-respecting behavior); every Cmd shortcut flaps the tool
-  through selection and back.
+  groups (vendor `App.tsx:9549`, re-verified 2026-08-15 — was stale at
+  `App.tsx:7223` before this correction, a casualty of the 2026-08-11
+  upstream replay's line-number churn; `if (event[KEYS.CTRL_OR_CMD])` inside
+  the pointerdown hit-test handler — drilling into groups regardless of a
+  normal click's group-respecting behavior); every Cmd shortcut flaps the
+  tool through selection and back.
