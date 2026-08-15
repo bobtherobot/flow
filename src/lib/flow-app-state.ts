@@ -2,6 +2,7 @@ import { FONT_FAMILY } from "@excalidraw/excalidraw";
 import type { Sloppiness } from "./roughness";
 import type { BindingMode } from "./binding-mode";
 import type { SelectionMode } from "./selection-mode";
+import { boldGridColor } from "./grid";
 
 export interface FlowAppStatePrefs {
   sloppiness: Sloppiness;
@@ -9,6 +10,7 @@ export interface FlowAppStatePrefs {
   laserColor: string;
   selectionMode: SelectionMode;
   gridSize: number;
+  gridColor: string;
 }
 
 /**
@@ -30,6 +32,7 @@ export function flowSeedAppState({
   laserColor,
   selectionMode,
   gridSize,
+  gridColor,
 }: FlowAppStatePrefs) {
   return {
     currentItemRoughness: sloppiness,
@@ -51,6 +54,11 @@ export function flowSeedAppState({
     // Seed the grid size at init so the grid renders at the preferred cell size
     // on first paint (native field; no cast needed).
     gridSize,
+    // Seed the grid colors at init (fork fields; same race rationale as
+    // bindingMode). Only gridColor is a stored preference — the bold shade is
+    // always derived here so the pair can never drift.
+    gridColor,
+    gridColorBold: boldGridColor(gridColor),
     // flow defaults object-snapping ON (Excalidraw ships it off). Users can
     // still toggle it off in-canvas (Alt+S); saved docs restore their own
     // value. Native field; no cast needed.
@@ -89,6 +97,8 @@ export const FLOW_GLOBAL_APP_STATE_KEYS = [
   "laserColor",
   "selectionMode",
   "gridSize",
+  "gridColor",
+  "gridColorBold",
   "currentItemFlowShape",
 ] as const;
 

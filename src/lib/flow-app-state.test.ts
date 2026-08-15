@@ -16,6 +16,7 @@ const PREFS = {
   laserColor: "#ff0000",
   selectionMode: "enclose",
   gridSize: 20,
+  gridColor: "#dddddd",
 } as const;
 
 describe("flowSeedAppState", () => {
@@ -26,6 +27,8 @@ describe("flowSeedAppState", () => {
       laserColor: "#ff0000",
       selectionMode: "enclose",
       gridSize: 20,
+      gridColor: "#dddddd",
+      gridColorBold: "#e5e5e5",
     });
   });
 
@@ -65,6 +68,30 @@ describe("flowSeedAppState", () => {
     });
     expect("currentItemFlowShape" in stripped).toBe(false);
     expect(stripped.viewBackgroundColor).toBe("#fff");
+  });
+
+  it("derives the bold gridline color rather than taking it as a preference", () => {
+    // Only gridColor is persisted; the bold shade is always computed, so the two
+    // cannot drift out of sync.
+    const seed = flowSeedAppState({ ...PREFS, gridColor: "#001020" }) as Record<
+      string,
+      unknown
+    >;
+
+    expect(seed.gridColor).toBe("#001020");
+    expect(seed.gridColorBold).toBe("#081828");
+  });
+
+  it("treats both grid colors as flow globals, so an opened document cannot override them", () => {
+    const stripped = withoutFlowGlobals({
+      gridColor: "#ff0000",
+      gridColorBold: "#ff0808",
+      viewBackgroundColor: "#ffffff",
+    });
+
+    expect(stripped).not.toHaveProperty("gridColor");
+    expect(stripped).not.toHaveProperty("gridColorBold");
+    expect(stripped).toHaveProperty("viewBackgroundColor", "#ffffff");
   });
 });
 
