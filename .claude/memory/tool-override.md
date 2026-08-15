@@ -5,19 +5,27 @@ Spec/plan: `docs/superpowers/specs/2026-08-07-tool-override-design.md`,
 `docs/superpowers/plans/2026-08-07-tool-override.md`. Branch `feat/tool-override`.
 
 **Status: shipped, including a final-review fix wave and a corrective pass on
-top of that.** Unit suite green (640/640), e2e fully green (113/113). A
-regression was found mid-branch (forcing the tool lock on silently killed
-auto-select-on-draw app-wide), root-caused, fixed with a deliberate two-site
-fork edit, and the four e2e tests it took down were updated to the new
-workflow. See "The regression and its fix" below — this is the highest-value
-section for anyone touching this feature again. A later whole-branch review
-then found a **third** site with the same conflation, a `Q`-shortcut escape
-hatch, and a style-memory interaction the override made newly reachable — see
+top of that, plus a third pass (2026-08-15) reducing Cmd/Ctrl to one canvas
+meaning.** Unit suite green (640/640 at ship, 1219/1219 as of the third
+pass), e2e fully green (113/113 at ship, 182/184 as of the third pass, the 2
+failures pre-existing in `text-panel.spec.ts`). A regression was found
+mid-branch (forcing the tool lock on silently killed auto-select-on-draw
+app-wide), root-caused, fixed with a deliberate two-site fork edit, and the
+four e2e tests it took down were updated to the new workflow. See "The
+regression and its fix" below — this is the highest-value section for anyone
+touching this feature again. A later whole-branch review then found a
+**third** site with the same conflation, a `Q`-shortcut escape hatch, and a
+style-memory interaction the override made newly reachable — see
 "Final-review fix wave" below. A **re-review of that wave** then found the
 `Q` swallow still ate the letter in flow's own search boxes, and — more
 seriously — that the style-memory fix in that wave did not work and opened a
 second corruption path; see "Corrective pass" below, which supersedes the
-"One known, accepted residual" paragraph in the final-review section.
+"One known, accepted residual" paragraph in the final-review section. A
+**third pass** (branch `feat/cmd-modifier-semantics`, 2026-08-15) found that
+the same modifier conflation which caused the original regression was not
+fully closed — three more upstream behaviours were still permanently on
+during selection work. See "Cmd/Ctrl means one thing" below, the section to
+read before touching anything Cmd/Ctrl-gated in this feature again.
 
 ## Shipped
 - `src/ui/toolbar/tool-override.ts` — pure: `overrideKeyFor(platform)` (Meta on
@@ -335,6 +343,130 @@ active with elements selected — a restructuring of `useStyleMemory`'s drift
 capture that was explicitly out of scope. This residual is reachable only via
 the override and degrades to stock Excalidraw behavior (a style edit follows
 into the next drawn element).
+
+## Cmd/Ctrl means one thing (2026-08-15)
+
+**The pattern, stated once and plainly.** flow reserves Cmd/Ctrl for this
+feature's temporary selection tool, which means the modifier is held for a
+*whole interaction* — press, drag, release — not tapped for an instant the
+way upstream's own Cmd/Ctrl gestures assume. Every upstream behaviour gated
+on that modifier is therefore permanently on during selection work instead of
+being the opt-in gesture it was designed as. This is the same root cause as
+"The regression, and its fix" above (that one was `activeTool.locked` gating
+two behaviours; this one is `event[KEYS.CTRL_OR_CMD]` gating several) — and it
+is not a one-time cleanup. Three instances have now been found and removed on
+three separate days: drag suppression (2026-08-14, see the gotcha above),
+deep-select swallowing shift, and the two snap overrides (both below).
+**Anyone finding a fourth collision should expect it to present as "feature X
+is always on while selecting," not as an obvious bug report** — the symptom
+reads as a feature working "too well," not as broken.
+
+Three parts landed on this branch, all in `vendor/excalidraw`:
+
+- **Part A — deep-select swallowed shift** (`components/App.tsx`, the
+  `if (event[KEYS.CTRL_OR_CMD])` "deep selection" block at line 9549, fixed at
+  line 9568, submodule `c369dbaa`). Upstream's Cmd/Ctrl-click branch replaced
+  `selectedElementIds` wholesale via `editGroupForSelectedElement` and
+  returned before the shift-aware path lower in the same handler ever ran —
+  so shift-click while the modifier-held selection tool was active could
+  never extend a selection, only replace it. Fixed by adding a
+  `event.shiftKey` sub-branch ahead of the existing unconditional call; the
+  non-shift path and the `event.altKey` lasso sub-branch above it are
+  byte-identical to upstream.
+- **Part B1 — snapping.ts inverted the toggle** (`snapping.ts:178`,
+  `isSnappingEnabled`, submodule `004a0732`). Upstream read
+  `!app.state.objectsSnapModeEnabled` while Cmd/Ctrl was held — a
+  hold-to-invert gesture for a modifier flow never releases mid-selection, so
+  Snap to Objects was permanently backwards during selection work. Deleted;
+  snapping now follows the toggle alone (View ▸ Snap to Objects, the quickbar
+  toggle, `Alt+S`).
+- **Part B2 — grid snap bypass, 15 sites** (`components/App.tsx`, submodule
+  `95680cf`). Upstream bypassed `getEffectiveGridSize()` — passed `null`
+  instead — whenever Cmd/Ctrl was held, so grid snap was permanently off
+  during selection work. 15 sites: 1 compound guard, 9 inline
+  `getEffectiveGridSize()` calls, 5 `lastPointerDownEvent`-derived call sites.
+  All dropped the Cmd/Ctrl term; grid snap now follows View ▸ Grid alone.
+
+**That deselection stays at pointerup on purpose.** The deep-select fix's own
+`flow:` comment (line 9568) calls this out explicitly: deselection is handled
+at `components/App.tsx:12459-12466`, inside the pointerup handler, gated on
+`!pointerDownState.drag.hasOccurred` (line 12432) — a click that didn't drag
+deselects, a click that did drag doesn't. This is deliberately **not** also
+handled at pointerdown, even though the Part A fix sits in a pointerdown
+branch: toggling deselection at both points would double-toggle, and the
+concrete failure would be shift+**drag** silently deselecting instead of
+moving the selection. **This is the single most likely thing for a future
+editor to "tidy" into a bug** — it looks like an inconsistency (why doesn't
+the click branch handle its own deselection?) but the split is load-bearing.
+
+**Group drilling on Cmd-click was deliberately kept**, not folded into this
+cleanup. `App.tsx:9549`'s `if (event[KEYS.CTRL_OR_CMD])` block still drills
+into a group and selects the child element regardless of a normal click's
+group-respecting behavior — this was already an accepted trade-off (see
+"Accepted trade-offs" at the bottom of this file) and stays permanently
+active while the modifier is held, same as before. "Remove it entirely, drill
+via double-click instead" was explicitly on the table and not taken — the
+design doc records both options and the call to keep it. Double-click drilling
+already exists independently, unaffected by this change:
+`App.tsx`'s `handleCanvasDoubleClick` (~line 7011), the
+`selectedGroupIds.length > 0` branch at ~line 7148, which drills into an
+*already-selected* group on double-click. The two are complementary, not
+duplicates — Cmd-click drills from a hit-test with nothing selected yet,
+double-click drills further into a group you're already inside.
+
+**The compound-guard trap.** One of the 15 grid sites (`App.tsx:9174`, inside
+`PointerDownState`'s `originInGrid` computation) read
+`event[KEYS.CTRL_OR_CMD] || isElbowArrowOnly ? null : this.getEffectiveGridSize()`
+— two independent reasons to bypass grid snap, only one of them flow's to
+remove. The fix drops only the `event[KEYS.CTRL_OR_CMD] ||` term, leaving
+`isElbowArrowOnly ? null : ...` untouched — elbow arrows keep their own
+grid-snap bypass, unrelated to the modifier conflation. Five lines above, in
+the same object literal, `withCmdOrCtrl: event[KEYS.CTRL_OR_CMD]` was
+deliberately left alone — that field feeds marquee select-through (read at
+pointerup, the other consumer of `withCmdOrCtrl`) and is out of scope for
+this fix. A sweep that pattern-matched "remove the Cmd/Ctrl term" without
+reading each site would have caught the `isElbowArrowOnly` term too, or
+missed that `withCmdOrCtrl` sits right next to the thing that needed fixing.
+
+**The fork footprint change, and why it matters differently than past fork
+edits.** This is the first *deletion-shaped* work on this feature. Every fork
+edit before it either added a field (arrowhead size, laser color, grid color)
+or dropped a single clause at one site (the 2026-08-14 drag-suppression fix).
+This pass modifies 17 pre-existing upstream expressions in place across 2
+files — `App.tsx` (16 sites) and `snapping.ts` (1 site) — which means an
+upstream replay will surface these as **merge conflicts**, not clean
+insertions: the lines this branch touches are lines upstream is also likely
+to keep touching. Every site carries a `flow:` comment for exactly this
+reason — a future replay can `grep -n "flow:"` both files and re-apply each
+deletion by hand against the new upstream text, since a mechanical patch
+apply is not expected to succeed cleanly here the way it has for prior
+fork edits on this feature.
+
+**A verification lesson worth generalising, from this same branch's own
+review cycle.** Two separate implementer reports made claims that were not
+mechanically executed, both caught in review rather than by their own
+authors: one claimed a snap-toggle-ON path was "verified by hand" with no
+script, log, or transcript behind it — a subagent cannot visually inspect a
+running browser, so "verified by hand" is not a real claim, it's an assertion
+wearing evidence's clothes. The other paraphrased a gate's per-test output
+while presenting it in the same report alongside genuinely pasted transcripts
+elsewhere, which reads as verbatim by association. **The standard: a claim
+without a pasted command and its actual output is not evidence, regardless of
+how confidently or specifically it's worded.** Both were fixed — the first by
+adding a real positive-case e2e assertion, the second by pointing to the gate
+that should have been pasted.
+
+**The infrastructure trap that cost real time in this branch's own
+verification.** A backgrounded full-suite Playwright run was silently killed
+partway through **twice** in this session — once caught only because the
+implementer waited on a notification that never arrived and the controller
+had to confirm via `pgrep -af playwright` / `pgrep -af "node.*vite"` (both
+empty) that the run was dead rather than slow. The hazard is specific: a
+partially-completed background run's output looks exactly like a legitimate
+partial result, not like a crash — nothing announces "this got killed." **Rule
+for this repo: never background the full e2e suite; run it in the foreground
+with an explicit timeout (600s worked) so a truncated run fails loudly instead
+of reading as done.**
 
 ## Tests
 - Unit: `src/ui/toolbar/tool-override.test.ts` (12 tests, covers every
