@@ -300,3 +300,56 @@ test("holding the modifier does not turn object snapping on", async ({ page }) =
   await page.mouse.up();
   await page.keyboard.up("ControlOrMeta");
 });
+
+/** Turn "Snap to Objects" on via the real View menu if it is currently off. */
+async function ensureObjectSnapOn(page: Page) {
+  const enabled = await page.evaluate(
+    () =>
+      (window as unknown as { h?: { state?: { objectsSnapModeEnabled?: boolean } } })
+        .h?.state?.objectsSnapModeEnabled ?? false,
+  );
+  if (enabled) {
+    return;
+  }
+  await page.getByRole("menuitem", { name: "View" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Snap to Objects" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { h?: { state?: { objectsSnapModeEnabled?: boolean } } })
+            .h?.state?.objectsSnapModeEnabled ?? false,
+      ),
+    )
+    .toBe(true);
+}
+
+test("the snap toggle, switched on through the real menu, still produces guides with no modifier held", async ({
+  page,
+}) => {
+  // Companion to the test above: that one proves the OFF side survived the
+  // fork edit (modifier can no longer force snapping on). This proves the ON
+  // side survived too — the binding constraint is "snapping follows the
+  // explicit toggles alone," not just "the modifier no longer overrides it."
+  // Route through OFF first so the ON branch below always exercises the real
+  // menu-click path, regardless of flow's default.
+  await ensureObjectSnapOff(page);
+  await ensureObjectSnapOn(page);
+  await drawBox(page);
+  await drawSecondBox(page);
+  await page.locator("canvas.interactive").first().click({ position: { x: 5, y: 5 } });
+  await pickTool(page, "Rectangle");
+
+  // Identical drag geometry to the RED run that reported snapLines.length
+  // === 6 at this exact alignment — no modifier held this time, since this
+  // test is about the toggle, not the override.
+  await page.mouse.move(BOX2_EDGE[0], BOX2_EDGE[1]);
+  await page.mouse.down();
+  await page.mouse.move(BOX_EDGE[0] + 2, BOX_EDGE[1] + 2, { steps: 12 });
+
+  // Assert while the drag is still in progress — snapLines is only populated
+  // during an active drag, not after mouse.up() commits the move.
+  expect(await snapLineCount(page)).toBeGreaterThan(0);
+
+  await page.mouse.up();
+});
