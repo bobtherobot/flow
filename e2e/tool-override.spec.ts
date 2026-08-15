@@ -353,3 +353,48 @@ test("the snap toggle, switched on through the real menu, still produces guides 
 
   await page.mouse.up();
 });
+
+/** Turn grid mode on via the real View menu. */
+async function enableGridMode(page: Page) {
+  await page.getByRole("menuitem", { name: "View" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Grid", exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { h?: { state?: { gridModeEnabled?: boolean } } }).h
+            ?.state?.gridModeEnabled ?? false,
+      ),
+    )
+    .toBe(true);
+}
+
+test("holding the modifier does not bypass grid snapping", async ({ page }) => {
+  await enableGridMode(page);
+  await drawBox(page);
+  await page.locator("canvas.interactive").first().click({ position: { x: 5, y: 5 } });
+  await pickTool(page, "Rectangle");
+
+  // Drag by a deliberately non-grid-multiple offset with the modifier held.
+  await page.keyboard.down("ControlOrMeta");
+  await page.mouse.click(BOX_EDGE[0], BOX_EDGE[1]);
+  await expect.poll(() => selectedCount(page)).toBe(1);
+  await page.mouse.move(BOX_EDGE[0], BOX_EDGE[1]);
+  await page.mouse.down();
+  await page.mouse.move(BOX_EDGE[0] + 47, BOX_EDGE[1] + 33, { steps: 10 });
+  await page.mouse.up();
+  await page.keyboard.up("ControlOrMeta");
+
+  const { x, y, gridSize } = await page.evaluate(() => {
+    const h = (
+      window as unknown as {
+        h: { elements: { x: number; y: number }[]; state: { gridSize: number } };
+      }
+    ).h;
+    return { x: h.elements[0].x, y: h.elements[0].y, gridSize: h.state.gridSize };
+  });
+
+  // The drop position must land on the grid despite the held modifier.
+  expect(x % gridSize).toBe(0);
+  expect(y % gridSize).toBe(0);
+});
