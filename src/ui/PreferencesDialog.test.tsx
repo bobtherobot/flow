@@ -139,7 +139,10 @@ describe("PreferencesDialog", () => {
 
   it("shows the grid color swatch reflecting the current value", () => {
     setup();
-    expect(screen.getByRole("button", { name: "Grid color" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Grid color" })).toHaveAttribute(
+      "title",
+      "#dddddd",
+    );
   });
 
   it("fires onChangeGridColor with a hex committed from the picker", async () => {

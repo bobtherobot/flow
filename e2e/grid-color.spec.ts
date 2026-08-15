@@ -140,17 +140,27 @@ test("grid-color preference repaints the static canvas, not just appState", asyn
     }
     const ctx = canvas.getContext("2d")!;
     const { width, height } = canvas;
+    const regionWidth = Math.min(width, 900);
+    const regionHeight = Math.min(height, 700);
+    // Single getImageData over the whole region, then stride the returned
+    // buffer in JS — one GPU→CPU sync instead of one per sampled pixel
+    // (~157,500 individual calls previously). Same region and same stride
+    // over x/y as before; only the read mechanism changed.
+    const { data } = ctx.getImageData(0, 0, regionWidth, regionHeight);
     let hits = 0;
     let total = 0;
     // Scan a broad swath of the canvas at a fine step so both the dashed
     // regular lines (every 20px) and the solid bold lines (every 100px) get
     // crossed multiple times regardless of the scroll offset.
-    for (let x = 0; x < Math.min(width, 900); x += 2) {
-      for (let y = 0; y < Math.min(height, 700); y += 2) {
-        const d = ctx.getImageData(x, y, 1, 1).data;
+    for (let x = 0; x < regionWidth; x += 2) {
+      for (let y = 0; y < regionHeight; y += 2) {
+        const idx = (y * regionWidth + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
         total++;
         // Red-dominant: high red channel, low green/blue.
-        if (d[0] > 180 && d[1] < 100 && d[2] < 100) {
+        if (r > 180 && g < 100 && b < 100) {
           hits++;
         }
       }

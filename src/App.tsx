@@ -25,7 +25,8 @@ import {
 import { type Unit } from "./lib/units";
 import { type BindingMode, isBindingActive, toggledBindingMode } from "./lib/binding-mode";
 import { type SelectionMode } from "./lib/selection-mode";
-import { clampGridSize, DEFAULT_GRID_COLOR, isGridColor, boldGridColor } from "./lib/grid";
+import { clampGridSize, DEFAULT_GRID_COLOR, boldGridColor } from "./lib/grid";
+import { scrubHex } from "./lib/color-palettes";
 import { flowSeedAppState } from "./lib/flow-app-state";
 import { IndexedDbProvider } from "./storage/indexeddb-provider";
 import type { DocumentSummary } from "./storage/types";
@@ -243,7 +244,11 @@ export default function App() {
   // write, so the pair cannot drift.
   const [gridColor, setGridColorState] = useState<string>(() => getGridColor());
   const handleChangeGridColor = useCallback((next: string) => {
-    const color = isGridColor(next) ? next : DEFAULT_GRID_COLOR;
+    // Normalize via scrubHex (not just validate) so live appState always
+    // matches what setGridColor persists — otherwise a valid-but-non-canonical
+    // hex (e.g. 8-digit with alpha) would sit in state verbatim while the
+    // stored value gets normalized, splitting the two until reload.
+    const color = scrubHex(next) ?? DEFAULT_GRID_COLOR;
     setGridColorState(color);
     setGridColor(color);
   }, []);

@@ -25,6 +25,8 @@ function readState(page: Page) {
       laserColor: s.laserColor,
       selectionMode: s.selectionMode,
       gridSize: s.gridSize,
+      gridColor: s.gridColor,
+      gridColorBold: s.gridColorBold,
     };
   });
 }
@@ -70,6 +72,8 @@ test("File ▸ New keeps flow's app-wide appState preferences", async ({ page })
   expect(after.currentItemRoughness).toBe(0);
   expect(after.objectsSnapModeEnabled).toBe(true);
   expect(after.bindingMode).toBe("on");
+  expect(after.gridColor).toBe("#dddddd");
+  expect(after.gridColorBold).toBe("#e5e5e5");
 });
 
 test("File ▸ New still clears the canvas", async ({ page }) => {
