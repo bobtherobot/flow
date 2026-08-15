@@ -166,3 +166,85 @@ test("the modifier still marquee-selects from empty canvas", async ({ page }) =>
 
   expect(await selectedCount(page)).toBe(1);
 });
+
+/** A second box, clear of BOX, drawn the same way. Its left edge is the hit
+ *  target for the same transparent-fill reason BOX_EDGE exists. */
+const BOX2 = [700, 300, 820, 380] as const;
+const BOX2_EDGE = [700, 340] as const;
+
+async function drawSecondBox(page: Page) {
+  await pickTool(page, "Rectangle");
+  await page.mouse.move(BOX2[0], BOX2[1]);
+  await page.mouse.down();
+  await page.mouse.move(BOX2[2], BOX2[3], { steps: 8 });
+  await page.mouse.up();
+}
+
+test("modifier + shift-click adds a second element to the selection", async ({ page }) => {
+  await drawBox(page);
+  await drawSecondBox(page);
+  await page.locator("canvas.interactive").first().click({ position: { x: 5, y: 5 } });
+  await pickTool(page, "Rectangle");
+
+  await page.keyboard.down("ControlOrMeta");
+  await page.mouse.click(BOX_EDGE[0], BOX_EDGE[1]);
+  await expect.poll(() => selectedCount(page)).toBe(1);
+
+  await page.keyboard.down("Shift");
+  await page.mouse.click(BOX2_EDGE[0], BOX2_EDGE[1]);
+  await page.keyboard.up("Shift");
+  await page.keyboard.up("ControlOrMeta");
+
+  await expect.poll(() => selectedCount(page)).toBe(2);
+});
+
+test("modifier + shift-click on an already-selected element removes it", async ({ page }) => {
+  await drawBox(page);
+  await drawSecondBox(page);
+  await page.locator("canvas.interactive").first().click({ position: { x: 5, y: 5 } });
+  await pickTool(page, "Rectangle");
+
+  await page.keyboard.down("ControlOrMeta");
+  await page.mouse.click(BOX_EDGE[0], BOX_EDGE[1]);
+  await page.keyboard.down("Shift");
+  await page.mouse.click(BOX2_EDGE[0], BOX2_EDGE[1]);
+  await expect.poll(() => selectedCount(page)).toBe(2);
+
+  // Clicking the second one again with shift still held takes it back out.
+  // This proves the pointerup deselect path still owns deselection and that
+  // pointerdown did not also toggle (which would net out to no change).
+  await page.mouse.click(BOX2_EDGE[0], BOX2_EDGE[1]);
+  await page.keyboard.up("Shift");
+  await page.keyboard.up("ControlOrMeta");
+
+  await expect.poll(() => selectedCount(page)).toBe(1);
+});
+
+test("modifier + shift-drag moves the selection instead of deselecting", async ({ page }) => {
+  await drawBox(page);
+  await page.locator("canvas.interactive").first().click({ position: { x: 5, y: 5 } });
+  await pickTool(page, "Rectangle");
+
+  await page.keyboard.down("ControlOrMeta");
+  await page.mouse.click(BOX_EDGE[0], BOX_EDGE[1]);
+  await expect.poll(() => selectedCount(page)).toBe(1);
+
+  const before = await page.evaluate(
+    () => (window as unknown as { h: { elements: { x: number }[] } }).h.elements[0].x,
+  );
+
+  await page.keyboard.down("Shift");
+  await page.mouse.move(BOX_EDGE[0], BOX_EDGE[1]);
+  await page.mouse.down();
+  await page.mouse.move(BOX_EDGE[0] + 60, BOX_EDGE[1], { steps: 10 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  await page.keyboard.up("ControlOrMeta");
+
+  // Still selected (not deselected by the shift), and actually moved.
+  await expect.poll(() => selectedCount(page)).toBe(1);
+  const after = await page.evaluate(
+    () => (window as unknown as { h: { elements: { x: number }[] } }).h.elements[0].x,
+  );
+  expect(after).toBeGreaterThan(before);
+});
