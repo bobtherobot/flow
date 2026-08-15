@@ -170,6 +170,13 @@ unlike `gridSize`, which does not. `appStatePrefs` gains `gridColor`.
 
 ## Fork edit (additive — 3 files)
 
+> **SUPERSEDED during execution:** this was actually **4 files**. A 4th file,
+> `packages/excalidraw/components/canvases/StaticCanvas.tsx`, needed
+> `gridColor` / `gridColorBold` added to `getRelevantAppStateProps` (the
+> `React.memo` comparator) — without it, an appState-only `updateScene` call
+> (no other tracked prop changing) never triggers a repaint, so the new grid
+> color silently fails to apply until something else forces a re-render.
+
 1. **`packages/excalidraw/types.ts`**
    - `AppState`: `gridColor?: string;` and `gridColorBold?: string;` beside the
      existing flow fields (~line 360).
@@ -184,6 +191,15 @@ unlike `gridSize`, which does not. `appStatePrefs` gains `gridColor`.
      sees no change. flow's inverted pair arrives via `flowSeedAppState`, which
      overrides these — the vendor default is not flow's default and is not
      expected to match it.
+
+     > **SUPERSEDED during execution:** ruled out as a Critical bug. Hardcoding
+     > light-theme literals here makes the `??` fallback in
+     > `renderer/staticScene.ts` permanently unreachable (the fields are never
+     > `undefined`), which paints a near-white grid on the fork's DARK theme.
+     > The shipped implementation drops these defaults entirely — `gridColor`
+     > / `gridColorBold` stay `undefined` in `getDefaultAppState` so the `??`
+     > in `staticScene.ts` resolves `GridLineColor[theme]` per theme, exactly
+     > as it did before this feature.
    - `APP_STATE_STORAGE_CONF` (~line 233): both as
      `{ browser: false, export: false, server: false }` — persistence is
      flow-owned, matching `laserColor` / `selectionMode`.

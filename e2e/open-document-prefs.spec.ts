@@ -12,6 +12,7 @@ const FOREIGN_DOC = JSON.stringify({
     selectionMode: "touch",
     laserColor: "#00ff00",
     bindingMode: "off",
+    gridColor: "#123456",
     viewBackgroundColor: "#ffe4e1",
   },
   files: {},
@@ -22,6 +23,8 @@ interface FlowGlobals {
   selectionMode?: string;
   laserColor?: string;
   bindingMode?: string;
+  gridColor?: string;
+  gridColorBold?: string;
   viewBackgroundColor?: string;
 }
 
@@ -33,6 +36,8 @@ function readAppState(page: Page): Promise<FlowGlobals> {
       selectionMode: state.selectionMode,
       laserColor: state.laserColor,
       bindingMode: state.bindingMode,
+      gridColor: state.gridColor,
+      gridColorBold: state.gridColorBold,
       viewBackgroundColor: state.viewBackgroundColor,
     };
   });
@@ -44,6 +49,16 @@ async function setGridSize(page: Page, value: number) {
   const input = page.getByLabel("Grid size");
   await input.fill(String(value));
   await input.blur();
+  await page.getByRole("button", { name: "Done" }).click();
+}
+
+async function setGridColor(page: Page, hex: string) {
+  await page.getByRole("menuitem", { name: "File" }).click();
+  await page.getByRole("menuitem", { name: "Preferences…" }).click();
+  await page.getByRole("button", { name: "Grid color" }).click();
+  const field = page.getByLabel("Grid color hex");
+  await field.fill(hex);
+  await field.press("Enter");
   await page.getByRole("button", { name: "Done" }).click();
 }
 
@@ -69,9 +84,11 @@ test("opening a foreign document does not override flow's global preferences", a
   // Wait for the app to be interactive before touching window.h (mount race).
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 
-  // Move grid size off both the flow default and the doc's value.
+  // Move grid size and grid color off both the flow default and the doc's value.
   await setGridSize(page, 40);
   await expect.poll(() => readAppState(page).then((s) => s.gridSize)).toBe(40);
+  await setGridColor(page, "#654321");
+  await expect.poll(() => readAppState(page).then((s) => s.gridColor)).toBe("#654321");
   const before = await readAppState(page);
 
   await openLocalDoc(page, FOREIGN_DOC);
@@ -86,4 +103,6 @@ test("opening a foreign document does not override flow's global preferences", a
   expect(after.selectionMode).toBe(before.selectionMode);
   expect(after.laserColor).toBe(before.laserColor);
   expect(after.bindingMode).toBe(before.bindingMode);
+  expect(after.gridColor).toBe(before.gridColor);
+  expect(after.gridColorBold).toBe(before.gridColorBold);
 });
