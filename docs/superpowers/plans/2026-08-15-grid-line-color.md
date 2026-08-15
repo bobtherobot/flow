@@ -395,6 +395,12 @@ git commit -m "feat(prefs): seed grid colors as flow-owned global appState"
 - Modify: `vendor/excalidraw/packages/excalidraw/appState.ts` (~line 91 and ~line 235)
 - Modify: `vendor/excalidraw/packages/excalidraw/renderer/staticScene.ts` (lines 57-69, 102-104, 123-125, 272-282)
 
+> **SUPERSEDED during execution:** this ended up as **4 files**, not 3. A 4th
+> file, `packages/excalidraw/components/canvases/StaticCanvas.tsx`, needed
+> `gridColor` / `gridColorBold` added to `getRelevantAppStateProps` (the
+> `React.memo` comparator) — otherwise an appState-only `updateScene` call
+> never triggers a repaint and the color change silently doesn't apply.
+
 **Interfaces:**
 - Consumes: nothing from earlier tasks (the fork holds no flow logic).
 - Produces: `appState.gridColor` and `appState.gridColorBold`, both `string | undefined`, honored by the static grid renderer. Task 6 writes them via `updateScene`.
@@ -436,6 +442,14 @@ In `vendor/excalidraw/packages/excalidraw/appState.ts`, after the `selectionMode
 ```
 
 Note these are **upstream's orientation** (bold darker) so a non-flow consumer sees no change. flow's inverted pair arrives via `flowSeedAppState` and overrides them — the vendor default is not flow's default and is not meant to match it.
+
+> **SUPERSEDED during execution:** ruled out as a Critical bug. These literals
+> make the `??` fallback in `renderer/staticScene.ts` permanently unreachable
+> (the fields would never be `undefined`), which paints a near-white grid on
+> the fork's DARK theme. The shipped implementation drops these defaults
+> entirely — `gridColor` / `gridColorBold` stay `undefined` in
+> `getDefaultAppState`, so `??` resolves `GridLineColor[theme]` per theme, same
+> as before this feature.
 
 After the `selectionMode` storage entry (~line 235):
 
