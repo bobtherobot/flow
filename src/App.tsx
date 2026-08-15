@@ -20,11 +20,12 @@ import {
   getLaserColor, setLaserColor,
   getSelectionMode, setSelectionMode,
   getGridSize, setGridSize,
+  getGridColor, setGridColor,
 } from "./app/preferences";
 import { type Unit } from "./lib/units";
 import { type BindingMode, isBindingActive, toggledBindingMode } from "./lib/binding-mode";
 import { type SelectionMode } from "./lib/selection-mode";
-import { clampGridSize } from "./lib/grid";
+import { clampGridSize, DEFAULT_GRID_COLOR, isGridColor, boldGridColor } from "./lib/grid";
 import { flowSeedAppState } from "./lib/flow-app-state";
 import { IndexedDbProvider } from "./storage/indexeddb-provider";
 import type { DocumentSummary } from "./storage/types";
@@ -236,10 +237,34 @@ export default function App() {
     excalidrawApi.updateScene({ appState: { gridSize } });
   }, [excalidrawApi, gridSize]);
 
+  // Grid color: flow's app-wide gridline color. Fork appState fields (absent
+  // from the vendor .d.ts) so updateScene needs the same cast as selectionMode
+  // and laserColor. Only gridColor is stored — gridColorBold is derived on every
+  // write, so the pair cannot drift.
+  const [gridColor, setGridColorState] = useState<string>(() => getGridColor());
+  const handleChangeGridColor = useCallback((next: string) => {
+    const color = isGridColor(next) ? next : DEFAULT_GRID_COLOR;
+    setGridColorState(color);
+    setGridColor(color);
+  }, []);
+  useEffect(() => {
+    if (!excalidrawApi) return;
+    excalidrawApi.updateScene({
+      appState: { gridColor, gridColorBold: boldGridColor(gridColor) },
+    } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
+  }, [excalidrawApi, gridColor]);
+
   // The app-wide preferences that get seeded into appState, gathered in one
   // place. `initialData` reads it at mount; File ▸ New re-seeds from the ref
   // (its callback is stable, and the values must be current at click time).
-  const appStatePrefs = { sloppiness, bindingMode, laserColor, selectionMode, gridSize };
+  const appStatePrefs = {
+    sloppiness,
+    bindingMode,
+    laserColor,
+    selectionMode,
+    gridSize,
+    gridColor,
+  };
   const appStatePrefsRef = useRef(appStatePrefs);
   appStatePrefsRef.current = appStatePrefs;
 
@@ -519,6 +544,8 @@ export default function App() {
           onChangeSelectionMode={handleChangeSelectionMode}
           gridSize={gridSize}
           onChangeGridSize={handleChangeGridSize}
+          gridColor={gridColor}
+          onChangeGridColor={handleChangeGridColor}
           laserColor={laserColor}
           onChangeLaserColor={handleChangeLaserColor}
           onShowShortcuts={handleShowShortcuts}
