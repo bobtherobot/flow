@@ -29,6 +29,10 @@ export interface PreferencesDialogProps {
   onChangeSelectionMode: (value: SelectionMode) => void;
   gridSize: number;
   onChangeGridSize: (value: number) => void;
+  /** Canvas grid line color as `#rrggbb` — a global preference. The bold
+   *  gridlines are derived from it, so there is only ever one control. */
+  gridColor: string;
+  onChangeGridColor: (value: string) => void;
   /** Laser-trail color as `#rrggbb` or `#rrggbbaa` — a global preference, never
    *  a per-element property, which is why it lives here and not in the Color panel. */
   laserColor: string;
@@ -56,6 +60,8 @@ export function PreferencesDialog({
   onChangeSelectionMode,
   gridSize,
   onChangeGridSize,
+  gridColor,
+  onChangeGridColor,
   laserColor,
   onChangeLaserColor,
   onShowShortcuts,
@@ -196,6 +202,17 @@ export function PreferencesDialog({
                   // defer, and persisting every frame gives a live grid preview
                   // while dragging.
                   onChange={(n) => onChangeGridSize(n)}
+                />
+              </div>
+            )}
+
+            {category === "general" && (
+              <div className="flow-num">
+                <span className="flow-num__label">Grid color</span>
+                <ColorSwatch
+                  value={gridColor}
+                  onChange={onChangeGridColor}
+                  ariaLabel="Grid color"
                 />
               </div>
             )}

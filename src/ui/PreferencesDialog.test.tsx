@@ -8,6 +8,7 @@ function setup(overrides = {}) {
   const onChangeUnits = vi.fn();
   const onChangeSelectionMode = vi.fn();
   const onChangeGridSize = vi.fn();
+  const onChangeGridColor = vi.fn();
   const onChangeLaserColor = vi.fn();
   const onShowShortcuts = vi.fn();
   const onClose = vi.fn();
@@ -21,6 +22,8 @@ function setup(overrides = {}) {
       onChangeSelectionMode={onChangeSelectionMode}
       gridSize={20}
       onChangeGridSize={onChangeGridSize}
+      gridColor="#dddddd"
+      onChangeGridColor={onChangeGridColor}
       laserColor="#ff0000"
       onChangeLaserColor={onChangeLaserColor}
       onShowShortcuts={onShowShortcuts}
@@ -33,6 +36,7 @@ function setup(overrides = {}) {
     onChangeUnits,
     onChangeSelectionMode,
     onChangeGridSize,
+    onChangeGridColor,
     onChangeLaserColor,
     onShowShortcuts,
     onClose,
@@ -131,6 +135,20 @@ describe("PreferencesDialog", () => {
     fireEvent.pointerUp(window, { clientY: 280 });
 
     expect(onChangeGridSize).toHaveBeenLastCalledWith(35);
+  });
+
+  it("shows the grid color swatch reflecting the current value", () => {
+    setup();
+    expect(screen.getByRole("button", { name: "Grid color" })).toBeInTheDocument();
+  });
+
+  it("fires onChangeGridColor with a hex committed from the picker", async () => {
+    const { onChangeGridColor } = setup();
+    await userEvent.click(screen.getByRole("button", { name: "Grid color" }));
+    const hex = screen.getByLabelText("Grid color hex");
+    await userEvent.type(hex, "#3366aa");
+    fireEvent.blur(hex);
+    expect(onChangeGridColor).toHaveBeenCalledWith("#3366aa");
   });
 
   it("shows the laser swatch and opacity reflecting the current color", () => {
