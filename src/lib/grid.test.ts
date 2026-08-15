@@ -5,6 +5,9 @@ import {
   DEFAULT_GRID_SIZE,
   clampGridSize,
   isGridSize,
+  DEFAULT_GRID_COLOR,
+  isGridColor,
+  boldGridColor,
 } from "./grid";
 
 describe("clampGridSize", () => {
@@ -47,5 +50,56 @@ describe("isGridSize", () => {
     expect(isGridSize(Number.NaN)).toBe(false);
     expect(isGridSize("20")).toBe(false);
     expect(isGridSize(null)).toBe(false);
+  });
+});
+
+describe("boldGridColor", () => {
+  it("lightens each channel by 8 from the default", () => {
+    // #dd = 221, +8 = 229 = #e5 — flow's bold lines are LIGHTER than the thin
+    // ones, deliberately inverting upstream Excalidraw.
+    expect(boldGridColor(DEFAULT_GRID_COLOR)).toBe("#e5e5e5");
+  });
+
+  it("lightens each channel independently", () => {
+    expect(boldGridColor("#001020")).toBe("#081828");
+  });
+
+  it("clamps at ff instead of wrapping around", () => {
+    expect(boldGridColor("#fefefe")).toBe("#ffffff");
+    expect(boldGridColor("#ffffff")).toBe("#ffffff");
+  });
+
+  it("accepts #rgb shorthand", () => {
+    // #abc expands to #aabbcc; aa+8=b2, bb+8=c3, cc+8=d4
+    expect(boldGridColor("#abc")).toBe("#b2c3d4");
+  });
+
+  it("strips an alpha channel", () => {
+    expect(boldGridColor("#dddddd80")).toBe("#e5e5e5");
+  });
+
+  it("uppercase input returns lowercase output", () => {
+    expect(boldGridColor("#DDDDDD")).toBe("#e5e5e5");
+  });
+
+  it("returns the derived default for unparseable input", () => {
+    expect(boldGridColor("banana")).toBe("#e5e5e5");
+    expect(boldGridColor("")).toBe("#e5e5e5");
+  });
+});
+
+describe("isGridColor", () => {
+  it("accepts 3-, 6-, and 8-digit hex", () => {
+    expect(isGridColor("#abc")).toBe(true);
+    expect(isGridColor("#dddddd")).toBe(true);
+    expect(isGridColor("#ddddddff")).toBe(true);
+  });
+
+  it("rejects non-hex and non-strings", () => {
+    expect(isGridColor("dddddd")).toBe(false);
+    expect(isGridColor("#gggggg")).toBe(false);
+    expect(isGridColor("banana")).toBe(false);
+    expect(isGridColor(null)).toBe(false);
+    expect(isGridColor(20)).toBe(false);
   });
 });
