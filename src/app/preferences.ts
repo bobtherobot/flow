@@ -14,7 +14,13 @@ import {
   isSelectionMode,
   type SelectionMode,
 } from "../lib/selection-mode";
-import { clampGridSize, isGridSize, DEFAULT_GRID_SIZE } from "../lib/grid";
+import {
+  clampGridSize,
+  isGridSize,
+  DEFAULT_GRID_SIZE,
+  DEFAULT_GRID_COLOR,
+  isGridColor,
+} from "../lib/grid";
 import { normalizePalettes, scrubHex, type ColorPalette } from "../lib/color-palettes";
 
 const SLOPPINESS_KEY = "flow.sloppiness";
@@ -219,6 +225,31 @@ export function getLaserColor(): string {
 export function setLaserColor(color: string): void {
   try {
     localStorage.setItem(LASER_COLOR_KEY, color);
+  } catch {
+    // Quota / disabled storage: preference simply won't persist this session.
+  }
+}
+
+const GRID_COLOR_KEY = "flow.gridColor";
+
+/** Read the app-wide grid-line color (default on miss/corrupt). */
+export function getGridColor(): string {
+  try {
+    const raw = localStorage.getItem(GRID_COLOR_KEY);
+    return isGridColor(raw) ? (scrubHex(raw) ?? DEFAULT_GRID_COLOR) : DEFAULT_GRID_COLOR;
+  } catch {
+    return DEFAULT_GRID_COLOR;
+  }
+}
+
+/** Persist the app-wide grid-line color, normalized to canonical `#rrggbb`.
+ *  An unparseable value is dropped rather than stored, so a bad write can never
+ *  poison the next read. */
+export function setGridColor(color: string): void {
+  const hex = isGridColor(color) ? scrubHex(color) : null;
+  if (!hex) return;
+  try {
+    localStorage.setItem(GRID_COLOR_KEY, hex);
   } catch {
     // Quota / disabled storage: preference simply won't persist this session.
   }

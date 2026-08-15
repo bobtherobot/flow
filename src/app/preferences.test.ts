@@ -7,6 +7,7 @@ import {
   getLaserColor, setLaserColor,
   getSelectionMode, setSelectionMode,
   getGridSize, setGridSize,
+  getGridColor, setGridColor,
   getColorPalettes,
   setColorPalettes,
   getDefaultPaletteId,
@@ -20,6 +21,7 @@ import {
 import { DEFAULT_TOOLBAR_STATE, DEFAULT_SHAPEBAR_STATE } from "../ui/toolbar/toolbar-state";
 import { DEFAULT_QUICKBAR_STATE } from "../ui/quickbar/quickbar-state";
 import { DEFAULT_LASER_HEX } from "../lib/laser-color";
+import { DEFAULT_GRID_COLOR } from "../lib/grid";
 
 // Mock localStorage with a simple in-memory implementation
 const mockStorage: Record<string, string> = {};
@@ -275,6 +277,34 @@ describe("color numeric mode", () => {
   it("rejects an unknown stored mode", () => {
     localStorage.setItem("flow.colorNumericMode", "cmyk");
     expect(getColorNumericMode()).toBe("hsla");
+  });
+});
+
+describe("grid color persistence", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("returns the default when unset", () => {
+    expect(getGridColor()).toBe(DEFAULT_GRID_COLOR);
+  });
+
+  it("round-trips a valid value", () => {
+    setGridColor("#3366aa");
+    expect(getGridColor()).toBe("#3366aa");
+  });
+
+  it("falls back to the default on a corrupt stored value", () => {
+    localStorage.setItem("flow.gridColor", "banana");
+    expect(getGridColor()).toBe(DEFAULT_GRID_COLOR);
+  });
+
+  it("normalizes a valid non-canonical value on write", () => {
+    setGridColor("#ABC");
+    expect(getGridColor()).toBe("#aabbcc");
+  });
+
+  it("ignores an invalid value on write rather than storing it", () => {
+    setGridColor("nope");
+    expect(getGridColor()).toBe(DEFAULT_GRID_COLOR);
   });
 });
 
