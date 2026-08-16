@@ -221,6 +221,14 @@ test("modifier + shift-click on an already-selected element removes it", async (
 });
 
 test("modifier + shift-drag moves the selection instead of deselecting", async ({ page }) => {
+  // Note on what this does and does not prove: unlike the two shift tests
+  // above, this one passed BEFORE the deep-select shift fix as well as after,
+  // so it has no RED proof of its own and is not evidence that the shift branch
+  // works. What it guards is the pointerdown/pointerup split — deselection is
+  // owned by the pointerup handler alone, gated on `!drag.hasOccurred`. Handle
+  // it at pointerdown too (a tempting "tidy", see [[tool-override]]) and this
+  // test goes red while the two above stay green. Keep it; do not read it as
+  // coverage of the shift branch.
   await drawBox(page);
   await page.locator("canvas.interactive").first().click({ position: { x: 5, y: 5 } });
   await pickTool(page, "Rectangle");
@@ -354,8 +362,49 @@ test("the snap toggle, switched on through the real menu, still produces guides 
   await page.mouse.up();
 });
 
-/** Turn grid mode on via the real View menu. */
+test("the snap toggle stays on while the modifier is held", async ({ page }) => {
+  // The third cell of the toggle × modifier matrix, and the common one. The two
+  // tests above each differ from this in *two* variables (OFF+held, ON+unheld),
+  // so neither isolates the modifier: together they prove "the modifier cannot
+  // force snapping ON" and "the ON toggle works", but nothing covered ON+held —
+  // the user with Snap to Objects enabled who holds the override. For them the
+  // pre-fix inversion in vendor snapping.ts's isSnappingEnabled read
+  // `!objectsSnapModeEnabled` and presented as "snapping stops working when I
+  // hold Cmd," which is the more frequent complaint of the two.
+  await ensureObjectSnapOff(page);
+  await ensureObjectSnapOn(page);
+  await drawBox(page);
+  await drawSecondBox(page);
+  await page.locator("canvas.interactive").first().click({ position: { x: 5, y: 5 } });
+  await pickTool(page, "Rectangle");
+
+  // Same drag geometry as both sibling tests, so the only variable that differs
+  // from the ON+unheld test is the held modifier.
+  await page.keyboard.down("ControlOrMeta");
+  await page.mouse.move(BOX2_EDGE[0], BOX2_EDGE[1]);
+  await page.mouse.down();
+  await page.mouse.move(BOX_EDGE[0] + 2, BOX_EDGE[1] + 2, { steps: 12 });
+
+  // Assert mid-drag: snapLines is only populated during an active drag.
+  expect(await snapLineCount(page)).toBeGreaterThan(0);
+
+  await page.mouse.up();
+  await page.keyboard.up("ControlOrMeta");
+});
+
+/** Turn grid mode on via the real View menu if it is currently off. */
 async function enableGridMode(page: Page) {
+  // Read-then-act, matching ensureObjectSnapOff/On above. An unconditional
+  // click is a toggle, so it would silently turn grid mode *off* the moment
+  // flow's default flips or state leaks in from storage.
+  const enabled = await page.evaluate(
+    () =>
+      (window as unknown as { h?: { state?: { gridModeEnabled?: boolean } } }).h
+        ?.state?.gridModeEnabled ?? false,
+  );
+  if (enabled) {
+    return;
+  }
   await page.getByRole("menuitem", { name: "View" }).click();
   await page.getByRole("menuitemcheckbox", { name: "Grid", exact: true }).click();
   await expect
@@ -375,26 +424,67 @@ test("holding the modifier does not bypass grid snapping", async ({ page }) => {
   await page.locator("canvas.interactive").first().click({ position: { x: 5, y: 5 } });
   await pickTool(page, "Rectangle");
 
-  // Drag by a deliberately non-grid-multiple offset with the modifier held.
+  // Grid mode is enabled before the box is drawn, so the box starts already
+  // grid-aligned — `x % gridSize === 0` on its own would therefore still pass if
+  // the gesture moved nothing at all. That is not hypothetical: cmd-drag failing
+  // to move the element is the exact regression fixed earlier in this same
+  // feature family ("holding the modifier lets you drag a shape to move it"
+  // above). Every gesture below is bracketed by a before/after read so a
+  // no-op cannot masquerade as a snap.
+  const geometry = () =>
+    page.evaluate(() => {
+      const h = (
+        window as unknown as {
+          h: {
+            elements: { x: number; y: number }[];
+            state: { gridSize: number };
+          };
+        }
+      ).h;
+      return {
+        x: h.elements[0].x,
+        y: h.elements[0].y,
+        gridSize: h.state.gridSize,
+      };
+    });
+
+  const start = await geometry();
+
   await page.keyboard.down("ControlOrMeta");
   await page.mouse.click(BOX_EDGE[0], BOX_EDGE[1]);
   await expect.poll(() => selectedCount(page)).toBe(1);
+
+  // Gesture 1 — RESIZE. BOX_EDGE is the midpoint of the box's left edge, which
+  // once the box is selected is the west resize handle, not its interior. So
+  // this drag resizes from the left: it changes `x` (and width) and leaves `y`
+  // alone by construction. Asserting on `y` here would be vacuous.
   await page.mouse.move(BOX_EDGE[0], BOX_EDGE[1]);
   await page.mouse.down();
   await page.mouse.move(BOX_EDGE[0] + 47, BOX_EDGE[1] + 33, { steps: 10 });
   await page.mouse.up();
+
+  const resized = await geometry();
+  expect(resized.x).not.toBe(start.x);
+  expect(resized.x % resized.gridSize).toBe(0);
+
+  // Gesture 2 — MOVE. Press inside the selection's bounding box instead of on a
+  // handle, which drags the whole selection. This is the gesture the 2026-08-14
+  // drag fix restored, and the only one that can exercise grid snapping on both
+  // axes. Offsets are deliberately non-multiples of the grid.
+  const mid = { x: (BOX[0] + BOX[2]) / 2, y: (BOX[1] + BOX[3]) / 2 };
+  await page.mouse.move(mid.x, mid.y);
+  await page.mouse.down();
+  await page.mouse.move(mid.x + 47, mid.y + 33, { steps: 10 });
+  await page.mouse.up();
   await page.keyboard.up("ControlOrMeta");
 
-  const { x, y, gridSize } = await page.evaluate(() => {
-    const h = (
-      window as unknown as {
-        h: { elements: { x: number; y: number }[]; state: { gridSize: number } };
-      }
-    ).h;
-    return { x: h.elements[0].x, y: h.elements[0].y, gridSize: h.state.gridSize };
-  });
+  const moved = await geometry();
 
-  // The drop position must land on the grid despite the held modifier.
-  expect(x % gridSize).toBe(0);
-  expect(y % gridSize).toBe(0);
+  // It actually moved, on both axes...
+  expect(moved.x).not.toBe(resized.x);
+  expect(moved.y).not.toBe(resized.y);
+
+  // ...and landed on the grid despite the held modifier.
+  expect(moved.x % moved.gridSize).toBe(0);
+  expect(moved.y % moved.gridSize).toBe(0);
 });
