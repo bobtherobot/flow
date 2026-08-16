@@ -15,9 +15,9 @@
 // Requires Node 20–22 to install/build the submodule (upstream's engine cap
 // rejects newer Node; `.nvmrc` pins 22). This script does not switch Node
 // versions for you — use nvm (`nvm use`) first if your shell defaults newer.
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -122,6 +122,105 @@ if (missing.length > 0) {
   );
 }
 
+// ── 5. Deletion-shaped fork-edit survival ───────────────────────────────────
+// Stage 4 can only express *additive* fork edits: it asserts a symbol is
+// PRESENT in the built output. The `feat/cmd-modifier-semantics` work is the
+// opposite shape — it DELETES upstream expressions (20 sites that let a held
+// cmd/ctrl bypass grid snapping). A replay that silently restores one of those
+// bypasses produces no missing symbol, no merge conflict, and no test failure
+// behind all but one site, so stage 4 is structurally blind to it.
+//
+// This check therefore runs against the fork SOURCE, not the built artifact: a
+// deletion has no footprint in `dist/` to assert on. It looks for the removed
+// idiom — `event[KEYS.CTRL_OR_CMD]` feeding `getEffectiveGridSize()` or a
+// `snapToGrid` argument — within a 3-line window, which is enough to span the
+// multi-line ternaries upstream formats these as. Comment lines are skipped so
+// the `flow:` markers that document each deletion don't trip it.
+//
+// A small number of sites were DELIBERATELY left: they are reachable only while
+// a multi-point element is being drawn, and `canEngage`
+// (src/ui/toolbar/tool-override.ts) refuses to engage the override when
+// `multiElement` is set, so the modifier is never held through them. They are
+// allowlisted per file with an exact expected count, so removing one is fine
+// but adding one anywhere fails the build.
+const GRID_BYPASS_IDIOM = /getEffectiveGridSize|snapToGrid/;
+const GRID_BYPASS_ALLOWED = new Map([
+  [
+    "packages/element/src/linearElementEditor.ts",
+    {
+      count: 2,
+      why: "handlePointerMoveInEditMode — mid-draw only; canEngage bails on multiElement",
+    },
+  ],
+  [
+    "packages/excalidraw/actions/actionFinalize.tsx",
+    {
+      count: 1,
+      why: "actionFinalize — finishing an in-progress multi-point draw; same reachability",
+    },
+  ],
+]);
+
+const collectGridBypasses = (dir, found = []) => {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules" || entry.name === "dist" || entry.name === ".git") {
+        continue;
+      }
+      collectGridBypasses(path, found);
+      continue;
+    }
+    if (!/\.tsx?$/.test(entry.name)) {
+      continue;
+    }
+    const lines = readFileSync(path, "utf8").split("\n");
+    lines.forEach((line, i) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("//") || trimmed.startsWith("*")) {
+        return; // a `flow:` comment describing the deletion, not the idiom
+      }
+      if (!line.includes("CTRL_OR_CMD")) {
+        return;
+      }
+      if (GRID_BYPASS_IDIOM.test(lines.slice(i, i + 3).join("\n"))) {
+        found.push({ file: relative(vendor, path), line: i + 1, text: trimmed });
+      }
+    });
+  }
+  return found;
+};
+
+const bypasses = collectGridBypasses(join(vendor, "packages"));
+const byFile = new Map();
+for (const hit of bypasses) {
+  byFile.set(hit.file, [...(byFile.get(hit.file) ?? []), hit]);
+}
+
+const unexpected = [...byFile].flatMap(([file, hits]) => {
+  const allowed = GRID_BYPASS_ALLOWED.get(file)?.count ?? 0;
+  return hits.length > allowed ? [{ file, allowed, hits }] : [];
+});
+
+if (unexpected.length > 0) {
+  die(
+    `cmd/ctrl grid-snap bypass reappeared in the fork source — an upstream ` +
+      `replay probably restored a deletion this fork made on purpose ` +
+      `(see .claude/memory/tool-override.md, "Cmd/Ctrl means one thing"):\n` +
+      unexpected
+        .map(
+          ({ file, allowed, hits }) =>
+            `  - ${file}: ${hits.length} site(s), ${allowed} allowed\n` +
+            hits.map((h) => `      ${h.file}:${h.line}  ${h.text}`).join("\n"),
+        )
+        .join("\n") +
+      `\n\n  Drop the \`event[KEYS.CTRL_OR_CMD]\` term (keep any elbow-arrow ` +
+      `exemption) and re-add a \`flow:\` comment at each site.`,
+  );
+}
+
 console.log(
-  `[build:excalidraw] done — ${FORK_EDITS.length} fork edits verified in the built declarations.`,
+  `[build:excalidraw] done — ${FORK_EDITS.length} fork edits verified in the ` +
+    `built declarations, and no cmd/ctrl grid-snap bypass in the fork source ` +
+    `(${bypasses.length} allowlisted mid-draw site(s) skipped).`,
 );
