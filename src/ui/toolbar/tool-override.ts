@@ -32,12 +32,16 @@ export interface OverrideState {
  * branch prevents a concrete failure, not a hypothetical one:
  *
  * - `selection` — nothing to suspend.
- * - `image` — the restore would call `setActiveTool({type:"image"})`, which
- *   re-fires `onImageAction` and re-opens the OS file picker (vendor
- *   `App.tsx:4741`).
- * - pointer down / `newElement` / `multiElement` — the vendor reads Cmd
- *   mid-drag to bypass grid snapping and to close elbow arrows; stealing the
- *   tool mid-gesture would break drawing outright.
+ * - `image` — the restore would call `setActiveTool({type:"image"})`, whose
+ *   `nextActiveTool.type === "image"` branch calls `onImageToolbarButtonClick`
+ *   and re-opens the OS file picker (vendor `App.tsx`, ~6069 / ~12827).
+ * - pointer down / `newElement` / `multiElement` — stealing the tool mid-gesture
+ *   would break drawing outright. The vendor reads Cmd mid-drag to close elbow
+ *   arrows, and the mid-draw grid-snap bypasses that `feat/cmd-modifier-semantics`
+ *   deliberately left in place (`handlePointerMoveInEditMode`, `actionFinalize`)
+ *   are only safe *because* this guard makes them unreachable. It used to also
+ *   say "to bypass grid snapping" generally; that is no longer true of the
+ *   reachable paths — see [[tool-override]].
  * - text editing, or a key aimed at a text field — the modifier belongs to
  *   whatever the user is typing into.
  */

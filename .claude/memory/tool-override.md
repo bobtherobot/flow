@@ -4,20 +4,45 @@ Illustrator-style temporary tool override plus a permanently-on tool lock.
 Spec/plan: `docs/superpowers/specs/2026-08-07-tool-override-design.md`,
 `docs/superpowers/plans/2026-08-07-tool-override.md`. Branch `feat/tool-override`.
 
+> **On the vendor line numbers in this file.** It carries roughly a dozen
+> `vendor/excalidraw` line references, and an upstream replay invalidates all of
+> them at once with nothing to detect it. The references touched during the
+> 2026-08-16 fix wave were re-verified against the tree at that time: the
+> image-tool guard, the deep-select block, the deselection split, the
+> grid/snap site lists, the `withCmdOrCtrl` note, and the move-cursor gate.
+> **Re-verified again on 2026-08-17**, because this branch's own `flow:`
+> comment insertions shifted every reference below `App.tsx:10789` by about 5
+> lines: the image-tool guard, the `withCmdOrCtrl` note, and the deselection
+> split were corrected to their current line numbers. The move-cursor gate
+> (`~App.tsx:8110`/`~8124`) and the grid/snap site lists sit above that shift
+> point and were unaffected. **Every other line number here is presumed stale
+> since the 2026-08-11 upstream replay** — trust the symbol name, grep for it,
+> and treat any bare number as a hint, not a promise of precision. Where a
+> reference was corrected in the 2026-08-16 or 2026-08-17 pass it now leads
+> with a symbol and keeps the number only as a parenthetical.
+
 **Status: shipped, including a final-review fix wave and a corrective pass on
-top of that.** Unit suite green (640/640), e2e fully green (113/113). A
-regression was found mid-branch (forcing the tool lock on silently killed
-auto-select-on-draw app-wide), root-caused, fixed with a deliberate two-site
-fork edit, and the four e2e tests it took down were updated to the new
-workflow. See "The regression and its fix" below — this is the highest-value
-section for anyone touching this feature again. A later whole-branch review
-then found a **third** site with the same conflation, a `Q`-shortcut escape
-hatch, and a style-memory interaction the override made newly reachable — see
+top of that, plus a third pass (2026-08-15) reducing Cmd/Ctrl to one canvas
+meaning.** Unit suite green (640/640 at ship, 1219/1219 as of the third
+pass), e2e fully green (113/113 at ship; 183/185 after the third pass's
+2026-08-16 fix wave, the 2 failures pre-existing in `text-panel.spec.ts`). A regression was found
+mid-branch (forcing the tool lock on silently killed auto-select-on-draw
+app-wide), root-caused, fixed with a deliberate two-site fork edit, and the
+four e2e tests it took down were updated to the new workflow. See "The
+regression and its fix" below — this is the highest-value section for anyone
+touching this feature again. A later whole-branch review then found a
+**third** site with the same conflation, a `Q`-shortcut escape hatch, and a
+style-memory interaction the override made newly reachable — see
 "Final-review fix wave" below. A **re-review of that wave** then found the
 `Q` swallow still ate the letter in flow's own search boxes, and — more
 seriously — that the style-memory fix in that wave did not work and opened a
 second corruption path; see "Corrective pass" below, which supersedes the
-"One known, accepted residual" paragraph in the final-review section.
+"One known, accepted residual" paragraph in the final-review section. A
+**third pass** (branch `feat/cmd-modifier-semantics`, 2026-08-15) found that
+the same modifier conflation which caused the original regression was not
+fully closed — three more upstream behaviours were still permanently on
+during selection work. See "Cmd/Ctrl means one thing" below, the section to
+read before touching anything Cmd/Ctrl-gated in this feature again.
 
 ## Shipped
 - `src/ui/toolbar/tool-override.ts` — pure: `overrideKeyFor(platform)` (Meta on
@@ -79,15 +104,29 @@ second corruption path; see "Corrective pass" below, which supersedes the
   {selectedElementIds, selectedGroupIds, editingGroupId}})` puts it back.
   Selection is read FRESH at release — an engage-time snapshot would clobber
   an undo made mid-hold.
-- **Never `setActiveTool({type:"image"})` from this feature** — it re-fires
-  `onImageAction` and re-opens the OS file picker (vendor `App.tsx:4741`,
-  inside `setActiveTool`'s `if (nextActiveTool.type === "image")` branch).
+- **Never `setActiveTool({type:"image"})` from this feature** — it re-fires the
+  image picker. In vendor `App.tsx`, `setActiveTool`'s
+  `if (nextActiveTool.type === "image")` branch calls
+  `onImageToolbarButtonClick`, which opens the OS file picker (~`App.tsx:6069`
+  for the branch, ~`12832` for the method; re-verified 2026-08-17 — was stale at
+  `App.tsx:4741`, another casualty of the 2026-08-11 replay's line churn, then
+  drifted again to `12827` by this branch's own comment insertions).
   Both the engage guard (`canEngage`) and the lock normalizer skip the image
-  tool for this reason.
-- **Don't engage mid-gesture.** The vendor reads Cmd during a drag to bypass
-  grid snapping and to close elbow arrows, so `canEngage` bails on
-  `cursorButton === "down"`, `newElement`, and `multiElement`. (It no longer
-  reads Cmd to suppress dragging — see the drag fix above.)
+  tool for this reason. `src/ui/toolbar/tool-override.ts`'s own JSDoc carried
+  the same stale `4741` and was corrected in the same pass.
+- **Don't engage mid-gesture.** `canEngage` bails on `cursorButton === "down"`,
+  `newElement`, and `multiElement`. **Amended 2026-08-16:** the recorded
+  justification used to be "the vendor reads Cmd during a drag to bypass grid
+  snapping and to close elbow arrows." The grid-snapping half is no longer true
+  — removing exactly that bypass is what the 2026-08-15 pass did (see "Cmd/Ctrl
+  means one thing"). **The elbow-arrow half is still real, and so is a third
+  reason the original wording missed: the mid-draw sites this branch
+  deliberately left unfixed (`handlePointerMoveInEditMode`, `actionFinalize`)
+  are only safe to leave *because* `multiElement` blocks engagement.** So the
+  guard is now load-bearing in both directions — do not remove it on the
+  grounds that "the grid reason is gone." (It also no longer reads Cmd to
+  suppress dragging — see the drag fix above; that half was superseded on
+  2026-08-14.)
 - Related: [[vertical-toolbar]] (the rail this padlock left),
   [[quick-actions-bar]], [[view-menu-toggles]].
 
@@ -336,6 +375,279 @@ capture that was explicitly out of scope. This residual is reachable only via
 the override and degrades to stock Excalidraw behavior (a style edit follows
 into the next drawn element).
 
+## Cmd/Ctrl means one thing (2026-08-15)
+
+**The pattern, stated once and plainly.** flow reserves Cmd/Ctrl for this
+feature's temporary selection tool, which means the modifier is held for a
+*whole interaction* — press, drag, release — not tapped for an instant the
+way upstream's own Cmd/Ctrl gestures assume. Every upstream behaviour gated
+on that modifier is therefore permanently on during selection work instead of
+being the opt-in gesture it was designed as. This is the same root cause as
+"The regression, and its fix" above (that one was `activeTool.locked` gating
+two behaviours; this one is `event[KEYS.CTRL_OR_CMD]` gating several) — and it
+is not a one-time cleanup. Three instances have now been found and removed on
+three separate days: drag suppression (2026-08-14, see the gotcha above),
+deep-select swallowing shift, and the two snap overrides (both below).
+**Anyone finding a fourth collision should expect it to present as "feature X
+is always on while selecting," not as an obvious bug report** — the symptom
+reads as a feature working "too well," not as broken.
+
+**That prediction was correct, and here is the collision it predicted — known,
+named, and deliberately NOT fixed on this branch.** See "The fifth collision:
+arrow binding" at the end of this section.
+
+Three parts landed on this branch, all in `vendor/excalidraw`:
+
+- **Part A — deep-select swallowed shift** (`components/App.tsx`, the
+  `if (event[KEYS.CTRL_OR_CMD])` "deep selection" block at line 9549, fixed at
+  line 9568, submodule `c369dbaa`). Upstream's Cmd/Ctrl-click branch replaced
+  `selectedElementIds` wholesale via `editGroupForSelectedElement` and
+  returned before the shift-aware path lower in the same handler ever ran —
+  so shift-click while the modifier-held selection tool was active could
+  never extend a selection, only replace it. Fixed by adding a
+  `event.shiftKey` sub-branch ahead of the existing unconditional call; the
+  non-shift path and the `event.altKey` lasso sub-branch above it are
+  byte-identical to upstream.
+- **Part B1 — snapping.ts inverted the toggle** (`snapping.ts:178`,
+  `isSnappingEnabled`, submodule `004a0732`). Upstream read
+  `!app.state.objectsSnapModeEnabled` while Cmd/Ctrl was held — a
+  hold-to-invert gesture for a modifier flow never releases mid-selection, so
+  Snap to Objects was permanently backwards during selection work. Deleted;
+  snapping now follows the toggle alone (View ▸ Snap to Objects, the quickbar
+  toggle, `Alt+S`).
+- **Part B2 — grid snap bypass, 21 sites in 2 files** (`components/App.tsx` and
+  `packages/element/src/linearElementEditor.ts`; submodule `95680cf` for the
+  first 15, plus the 2026-08-16 fix wave for the rest). Upstream bypassed
+  `getEffectiveGridSize()` — passed `null` instead — whenever Cmd/Ctrl was
+  held, so grid snap was permanently off during selection work. All dropped the
+  Cmd/Ctrl term; grid snap now follows View ▸ Grid alone. Breakdown:
+  - `App.tsx`, **16**: 1 compound guard, 9 inline `getEffectiveGridSize()`
+    calls, 5 `lastPointerDownEvent`-derived call sites, and 1 negated boolean
+    argument — `LinearElementEditor.addMidpoint(..., !event[KEYS.CTRL_OR_CMD],
+    ...)`, whose 4th parameter is `snapToGrid`. That last one now passes `true`.
+  - `linearElementEditor.ts`, **5**: `handlePointerMove` (×2),
+    `handlePointDragging` (×2), `handlePointerDown`'s alt-click add-point (×1)
+    — linear-editor point drag and add-point, all reachable with the selection
+    tool. `addMidpoint`'s own
+    `snapToGrid && !isElbowArrow(element) ? ... : null` was left
+    byte-identical (the elbow exemption is upstream's, and `snapToGrid` is now
+    always `true` from the one caller); it carries a `flow:` comment only.
+
+  **Deliberately NOT fixed — three sites, and this is not an oversight.**
+  `linearElementEditor.ts`'s `handlePointerMoveInEditMode` (×2, one of them the
+  `event[KEYS.CTRL_OR_CMD] || isElbowArrow(element)` compound) and
+  `actions/actionFinalize.tsx`'s `effectiveGridSize` ternary. All three are
+  reached only while a multi-point element is *being drawn*, and `canEngage`
+  (`src/ui/toolbar/tool-override.ts`) refuses to engage the override when
+  `multiElement` is set — so the modifier is never held through them under
+  flow's model, and there they are still upstream's opt-in gesture. Leaving
+  them keeps the fork diff smaller and preserves upstream behaviour where flow
+  has no claim on it. They are allowlisted by name and exact count in
+  `scripts/build-excalidraw.mjs`'s stage 5 (below); adding a new one anywhere
+  fails the build.
+
+  **How this was missed the first time.** The original sweep was scoped to
+  `App.tsx`, so its exhaustion greps could only ever be exhaustive *within* that
+  file — a grep that proves "no more sites here" says nothing about the other
+  file with the identical idiom. The `addMidpoint` argument was missed for a
+  second, independent reason: it is a negated boolean, not a
+  `getEffectiveGridSize()` call, so a call-shaped grep could not see it. The
+  concrete symptom while it stood: `App.tsx`'s neighbouring *elbow*-midpoint
+  path (the `getGridPoint` call in the pointermove handler, ~10645) had been
+  fixed, so two adjacent midpoint paths disagreed — with grid on and the
+  modifier held, dragging an arrow endpoint or adding a segment midpoint landed
+  off-grid while every other drag snapped.
+
+- **Automated survival check for the deletions** (`scripts/build-excalidraw.mjs`,
+  stage 5, added 2026-08-16). The pre-existing stage 4 asserts a *symbol is
+  present* in the built declarations, which can only express additive fork
+  edits; 23 load-bearing deletions have no footprint in `dist/` to assert on.
+  Stage 5 therefore scans the fork **source** for the removed idiom
+  (`CTRL_OR_CMD` within 3 lines of `getEffectiveGridSize`/`snapToGrid`, comment
+  lines skipped) and fails the build if any file exceeds its allowlisted count.
+  Proven in both directions: passes on the post-fix tree, and reverting one
+  site produced `EXIT=1` with the offending file, line and text named.
+
+**That deselection stays at pointerup on purpose.** The deep-select fix's own
+`flow:` comment calls this out explicitly. The path it means is the
+**shift-click deselect** inside `handleCanvasPointerUp`: the gate
+`if (hitElement && !pointerDownState.drag.hasOccurred && ...)` followed by
+`if (childEvent.shiftKey && !this.state.selectedLinearElement?.isEditing)`, and
+inside it the `// remove element from selection while keeping prev elements
+selected` `setState` that `delete`s the id. Grep for that comment —
+`components/App.tsx` ~12266 for the gate, ~12318 for the removal, verified
+2026-08-17 (both had drifted by 5 lines from the 2026-08-16 figures of
+~12261/~12313 due to this branch's own comment insertions). A click that
+didn't drag deselects; a click that did drag doesn't.
+
+> **Corrected 2026-08-16 — this paragraph previously cited the wrong block.**
+> It pointed at `App.tsx:12459-12466` "gated on `!drag.hasOccurred` (12432)".
+> That range is a *different* thing: the **clear-all** block
+> (`// Deselect selected elements`, which resets `selectedElementIds` to `{}`)
+> and it has no `shiftKey` condition at all — it is the click-on-empty-canvas /
+> click-the-bounding-box path. That citation was introduced by this very branch
+> (`ab2dd14`) and is more dangerous than an ordinary stale ref, because the
+> wrong target is superficially plausible: it *is* in the pointerup handler, it
+> *is* gated on `!drag.hasOccurred`, and it *is* about deselecting. A future
+> editor "tidying" the two into consistency would be reading the wrong code.
+
+This is deliberately **not** also handled at pointerdown, even though the Part A
+fix sits in a pointerdown branch: toggling deselection at both points would
+double-toggle, and the concrete failure would be shift+**drag** silently
+deselecting instead of moving the selection. **This is the single most likely
+thing for a future editor to "tidy" into a bug** — it looks like an
+inconsistency (why doesn't the click branch handle its own deselection?) but
+the split is load-bearing. `e2e/tool-override.spec.ts`'s "modifier + shift-drag
+moves the selection instead of deselecting" is the guard, and its own comment
+records that it is a guard for *this split*, not for the shift branch.
+
+**Group drilling on Cmd-click was deliberately kept**, not folded into this
+cleanup. `App.tsx:9549`'s `if (event[KEYS.CTRL_OR_CMD])` block still drills
+into a group and selects the child element regardless of a normal click's
+group-respecting behavior — this was already an accepted trade-off (see
+"Accepted trade-offs" at the bottom of this file) and stays permanently
+active while the modifier is held, same as before. "Remove it entirely, drill
+via double-click instead" was explicitly on the table and not taken — the
+design doc records both options and the call to keep it. Double-click drilling
+already exists independently, unaffected by this change:
+`App.tsx`'s `handleCanvasDoubleClick` (~line 7011), the
+`selectedGroupIds.length > 0` branch at ~line 7148, which drills into an
+*already-selected* group on double-click. The two are complementary, not
+duplicates — Cmd-click drills from a hit-test with nothing selected yet,
+double-click drills further into a group you're already inside.
+
+**The compound-guard trap.** One of the `App.tsx` grid sites (inside
+`PointerDownState`'s `originInGrid` computation, ~`App.tsx:9174`) read
+`event[KEYS.CTRL_OR_CMD] || isElbowArrowOnly ? null : this.getEffectiveGridSize()`
+— two independent reasons to bypass grid snap, only one of them flow's to
+remove. The fix drops only the `event[KEYS.CTRL_OR_CMD] ||` term, leaving
+`isElbowArrowOnly ? null : ...` untouched — elbow arrows keep their own
+grid-snap bypass, unrelated to the modifier conflation. Five lines above, in
+the same object literal, `withCmdOrCtrl: event[KEYS.CTRL_OR_CMD]` was
+deliberately left alone — that field feeds marquee select-through (read at
+pointerup, the other consumer of `withCmdOrCtrl`) and is out of scope for
+this fix. A sweep that pattern-matched "remove the Cmd/Ctrl term" without
+reading each site would have caught the `isElbowArrowOnly` term too, or
+missed that `withCmdOrCtrl` sits right next to the thing that needed fixing.
+
+**The fork footprint change, and why it matters differently than past fork
+edits.** This is the first *deletion-shaped* work on this feature. Every fork
+edit before it either added a field (arrowhead size, laser color, grid color)
+or dropped a single clause at one site (the 2026-08-14 drag-suppression fix).
+This pass modifies **23 pre-existing upstream expressions in place across 3
+files** — `components/App.tsx` (17: 16 grid + 1 deep-select shift),
+`packages/element/src/linearElementEditor.ts` (5 grid), and `snapping.ts` (1
+object-snap) — which means an upstream replay will surface these as **merge
+conflicts**, not clean insertions: the lines this branch touches are lines
+upstream is also likely to keep touching. Every site carries a `flow:` comment
+for exactly this reason — a future replay can `grep -n "flow:"` all three files
+and re-apply each deletion by hand against the new upstream text, since a
+mechanical patch apply is not expected to succeed cleanly here the way it has
+for prior fork edits on this feature. `scripts/build-excalidraw.mjs` stage 5 is
+the automated backstop if a replay silently restores one.
+
+> **Corrected 2026-08-16.** This paragraph, the design spec, and the
+> `MEMORY.md` index line all previously said **"17 sites across 2 vendor
+> files."** That was true of `App.tsx` + `snapping.ts` alone, which is exactly
+> what the sweep was scoped to — and why its own exhaustion greps could not
+> have found the identical idiom in `linearElementEditor.ts`. The true figure
+> is 23 sites across 3 files, plus 3 sites deliberately left (listed under
+> Part B2). Correspondingly, "Cmd/Ctrl means exactly one thing" is an
+> overstatement: on the *reachable* canvas paths under flow's override it is
+> true, but the modifier still carries upstream meanings on the mid-draw paths
+> `canEngage` makes unreachable, and marquee select-through's `withCmdOrCtrl`
+> is untouched by design.
+
+### The fifth collision: arrow binding (known, NOT fixed)
+
+Recorded 2026-08-16. **No code was changed for this — it is a separate branch.**
+
+`components/App.tsx` — grep `bindingPreference`, three sites, all verified
+2026-08-16:
+
+```ts
+// handleKeyDown, ~5637 — invert while held
+if (event[KEYS.CTRL_OR_CMD] && !event.repeat) {
+  this.setState({ isBindingEnabled: this.state.bindingPreference !== "enabled" });
+}
+// handleKeyUp, ~5926 — restore on release
+if (!event[KEYS.CTRL_OR_CMD]) { /* isBindingEnabled = preferenceEnabled */ }
+// handleLinearElementOnPointerDown, ~10083 — the same inversion again, on a
+// raw `event.ctrlKey` rather than KEYS.CTRL_OR_CMD (so it is Ctrl-only even on
+// macOS). Do not miss this one when fixing the pair above.
+```
+
+This is **structurally identical to the object-snap defect Part B1 just fixed**:
+a hold-to-invert gesture applied to a *persisted user preference*, for a
+modifier flow never releases mid-interaction. Concretely: drag an arrow endpoint
+with the override held and arrow binding is the opposite of what the user chose
+in their preferences. Same class, same fix shape (delete the inversion, let the
+preference stand alone), same reason it reads as a feature rather than a bug.
+
+This is the collision the paragraph at the top of this section predicted —
+"a fourth collision will present as *feature X is always on while selecting*."
+It does, and that prediction is now evidence that the pattern generalises: when
+looking for the next one, grep vendor `App.tsx` for `event[KEYS.CTRL_OR_CMD]`
+in *keydown/keyup* handlers, not just pointer handlers. The keyboard sites were
+outside every sweep so far because all three fixed collisions were pointer-path.
+
+### Two further notes on modifier-gated vendor code (no code changed)
+
+- **`withCmdOrCtrl` is effectively stranded, not merely "out of scope".** Three
+  places — its own `flow:` comment in `App.tsx` (~10978), the comment on the
+  2026-08-14 drag fix, and the design spec — describe it as "read on
+  pointer-up". Verified 2026-08-17 (re-verified; drifted 5 lines from the
+  2026-08-16 figures of ~10973/~11444 due to this branch's own comment
+  insertions): it is **written once** (`App.tsx:9169`,
+  inside the `PointerDownState` literal) and **read at exactly one site**
+  (~`App.tsx:11449`), which is inside the box-selection branch of
+  `onPointerMoveFromPointerDownHandler` — the pointerdown-scoped **pointermove**
+  handler, not `handleCanvasPointerUp`. Its guard is
+  `!event.shiftKey && isSomeElementSelected(...)` plus
+  `pointerDownState.withCmdOrCtrl && pointerDownState.hit.element`. But
+  `hit.element` being set is precisely the case where, since the 2026-08-14 fix,
+  the drag branch now moves the hit element instead of starting a marquee — so
+  marquee select-through under a held modifier is largely unreachable under
+  flow's model. The correct description is "stranded": the field is still
+  written, still compiles, still read, and its read is almost never taken. The
+  "runs on pointer-up" wording in all three places is wrong; treat any reasoning
+  that leans on it as unsound.
+- **No move cursor for a drag that works (UX papercut, pre-existing).**
+  `App.tsx` ~8110 gates `CURSOR_TYPE.MOVE` on `!event[KEYS.CTRL_OR_CMD]` when
+  hitting the common bounding box of the selection, and ~8124 repeats it with
+  the comment `// if using cmd/ctrl, we're not dragging`. Since 2026-08-14 you
+  *can* drag while the modifier is held, so the comment is false and the user
+  gets no move affordance for an action that works — the cursor says "you can't
+  do this" while the app does it. Same family as the collisions above
+  (upstream's modifier assumption baked into a branch), cosmetic rather than
+  behavioural, so it is recorded rather than fixed.
+
+**A verification lesson worth generalising, from this same branch's own
+review cycle.** Two separate implementer reports made claims that were not
+mechanically executed, both caught in review rather than by their own
+authors: one claimed a snap-toggle-ON path was "verified by hand" with no
+script, log, or transcript behind it — a subagent cannot visually inspect a
+running browser, so "verified by hand" is not a real claim, it's an assertion
+wearing evidence's clothes. The other paraphrased a gate's per-test output
+while presenting it in the same report alongside genuinely pasted transcripts
+elsewhere, which reads as verbatim by association. **The standard: a claim
+without a pasted command and its actual output is not evidence, regardless of
+how confidently or specifically it's worded.** Both were fixed — the first by
+adding a real positive-case e2e assertion, the second by pointing to the gate
+that should have been pasted.
+
+**The infrastructure trap that cost real time in this branch's own
+verification.** A backgrounded full-suite Playwright run was silently killed
+partway through **twice** in this session — once caught only because the
+implementer waited on a notification that never arrived and the controller
+had to confirm via `pgrep -af playwright` / `pgrep -af "node.*vite"` (both
+empty) that the run was dead rather than slow. The hazard is specific: a
+partially-completed background run's output looks exactly like a legitimate
+partial result, not like a crash — nothing announces "this got killed." **Rule
+for this repo: never background the full e2e suite; run it in the foreground
+with an explicit timeout (600s worked) so a truncated run fails loudly instead
+of reading as done.**
+
 ## Tests
 - Unit: `src/ui/toolbar/tool-override.test.ts` (12 tests, covers every
   `canEngage` guard, including "does not engage when the selection tool is
@@ -349,10 +661,36 @@ into the next drawn element).
   release-time-reload corruption/fix). `src/lib/history-shortcuts.test.ts`
   also gained a case for the widened `isTextEntry` input types. Full unit
   suite after the corrective pass: **640 tests / 70 files, all green.**
-- e2e: `e2e/tool-override.spec.ts`, **6 tests** (the original 4, the
-  elbow-arrow multi-point regression from the final-review wave, and the
-  search-box typing regression from the corrective pass). Full e2e suite
-  (113 tests) fully green, including the flake noted below.
+- e2e: `e2e/tool-override.spec.ts`, **15 tests** — the original 4, the
+  elbow-arrow multi-point regression (final-review wave), the search-box typing
+  regression (corrective pass), the drag/marquee pair (2026-08-14 drag fix), the
+  three shift tests and the three snap/grid tests (third pass), plus the
+  snap-ON-while-held test added 2026-08-16. Full e2e suite **183/185** green
+  (2 pre-existing `text-panel.spec.ts` padding failures), plus the flake noted
+  below.
+
+  **The snap toggle × modifier matrix is now complete, and the third cell was
+  the one that mattered.** The third pass shipped only OFF+held and ON+unheld —
+  two tests that each differ from the real case in *two* variables, so neither
+  isolated the modifier. The uncovered cell was ON+**held**: the user with Snap
+  to Objects on who holds the override, for whom the original bug presented as
+  "snapping stops working when I hold Cmd" — the more common of the two
+  complaints. Added as "the snap toggle stays on while the modifier is held" and
+  proven RED by reverting `snapping.ts` to upstream's `event[KEYS.CTRL_OR_CMD]
+  ? !objectsSnapModeEnabled : objectsSnapModeEnabled`, rebuilding, and running
+  it: it failed on its own assertion (`Expected: > 0 / Received: 0`) in the same
+  run where its ON+unheld sibling passed.
+
+  **A gesture that wasn't what it looked like.** The grid test's "drag from
+  `BOX_EDGE`" is, once the box is selected, a drag of the **west resize
+  handle** — so it resized and never changed `y`, which made
+  `expect(y % gridSize).toBe(0)` vacuous and would have let a re-broken cmd-drag
+  stay green (the box is drawn *after* grid mode is on, so it starts aligned).
+  The test now does both gestures with before/after reads bracketing each: the
+  edge resize (asserting `x` changed and is on-grid) and a genuine move pressing
+  inside the selection bbox (both axes changed and on-grid). Measured values
+  during the fix: resize/move from `(400, 260)` with `gridSize` 20 and a
+  `+47,+33` offset lands at `(440, 300)`.
 
 ## Gotchas for anyone touching this again
 
@@ -407,7 +745,9 @@ into the next drawn element).
   documents for `e2e/quickbar.spec.ts`'s arrow-binding persistence test.
 - Accepted trade-offs (from the spec, all still true): Cmd+drag with a
   *shape* tool no longer draws snap-free; Cmd-hold + click always drills into
-  groups (vendor `App.tsx:7223`, `if (event[KEYS.CTRL_OR_CMD])` inside the
-  pointerdown hit-test handler — drilling into groups regardless of a normal
-  click's group-respecting behavior); every Cmd shortcut flaps the tool
-  through selection and back.
+  groups (vendor `App.tsx:9549`, re-verified 2026-08-15 — was stale at
+  `App.tsx:7223` before this correction, a casualty of the 2026-08-11
+  upstream replay's line-number churn; `if (event[KEYS.CTRL_OR_CMD])` inside
+  the pointerdown hit-test handler — drilling into groups regardless of a
+  normal click's group-respecting behavior); every Cmd shortcut flaps the
+  tool through selection and back.

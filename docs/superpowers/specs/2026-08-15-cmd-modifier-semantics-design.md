@@ -3,6 +3,43 @@
 **Date:** 2026-08-15
 **Status:** Approved, ready for planning
 
+> ### Correction note (2026-08-16, added after implementation)
+>
+> This document is kept as the record of what was *designed*; the two claims
+> below did not survive contact with the tree, and are corrected here rather
+> than edited out.
+>
+> 1. **"17 sites across 2 vendor files" (Fork footprint section) undercounted.**
+>    The design scoped the grid sweep to `App.tsx`, so its exhaustion greps
+>    could only be exhaustive within that one file. The same
+>    `event[KEYS.CTRL_OR_CMD] ? null : app.getEffectiveGridSize()` idiom also
+>    lives in `packages/element/src/linearElementEditor.ts` (5 reachable sites:
+>    `handlePointerMove` ×2, `handlePointDragging` ×2, `handlePointerDown` ×1),
+>    and `App.tsx` had a 16th site the greps could not see because it is a
+>    negated boolean argument rather than a `getEffectiveGridSize()` call —
+>    `LinearElementEditor.addMidpoint(..., !event[KEYS.CTRL_OR_CMD], ...)`,
+>    whose 4th parameter is `snapToGrid`. **True figure: 23 sites across 3
+>    vendor files** — `App.tsx` 17 (16 grid + 1 deep-select shift),
+>    `linearElementEditor.ts` 5, `snapping.ts` 1.
+>
+>    **Three sites were deliberately left unfixed**, and that is a decision, not
+>    an omission: `linearElementEditor.ts`'s `handlePointerMoveInEditMode` (×2)
+>    and `actions/actionFinalize.tsx`'s `effectiveGridSize` ternary are reached
+>    only while a multi-point element is being drawn, and `canEngage` refuses to
+>    engage the override when `multiElement` is set — so the modifier is never
+>    held through them under flow's model, and upstream's opt-in gesture is
+>    correct there. They are allowlisted by file and exact count in
+>    `scripts/build-excalidraw.mjs` stage 5, which fails the build if a new one
+>    appears.
+>
+> 2. **"Cmd/Ctrl means exactly one thing" (Goal section) is an overstatement.**
+>    On the canvas paths *reachable while the override is held* it is true. It
+>    is not true globally: the three mid-draw sites above still carry upstream's
+>    meaning, marquee select-through's `withCmdOrCtrl` is untouched by design,
+>    and a fifth collision — arrow-binding inversion on
+>    `bindingPreference` — was found and deliberately deferred to its own
+>    branch. See [[tool-override]], "The fifth collision: arrow binding".
+
 ## Goal
 
 Two user-reported problems, one root cause:
@@ -206,6 +243,13 @@ No flow-side code changes in Part B at all.
 (`App.tsx:9548`), 1 for Part B1 (`snapping.ts`), 15 for Part B2 (`App.tsx`). No
 flow-side source changes are required by either part; flow's own behaviour
 changes purely because the fork stops fighting it.
+
+> **Corrected 2026-08-16 — the real figure is 23 sites across 3 vendor files**
+> (`App.tsx` 17, `linearElementEditor.ts` 5, `snapping.ts` 1), plus 3 mid-draw
+> sites deliberately left unfixed. The "17 sites carry a `flow:` comment"
+> mitigation below now covers 23 sites in three files, and
+> `scripts/build-excalidraw.mjs` stage 5 automates the check. See the
+> correction note at the top of this document.
 
 This is the first work on this feature that is **deletion-shaped rather than
 additive.** Every prior fork edit here added a field or dropped a single clause;
