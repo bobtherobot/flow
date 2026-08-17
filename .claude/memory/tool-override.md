@@ -6,14 +6,20 @@ Spec/plan: `docs/superpowers/specs/2026-08-07-tool-override-design.md`,
 
 > **On the vendor line numbers in this file.** It carries roughly a dozen
 > `vendor/excalidraw` line references, and an upstream replay invalidates all of
-> them at once with nothing to detect it. Only the references touched during the
-> 2026-08-16 fix wave were re-verified against the tree: the image-tool guard,
-> the deep-select block, the deselection split, the grid/snap site lists, the
-> `withCmdOrCtrl` note, and the move-cursor gate. **Every other line number here
-> is presumed stale since the 2026-08-11 upstream replay** — trust the symbol
-> name, grep for it, and treat any bare number as a hint. Where a reference was
-> corrected in that wave it now leads with a symbol and keeps the number only as
-> a parenthetical.
+> them at once with nothing to detect it. The references touched during the
+> 2026-08-16 fix wave were re-verified against the tree at that time: the
+> image-tool guard, the deep-select block, the deselection split, the
+> grid/snap site lists, the `withCmdOrCtrl` note, and the move-cursor gate.
+> **Re-verified again on 2026-08-17**, because this branch's own `flow:`
+> comment insertions shifted every reference below `App.tsx:10789` by about 5
+> lines: the image-tool guard, the `withCmdOrCtrl` note, and the deselection
+> split were corrected to their current line numbers. The move-cursor gate
+> (`~App.tsx:8110`/`~8124`) and the grid/snap site lists sit above that shift
+> point and were unaffected. **Every other line number here is presumed stale
+> since the 2026-08-11 upstream replay** — trust the symbol name, grep for it,
+> and treat any bare number as a hint, not a promise of precision. Where a
+> reference was corrected in the 2026-08-16 or 2026-08-17 pass it now leads
+> with a symbol and keeps the number only as a parenthetical.
 
 **Status: shipped, including a final-review fix wave and a corrective pass on
 top of that, plus a third pass (2026-08-15) reducing Cmd/Ctrl to one canvas
@@ -102,8 +108,9 @@ read before touching anything Cmd/Ctrl-gated in this feature again.
   image picker. In vendor `App.tsx`, `setActiveTool`'s
   `if (nextActiveTool.type === "image")` branch calls
   `onImageToolbarButtonClick`, which opens the OS file picker (~`App.tsx:6069`
-  for the branch, ~`12827` for the method; re-verified 2026-08-16 — was stale at
-  `App.tsx:4741`, another casualty of the 2026-08-11 replay's line churn).
+  for the branch, ~`12832` for the method; re-verified 2026-08-17 — was stale at
+  `App.tsx:4741`, another casualty of the 2026-08-11 replay's line churn, then
+  drifted again to `12827` by this branch's own comment insertions).
   Both the engage guard (`canEngage`) and the lock normalizer skip the image
   tool for this reason. `src/ui/toolbar/tool-override.ts`'s own JSDoc carried
   the same stale `4741` and was corrected in the same pass.
@@ -468,8 +475,10 @@ Three parts landed on this branch, all in `vendor/excalidraw`:
 `if (childEvent.shiftKey && !this.state.selectedLinearElement?.isEditing)`, and
 inside it the `// remove element from selection while keeping prev elements
 selected` `setState` that `delete`s the id. Grep for that comment —
-`components/App.tsx` ~12261 for the gate, ~12313 for the removal, verified
-2026-08-16. A click that didn't drag deselects; a click that did drag doesn't.
+`components/App.tsx` ~12266 for the gate, ~12318 for the removal, verified
+2026-08-17 (both had drifted by 5 lines from the 2026-08-16 figures of
+~12261/~12313 due to this branch's own comment insertions). A click that
+didn't drag deselects; a click that did drag doesn't.
 
 > **Corrected 2026-08-16 — this paragraph previously cited the wrong block.**
 > It pointed at `App.tsx:12459-12466` "gated on `!drag.hasOccurred` (12432)".
@@ -585,11 +594,13 @@ outside every sweep so far because all three fixed collisions were pointer-path.
 ### Two further notes on modifier-gated vendor code (no code changed)
 
 - **`withCmdOrCtrl` is effectively stranded, not merely "out of scope".** Three
-  places — its own `flow:` comment in `App.tsx` (~10973), the comment on the
+  places — its own `flow:` comment in `App.tsx` (~10978), the comment on the
   2026-08-14 drag fix, and the design spec — describe it as "read on
-  pointer-up". Verified 2026-08-16: it is **written once** (`App.tsx:9169`,
+  pointer-up". Verified 2026-08-17 (re-verified; drifted 5 lines from the
+  2026-08-16 figures of ~10973/~11444 due to this branch's own comment
+  insertions): it is **written once** (`App.tsx:9169`,
   inside the `PointerDownState` literal) and **read at exactly one site**
-  (~`App.tsx:11444`), which is inside the box-selection branch of
+  (~`App.tsx:11449`), which is inside the box-selection branch of
   `onPointerMoveFromPointerDownHandler` — the pointerdown-scoped **pointermove**
   handler, not `handleCanvasPointerUp`. Its guard is
   `!event.shiftKey && isSomeElementSelected(...)` plus

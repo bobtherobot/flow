@@ -125,17 +125,32 @@ if (missing.length > 0) {
 // ── 5. Deletion-shaped fork-edit survival ───────────────────────────────────
 // Stage 4 can only express *additive* fork edits: it asserts a symbol is
 // PRESENT in the built output. The `feat/cmd-modifier-semantics` work is the
-// opposite shape — it DELETES upstream expressions (20 sites that let a held
-// cmd/ctrl bypass grid snapping). A replay that silently restores one of those
-// bypasses produces no missing symbol, no merge conflict, and no test failure
-// behind all but one site, so stage 4 is structurally blind to it.
+// opposite shape — it DELETES upstream expressions. This stage can only key on
+// the grid-snap bypass idiom, so it covers that subset: 24 sites across 3
+// files (`App.tsx`, `linearElementEditor.ts`, `actionFinalize.tsx`) — 21
+// already removed as deletions (16 + 5, across the first two files only)
+// plus the 3 deliberately left and allowlisted below. The branch's other 2
+// deletions (App.tsx's deep-select shift gate and snapping.ts's object-snap
+// toggle) don't share this idiom and have no automated guard here. The
+// branch total across all 3 deletion kinds is 23 removed sites in 3 files
+// (App.tsx, linearElementEditor.ts, snapping.ts) — see
+// `.claude/memory/tool-override.md`, "Cmd/Ctrl means one thing". A replay
+// that silently restores one of the grid bypasses produces no missing
+// symbol, no merge conflict, and no test failure behind all but one site, so
+// stage 4 is structurally blind to it.
 //
 // This check therefore runs against the fork SOURCE, not the built artifact: a
 // deletion has no footprint in `dist/` to assert on. It looks for the removed
 // idiom — `event[KEYS.CTRL_OR_CMD]` feeding `getEffectiveGridSize()` or a
-// `snapToGrid` argument — within a 3-line window, which is enough to span the
-// multi-line ternaries upstream formats these as. Comment lines are skipped so
-// the `flow:` markers that document each deletion don't trip it.
+// `snapToGrid` argument — within a window around each `CTRL_OR_CMD` hit: 3
+// lines forward, enough to span the multi-line ternaries upstream formats
+// these as, and 6 lines back, enough to reach a `snapToGrid` mention sitting
+// in a preceding `flow:` comment rather than on the same or a following line
+// (the `LinearElementEditor.addMidpoint` boolean-argument site is call-shaped
+// this way — the idiom word is above the argument, not beside or below it).
+// Comment lines are skipped as scan *targets* (a `flow:` marker documenting a
+// deletion doesn't itself trip the check by being the CTRL_OR_CMD line), but
+// they still count as context when they fall inside another hit's window.
 //
 // A small number of sites were DELIBERATELY left: they are reachable only while
 // a multi-point element is being drawn, and `canEngage`
@@ -183,7 +198,8 @@ const collectGridBypasses = (dir, found = []) => {
       if (!line.includes("CTRL_OR_CMD")) {
         return;
       }
-      if (GRID_BYPASS_IDIOM.test(lines.slice(i, i + 3).join("\n"))) {
+      const window = lines.slice(Math.max(0, i - 6), i + 3).join("\n");
+      if (GRID_BYPASS_IDIOM.test(window)) {
         found.push({ file: relative(vendor, path), line: i + 1, text: trimmed });
       }
     });
