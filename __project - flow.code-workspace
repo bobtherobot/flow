@@ -4,5 +4,13 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"js/ts.suggest.enabled": true,
+		"js/ts.suggest.jsdoc.enabled": true,
+		"editor.quickSuggestions": {
+			"other": "offWhenInlineCompletions",
+			"comments": "off",
+			"strings": "off"
+		}
+	}
 }
