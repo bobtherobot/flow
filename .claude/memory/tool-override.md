@@ -558,31 +558,118 @@ the automated backstop if a replay silently restores one.
 > `canEngage` makes unreachable, and marquee select-through's `withCmdOrCtrl`
 > is untouched by design.
 
-### The fifth collision: arrow binding (known, NOT fixed)
+### The fifth collision: arrow binding (FIXED 2026-08-19)
 
-Recorded 2026-08-16. **No code was changed for this — it is a separate branch.**
+Recorded 2026-08-16, **corrected and fixed 2026-08-19** on
+`fix/arrow-binding-modifier` (submodule branch `flow-arrow-binding`). The
+original entry said "three sites" and implied the defect was uniform across
+platforms; both were wrong, and a first draft of the correction was wrong again
+about the blast radius. All three errors are kept visible below rather than
+edited out, because each came from tracing vendor code without following it
+through flow's own fork.
 
-`components/App.tsx` — grep `bindingPreference`, three sites, all verified
-2026-08-16:
+`components/App.tsx` — grep `bindingPreference`, **six** sites, all verified
+2026-08-19. None carries a `flow:` marker; every one is still pure upstream:
 
-```ts
-// handleKeyDown, ~5637 — invert while held
-if (event[KEYS.CTRL_OR_CMD] && !event.repeat) {
-  this.setState({ isBindingEnabled: this.state.bindingPreference !== "enabled" });
-}
-// handleKeyUp, ~5926 — restore on release
-if (!event[KEYS.CTRL_OR_CMD]) { /* isBindingEnabled = preferenceEnabled */ }
-// handleLinearElementOnPointerDown, ~10083 — the same inversion again, on a
-// raw `event.ctrlKey` rather than KEYS.CTRL_OR_CMD (so it is Ctrl-only even on
-// macOS). Do not miss this one when fixing the pair above.
-```
+| Line | Handler | Guard | Effect |
+| --- | --- | --- | --- |
+| 5637 | `handleKeyDown` | `event[KEYS.CTRL_OR_CMD] && !event.repeat` | invert to `bindingPreference !== "enabled"` |
+| 5892 | `handleKeyUp` | `!event[KEYS.CTRL_OR_CMD] && !isBindingEnabled(...)` | resets `bindMode` to `"orbit"` |
+| 5927 | `handleKeyUp` | `!event[KEYS.CTRL_OR_CMD]` | restore to preference |
+| 8379 | `handleCanvasPointerDown` | `!event.ctrlKey` | restore to preference |
+| 8876 | `handleCanvasPointerUp` | `!event.ctrlKey` | restore to preference |
+| 10083 | `handleLinearElementOnPointerDown` | `event.ctrlKey` | invert again (idempotent with 5637) |
 
-This is **structurally identical to the object-snap defect Part B1 just fixed**:
-a hold-to-invert gesture applied to a *persisted user preference*, for a
-modifier flow never releases mid-interaction. Concretely: drag an arrow endpoint
-with the override held and arrow binding is the opposite of what the user chose
-in their preferences. Same class, same fix shape (delete the inversion, let the
-preference stand alone), same reason it reads as a feature rather than a bug.
+**The two pointer restores (8379, 8876) are the sites the original entry
+missed, and they are the ones that decide the verdict.** They test a *raw*
+`event.ctrlKey`, not `KEYS.CTRL_OR_CMD`, while flow's override key is Meta on
+Apple and Control everywhere else (`src/ui/toolbar/tool-override.ts`,
+`overrideKeyFor`). So the defect is **platform-asymmetric**:
+
+- **macOS** — Meta held ⇒ `event.ctrlKey` is false ⇒ `handleCanvasPointerDown`
+  restores `isBindingEnabled` to the preference *before the drag starts*. The
+  keydown inversion is wiped almost immediately and the collision largely
+  self-heals.
+- **Linux / Windows** — Control held ⇒ `event.ctrlKey` is true ⇒ both restores
+  are skipped ⇒ the inversion stands for the whole hold. **flow develops on
+  Linux, so it was live here.** (Conclusion from reading the guards, not from a
+  runtime repro.)
+
+**A first draft of this correction claimed the inversion flipped arrow-endpoint
+binding, and that was wrong — flow's own fork shields exactly that path.**
+`bindingMode` (flow's lock, `src/lib/binding-mode.ts`) is consulted by the
+`isBindingEnabled` **selector** in `packages/element/src/binding.ts:149`, which
+short-circuits on `"on"`/`"off"` and only falls through to
+`appState.isBindingEnabled` on `"auto"`. Nothing in flow ever writes `"auto"` —
+`DEFAULT_BINDING_MODE` is `"on"` and `toggledBindingMode` yields only
+`"on"`/`"off"` — so **on every selector-based path `appState.isBindingEnabled`
+is dead code in flow**, the modifier included. Endpoint drag is one of those
+paths: `getBindingStrategyForDraggingBindingElementEndpoints`
+(`binding.ts:612`, guards at `:700` and `:1007`) calls the selector. An e2e of
+the form "hold the modifier, drag an endpoint, assert it still binds" is
+therefore **vacuous — it passes with or without the fix.** Do not write one.
+
+This is **structurally identical to the object-snap defect Part B1 fixed**: a
+hold-to-invert gesture applied to a *persisted user preference*, for a modifier
+flow never releases mid-interaction. Same class, same reason it reads as a
+feature rather than a bug.
+
+**But it is not the same pure deletion B1 was, and that is the second
+correction.** `canEngage` returns false for `activeTool.type === "selection"`,
+so the override never engages when the selection tool is already active — yet
+the keydown inversion at 5637 fired regardless of the override. That path was
+upstream's deliberate hold-to-suppress-binding gesture, not a flow bug. So
+deleting the inversion does not merely fix the override collision, it **removes
+upstream's binding-suppression gesture outright** — and `actionToggleArrowBinding`
+has no `keyTest`, so the quickbar lock and View ▸ Arrow Binding are now the only
+ways to suppress a binding. B1 set the precedent for accepting exactly that
+trade; it is a trade, not a free fix.
+
+**What the fix actually changes, given the selector shields the main paths.**
+Because `appState.isBindingEnabled` is dead on every selector-based path (see
+above), the inversion could only ever reach the sites that read the raw field
+**directly, bypassing flow's selector**. Those are the whole observable blast
+radius of this fix, and each was verified 2026-08-19:
+
+- `renderer/interactiveScene.ts:1687` — `appState.isBindingEnabled &&
+  appState.suggestedBinding` gates the binding highlight.
+- `element/src/linearElementEditor.ts:377` and `:581` — pass
+  `isBindingEnabled: app.state.isBindingEnabled` into an options bag consumed by
+  `elbowArrow.ts:1222/1262/1279`.
+- `components/App.drawshape.ts:129`, `:251`, `:257` — shape-recognition binding.
+- `actions/actionProperties.tsx:2074`, `:2088` — elbow fixed-point calc.
+
+So the user-visible effect of the fix is: while the modifier is held, the
+binding highlight still shows, elbow arrows still route as bound, and
+shape-recognition still binds. Real, but far narrower than the original entry
+implied.
+
+### Sixth, larger defect found while fixing the fifth: flow's lock is bypassed
+
+**Found 2026-08-19, verified by code reading, NOT fixed — needs its own branch.**
+
+The same direct-read list above is a bug independent of any modifier.
+`src/App.tsx` pushes only `bindingMode` into appState; nothing ever syncs
+`appState.isBindingEnabled` to it, so `isBindingEnabled` sits at its default
+`true` no matter what the user does. Consequence: with the quickbar
+arrow-binding lock switched **off** (`bindingMode: "off"`), every direct-read
+site above still behaves as if binding were on — the highlight still paints,
+recognized arrows still bind, elbow arrows still route bound. **flow's own
+arrow-binding toggle is only partially effective, all the time, with no
+modifier involved.**
+
+Almost certainly a regression from the 382-commit upgrade (see
+[[excalidraw-upgrade]]): new upstream code added `isBindingEnabled` reads that
+the fork's selector does not intercept. Note the two defects interacted —
+holding the modifier used to set `isBindingEnabled: false`, which accidentally
+made the direct reads *agree* with a `"off"` lock while held. Removing the
+inversion does not create this bug (it is present whenever the modifier is not
+held, i.e. almost always), but it does remove that accidental masking.
+
+Fix shape when picked up: route the direct reads through the
+`isBindingEnabled` selector rather than the raw field, and add a build guard in
+the shape of stage 6 that fails on a *raw* `state.isBindingEnabled` read
+outside `binding.ts`.
 
 This is the collision the paragraph at the top of this section predicted —
 "a fourth collision will present as *feature X is always on while selecting*."
@@ -590,6 +677,10 @@ It does, and that prediction is now evidence that the pattern generalises: when
 looking for the next one, grep vendor `App.tsx` for `event[KEYS.CTRL_OR_CMD]`
 in *keydown/keyup* handlers, not just pointer handlers. The keyboard sites were
 outside every sweep so far because all three fixed collisions were pointer-path.
+**Add a second sweep axis from this correction: grep raw `event.ctrlKey` /
+`event.metaKey` too.** Every site the original entry missed used the raw
+property, which is why a `CTRL_OR_CMD`-only sweep found three of six — and the
+raw form is also what makes a defect behave differently on macOS than on Linux.
 
 ### Two further notes on modifier-gated vendor code (no code changed)
 

@@ -235,8 +235,61 @@ if (unexpected.length > 0) {
   );
 }
 
+// ── 6. Arrow-binding inversion survival ─────────────────────────────────────
+// The same deletion shape as stage 5, for the fifth collision in that family:
+// upstream inverted `isBindingEnabled` away from `bindingPreference` while
+// cmd/ctrl was held. flow deleted both sites (`handleKeyDown` and
+// `handleLinearElementOnPointerDown` in `App.tsx`). A replay that restores
+// either one produces no missing symbol and no merge conflict.
+//
+// `packages/excalidraw/tests/arrowBinding.test.tsx` also covers this, so why
+// duplicate it here: the vendor test suite is not part of flow's build or CI
+// (flow runs its own unit + e2e suites against `dist/`), so a restored
+// inversion would only surface if somebody ran the fork's own tests by hand.
+// This check runs on every build.
+//
+// The idiom is narrow on purpose — an assignment of `isBindingEnabled` whose
+// value is derived by *negating* `bindingPreference`. The legitimate
+// preference-following writes (`=== "enabled"`, four of them) are the opposite
+// comparison and do not match.
+const BINDING_INVERSION_IDIOM =
+  /isBindingEnabled:\s*[\s\S]{0,80}?bindingPreference\s*!==\s*"enabled"/;
+
+const bindingSource = join(vendor, "packages/excalidraw/components/App.tsx");
+const bindingText = readFileSync(bindingSource, "utf8");
+const bindingLines = bindingText.split("\n");
+const inversions = bindingLines.flatMap((line, i) => {
+  const trimmed = line.trim();
+  if (trimmed.startsWith("//") || trimmed.startsWith("*")) {
+    return []; // a `flow:` comment describing the deletion, not the idiom
+  }
+  if (!line.includes("isBindingEnabled")) {
+    return [];
+  }
+  const window = bindingLines.slice(i, i + 4).join("\n");
+  return BINDING_INVERSION_IDIOM.test(window)
+    ? [{ line: i + 1, text: trimmed }]
+    : [];
+});
+
+if (inversions.length > 0) {
+  die(
+    `cmd/ctrl arrow-binding inversion reappeared in the fork source — an ` +
+      `upstream replay probably restored a deletion this fork made on purpose ` +
+      `(see .claude/memory/tool-override.md, "The fifth collision: arrow ` +
+      `binding"):\n` +
+      inversions
+        .map((h) => `      packages/excalidraw/components/App.tsx:${h.line}  ${h.text}`)
+        .join("\n") +
+      `\n\n  Delete the inversion and let the binding preference stand alone ` +
+      `(flow's \`bindingMode\` lock plus upstream's \`bindingPreference\`), ` +
+      `then re-add a \`flow:\` comment at the site.`,
+  );
+}
+
 console.log(
   `[build:excalidraw] done — ${FORK_EDITS.length} fork edits verified in the ` +
     `built declarations, and no cmd/ctrl grid-snap bypass in the fork source ` +
-    `(${bypasses.length} allowlisted mid-draw site(s) skipped).`,
+    `(${bypasses.length} allowlisted mid-draw site(s) skipped), and no ` +
+    `cmd/ctrl arrow-binding inversion.`,
 );
