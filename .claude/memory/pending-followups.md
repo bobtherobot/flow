@@ -58,7 +58,7 @@ fix is also wrong: the root contains the Excalidraw container, so undo would
 double-fire. Any broader fix needs a `closest(".excalidraw")` exclusion and
 deserves its own spec.
 
-## Flaky e2e — both families FIXED (2026-08-19); suite is deterministic
+## e2e — all flakes and the two real failures FIXED (2026-08-19/20); suite is fully green
 
 **The "parallel load" framing recorded earlier today was wrong. Load was never
 the cause.** Keeping the correction visible because the wrong framing survived
@@ -149,20 +149,40 @@ from both tracking the same third thing — those specs do the most canvas work.
 **Result: three consecutive full runs at 183 passed / 2 failed, the same two
 failures every time.** The suite is deterministic; every remaining red is real.
 
-### Still genuinely broken (not flakes)
+### Formerly "genuinely broken" — FIXED 2026-08-20
 
-`text-panel.spec.ts` ×2 — "padding rewraps a container's bound text" (the
-Padding input stays `disabled`) and "padding applies to every labelled
-container in a multi-selection" (undo yields `45,45`, expected `30,30`). They
-fail in **every** run, parallel and serial, and predate this work. Nothing
-about synchronisation will fix them; they need real investigation into the
-padding control and its undo entry.
+The two `text-panel.spec.ts` padding failures, filed as pre-existing since
+2026-08-11, were **two unrelated app bugs**, not test bugs:
+
+1. **Padding writes recorded no history entry.** `setContainerPadding` used
+   `api.mutateElement`, which mutates the live scene element in place, so
+   `updateScene` had no delta to capture. Undo popped unrelated earlier
+   entries. Fixed by writing immutably with `newElementWith` — see
+   [[flow-optional-prop-undo]], which now documents *both* mechanisms that
+   have cost this one write its history entry.
+2. **The Padding control was disabled because the container was deselected.**
+   Vendor `App.tsx`'s text-submit handler gated re-selection on
+   `!isToolLocked()`, and flow forces the lock on — a **third** site in the
+   tool-lock/auto-select family. See [[tool-override]].
+
+Fixing (2) then broke two other text-panel tests whose setup existed purely to
+work around (2). Removed.
+
+Also fixed the last real flake: `shapes.spec.ts`'s Save/Open round-trip. The
+earlier `expect.poll` covered only the **read** side; the test still reloaded
+immediately after clicking Save, so the IndexedDB write sometimes never
+committed and the document never appeared in the Open list — which the poll
+converted from a fast failure into a 30s timeout. Both sides now poll the store
+directly; the dialog closing is not proof the write landed.
+
+**The suite is now fully green: three consecutive runs at 185 passed / 0
+failed.**
 
 ### Standing rule
 
-`retries: 1` in CI now masks nothing worth masking, because the suite no longer
-flakes — but it would also hide the two real `text-panel` failures if they ever
-started passing intermittently. Since the suite is deterministic, **treat any
-red other than those two as a genuine regression**, and do not reach for
-`--workers=1` as a discriminator: neither family was load-related, and the
-menubar race reproduced serially too.
+The suite is green and deterministic, so **treat any red at all as a genuine
+regression** — there is no longer a known-failing baseline to excuse one
+against. Do not reach for `--workers=1` as a discriminator: none of the causes
+were load-related, and the menubar race reproduced serially too. `retries: 1`
+in CI now masks nothing worth masking, but it would hide a newly-introduced
+flake, so prefer reading the first-attempt result.

@@ -166,6 +166,29 @@ decoupling "stay locked" from "get selected":
 Submodule commit `vendor/excalidraw@a9dcdb6f` ("fix: decouple
 auto-select-on-draw from the tool lock"); flow pointer bump `ca1ab3e`.
 
+**A THIRD site in this family, found 2026-08-20 — the two above were not the
+whole set.** Vendor `App.tsx`'s `textWysiwyg` `onSubmit` handler (~6297) chose
+what to re-select after a keyboard text submit via
+`viaKeyboard && !this.isToolLocked() && activeTool.type !== "autoshape"`.
+Its own comment says "keyboard-submit keeps focus on the edited object. For
+bound text, keep the container selected" — but with flow forcing the lock
+permanently on, `elementIdToSelect` was **always `null`**, so labelling a shape
+with Enter and pressing Escape left it deselected. Every panel control needing
+a selection then greyed out. Fixed by dropping the `isToolLocked` term, exactly
+as the other two sites did.
+
+This is why it went unnoticed for so long: the symptom was not "the tool lock
+misbehaves", it was "the Padding field is disabled" in a text-panel test that
+had been filed as a pre-existing failure since 2026-08-11. **When forcing a
+vendor flag permanently on, grep every read of that flag — `isToolLocked` had
+three consumers with unrelated meanings, and two sweeps found only two of them.**
+
+Knock-on for tests: two `text-panel.spec.ts` tests had a Selection-click plus a
+canvas click that existed only to undo the old deselection. With the container
+now correctly still selected, clicking its bound text **opens the text editor**
+instead, greying the same controls — so those steps had to be removed. A
+workaround for a bug becomes a bug once the cause is fixed.
+
 **Second, deeper consequence — by design, not a bug:** because the tool no
 longer reverts after a draw, a plain click while a drawing tool is active no
 longer selects anything — it starts a new shape. Reaching the selection tool

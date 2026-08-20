@@ -115,8 +115,12 @@ test("changing size recenters text bound to a container (no resize needed)", asy
   await page.mouse.dblclick(690, 380);
   await page.keyboard.type("Hi");
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Selection" }).click();
-  await page.mouse.click(690, 380);
+  // Escape now leaves the container selected (vendor App.tsx: flow decoupled
+  // "keep the edited object selected" from the permanent tool lock). This used
+  // to need a Selection-tool click plus a canvas click to get the container
+  // selected again; both are not just redundant now but harmful — clicking the
+  // bound text of an ALREADY-selected container opens the text editor, which
+  // greys out every panel control this test then reads.
 
   const read = () =>
     page.evaluate(() => {
@@ -157,8 +161,12 @@ test("changing font family recenters text bound to a container", async ({ page }
   await page.mouse.dblclick(690, 380);
   await page.keyboard.type("Hi");
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Selection" }).click();
-  await page.mouse.click(690, 380);
+  // Escape now leaves the container selected (vendor App.tsx: flow decoupled
+  // "keep the edited object selected" from the permanent tool lock). This used
+  // to need a Selection-tool click plus a canvas click to get the container
+  // selected again; both are not just redundant now but harmful — clicking the
+  // bound text of an ALREADY-selected container opens the text editor, which
+  // greys out every panel control this test then reads.
 
   const read = () =>
     page.evaluate(() => {

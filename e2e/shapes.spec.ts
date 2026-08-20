@@ -432,6 +432,30 @@ test.describe("persistence, resize and graceful degradation", () => {
     await page.getByLabel("Name").fill(docName);
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
+    // Saving is asynchronous too (IndexedDB write), and clicking Save only
+    // *starts* it. Reloading straight afterwards can drop the document before
+    // it commits, after which it never appears in the Open list and the click
+    // below waits out the whole test timeout. Poll the store directly — the
+    // dialog closing is not proof the write landed.
+    await expect
+      .poll(() =>
+        page.evaluate(async (name) => {
+          const db: any = await new Promise((resolve, reject) => {
+            const req = indexedDB.open("flow");
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+          if (!db.objectStoreNames.contains("documents")) return false;
+          const all: any[] = await new Promise((resolve, reject) => {
+            const req = db.transaction("documents").objectStore("documents").getAll();
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+          return all.some((d) => typeof d?.name === "string" && d.name.includes(name));
+        }, docName),
+      )
+      .toBe(true);
+
     await reloadApp(page);
 
     await openMenu(page, "File");

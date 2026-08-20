@@ -6,7 +6,29 @@ Applies to every optional property flow adds to the vendor element schema
 
 ## Two separate things — one was a real bug, one is a vendor limit
 
-**1. FIXED — the write must bump the element version.**
+**1. FIXED TWICE — the write must bump the version AND leave the live element alone.**
+
+> **Second regression, 2026-08-20.** The `newElementWith` fix below was later
+> replaced by `api.mutateElement` (during the upstream upgrade, when
+> `resizeSingleElement`'s signature changed). `api.mutateElement` *does* bump
+> the version — so it looks correct, and its code comment argued exactly that —
+> but it mutates the **live scene element in place**, so by the time
+> `updateScene` ran there was no delta left between the scene and itself, and
+> the store captured nothing at all. Probed: the undo stack stayed at **5
+> across two padding writes** (vs 5 → 6 → 7 once fixed), so undo popped
+> unrelated earlier entries and padding never stepped back. Symptom in the
+> suite: `e2e/text-panel.spec.ts` "padding applies to every labelled container
+> in a multi-selection" expected `[30,30]` after one undo and got `[45,45]`.
+>
+> **The rule is therefore stronger than "bump the version".** It is: build the
+> new element with `newElementWith` and hand the resulting array to
+> `updateScene`; do not mutate first. Version-bumping is necessary but not
+> sufficient — the store needs an actual before/after difference to diff, and
+> an in-place mutation destroys the "before". Any write that rewraps bound text
+> must run `redrawBoundText` **after** the `updateScene`, against the element
+> instances now in the scene.
+
+
 `src/lib/transform.ts setContainerPadding` assigned `padding` straight onto the
 clone (`latest.padding = value`). `Store.detectChangedElements`/
 `createElementsSnapshot` (vendor `store.ts:398/435`) decide an element changed by

@@ -78,30 +78,37 @@ export function setContainerPadding(
   const padding = Math.max(0, value);
   const byId = new Map(elements.map((el) => [el.id, el]));
 
-  let touched = false;
+  const updated = new Map<string, SceneElement>();
   for (const id of ids) {
     const container = byId.get(id);
     if (!container) continue;
-    // Write through the vendor's own mutateElement so version/versionNonce bump
-    // and the history diff sees the padding. (A raw assignment leaves the
-    // version untouched: the rewrapped text got captured, its own version
-    // having bumped, but the padding didn't, so undo restored the wrap and not
-    // the value.) Padding is not a dimension, so nothing rewraps the bound text
-    // on its own -- redrawBoundText does that, and needs the Scene the vendor
-    // holds. This replaced a resizeSingleElement call whose signature upstream
-    // changed (it now takes a Scene where flow passed an elements map), which
-    // made the whole write silently do nothing.
-    api.mutateElement(container as Parameters<ExcalidrawAPI["mutateElement"]>[0], {
-      padding,
-    });
-    api.redrawBoundText(container);
-    touched = true;
+    // Write the padding IMMUTABLY, via `newElementWith`, and hand the resulting
+    // array to `updateScene` — do not mutate in place first.
+    //
+    // This is the second time this write has lost its history entry, by two
+    // different mechanisms, so both are recorded here:
+    //  1. (2026-08-05) A raw `latest.padding = value` assignment left
+    //     version/versionNonce untouched, and the store decides an element
+    //     changed by comparing versionNonce, so the change was invisible.
+    //  2. (2026-08-20) The fix for (1) was later replaced by
+    //     `api.mutateElement`, which does bump the version — but it mutates
+    //     the live scene element *in place*, so by the time `updateScene` ran
+    //     there was no delta left between the scene and itself and the store
+    //     captured nothing. Probed: the undo stack stayed at 5 across two
+    //     padding writes, so undo popped unrelated earlier entries and padding
+    //     never stepped back.
+    // `newElementWith` avoids both: it bumps the version AND leaves the live
+    // element untouched until `updateScene` swaps the array in, which is the
+    // delta the store needs. See `.claude/memory/flow-optional-prop-undo.md`.
+    updated.set(id, newElementWith(container, { padding }));
   }
-  if (!touched) return;
+  if (updated.size === 0) return;
+
+  const next = elements.map((el) => updated.get(el.id) ?? el);
 
   if (transient) markDeferred();
   api.updateScene({
-    elements: api.getSceneElements(),
+    elements: next,
     // flow: currentItemPadding is a resident appState key (see
     // style-memory.ts's CATEGORY_KEYS doc) — only the "shape" category ever
     // creates a container with one, so there is no per-category bucket to
@@ -112,4 +119,12 @@ export function setContainerPadding(
     captureUpdate: captureFor(transient),
     commitDeferredChanges: transient ? undefined : consumeDeferred(),
   });
+
+  // Padding is not a dimension, so nothing rewraps the bound text on its own.
+  // `redrawBoundText` needs the vendor's Scene, and it has to run against the
+  // element instances that are now IN the scene — hence the re-read rather
+  // than reusing the clones above.
+  for (const el of api.getSceneElements()) {
+    if (updated.has(el.id)) api.redrawBoundText(el);
+  }
 }
