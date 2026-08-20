@@ -58,7 +58,37 @@ fix is also wrong: the root contains the Excalidraw container, so undo would
 double-fire. Any broader fix needs a `closest(".excalidraw")` exclusion and
 deserves its own spec.
 
-## Flaky e2e: quickbar arrow-binding persistence (added 2026-08-05)
+## Flaky e2e under parallel load (added 2026-08-05, widened 2026-08-19)
 `e2e/quickbar.spec.ts` (arrow-binding persistence) flakes under parallel load.
 Pre-existing, unrelated to the scrub work. CI sets `retries: 1` so it cannot
 produce false reds, which masks rather than fixes it.
+
+**This is broader than one spec.** Four full-suite runs during the
+`fix/arrow-binding-modifier` / `fix/binding-lock-raw-reads` work (2026-08-19)
+each failed a *different* set, while every one of them passed in isolation:
+
+| Run | Parallel failures beyond the 2 known `text-panel` ones | In isolation |
+| --- | --- | --- |
+| 1 | `tool-override.spec.ts:335` snap toggle produces guides; `:365` snap toggle stays on while modifier held | 15/15 pass |
+| 2 | `drawing-defaults.spec.ts:69` Transform panel rounds a shape; `tool-override.spec.ts:45` drawing tool stays active | 24/24 pass |
+| 3 | `new-document.spec.ts:60` File ▸ New keeps flow's appState preferences | pass, plus 6/6 over 3× `--repeat-each=2` |
+| 4 | **`--workers=1`: none** — 183 passed, only the 2 known `text-panel` failures, 3.1m | n/a |
+
+So the flaky set is at least `quickbar`, `tool-override` (3 different tests),
+`drawing-defaults` and `new-document` — i.e. *no particular spec*, which points
+at shared load/timing rather than a bug in any one test. The failures present
+as **locator timeouts** (e.g. 30s waiting for
+`getByRole("menuitemcheckbox", { name: "Snap to Objects" })`), not assertion
+mismatches, which fits the same reading.
+
+**The operational lesson, and why this matters more than the flakes
+themselves:** a parallel full-suite red is not evidence of a regression here,
+and a different spec failing each run is the tell. The only run that
+distinguishes a real break from load noise is `npx playwright test
+--workers=1` (~3.1m vs ~45-95s). Do that before concluding a change broke
+something — and before treating a green parallel run as proof it didn't.
+
+Not investigated: whether the cause is worker count vs. the dev server, whether
+`fullyParallel` / `workers` in `playwright.config.ts` should be capped, or
+whether the shared vite server is the contention point. Any real fix belongs in
+config, not in the individual specs.
