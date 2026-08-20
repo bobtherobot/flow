@@ -287,9 +287,113 @@ if (inversions.length > 0) {
   );
 }
 
+// ── 7. Binding-lock selector survival ───────────────────────────────────────
+// flow's persistent arrow-binding lock lives in `appState.bindingMode` and is
+// honoured by ONE place: the `isBindingEnabled` selector in
+// `packages/element/src/binding.ts`. Any code that reads the raw
+// `state.isBindingEnabled` field instead silently bypasses the lock — which is
+// exactly the defect this stage exists to prevent recurring. Upstream added
+// several such reads during the 382-commit upgrade and flow's lock was
+// partially ineffective as a result (binding highlight, elbow routing and
+// outline snapping, shape recognition).
+//
+// This cannot be expressed as a test in flow's suites: the reads live in vendor
+// modules that flow's unit tests do not import and whose effects are canvas
+// rendering. It is a structural invariant, so it is checked structurally.
+//
+// The allowlist below is the complete set of legitimate raw reads. Everything
+// else must go through the selector.
+// Only appState-shaped reads count. `options?.isBindingEnabled` and friends are
+// options-bag plumbing carrying an ALREADY-RESOLVED boolean down the call
+// chain — the resolution happened at the appState read, which is what this
+// stage governs. Matching those too would flag ~7 legitimate sites in
+// `elbowArrow.ts` / `linearElementEditor.ts` and force a meaningless allowlist.
+const RAW_BINDING_READ =
+  /\b(?:appState|app\.state|this\.state|state)\.isBindingEnabled\b/;
+const RAW_BINDING_ALLOWED = new Map([
+  [
+    "packages/element/src/binding.ts",
+    { count: 1, why: "the selector itself — this is the one place that may read the raw field" },
+  ],
+  [
+    "packages/excalidraw/components/App.tsx",
+    {
+      count: 3,
+      why: "preference-restore comparisons (keyup / pointerdown / pointerup); writes, not binding decisions",
+    },
+  ],
+  [
+    "packages/excalidraw/components/canvases/InteractiveCanvas.tsx",
+    { count: 1, why: "prop mapping — passes the field through alongside bindingMode" },
+  ],
+]);
+
+const collectRawBindingReads = (dir, found = []) => {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules" || entry.name === "dist" || entry.name === ".git") {
+        continue;
+      }
+      if (entry.name === "tests" || entry.name === "__tests__") {
+        continue; // vendor tests legitimately assert on the raw field
+      }
+      collectRawBindingReads(path, found);
+      continue;
+    }
+    if (!/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) {
+      continue;
+    }
+    readFileSync(path, "utf8")
+      .split("\n")
+      .forEach((line, i) => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("//") || trimmed.startsWith("*")) {
+          return; // a `flow:` comment naming the field, not a read
+        }
+        if (RAW_BINDING_READ.test(line)) {
+          found.push({ file: relative(vendor, path), line: i + 1, text: trimmed });
+        }
+      });
+  }
+  return found;
+};
+
+const rawReads = collectRawBindingReads(join(vendor, "packages"));
+const rawByFile = new Map();
+for (const hit of rawReads) {
+  rawByFile.set(hit.file, [...(rawByFile.get(hit.file) ?? []), hit]);
+}
+
+const unexpectedRaw = [...rawByFile].flatMap(([file, hits]) => {
+  const allowed = RAW_BINDING_ALLOWED.get(file)?.count ?? 0;
+  return hits.length > allowed ? [{ file, allowed, hits }] : [];
+});
+
+if (unexpectedRaw.length > 0) {
+  die(
+    `raw \`.isBindingEnabled\` read(s) outside the selector — these bypass ` +
+      `flow's persistent \`bindingMode\` arrow-binding lock ` +
+      `(see .claude/memory/tool-override.md, "flow's lock is bypassed"):\n` +
+      unexpectedRaw
+        .map(
+          ({ file, allowed, hits }) =>
+            `  - ${file}: ${hits.length} read(s), ${allowed} allowed\n` +
+            hits.map((h) => `      ${h.file}:${h.line}  ${h.text}`).join("\n"),
+        )
+        .join("\n") +
+      `\n\n  Call \`isBindingEnabled(appState)\` from ` +
+      `\`@excalidraw/element\` instead of reading the field, and make sure the ` +
+      `appState reaching it actually carries \`bindingMode\` — the selector's ` +
+      `\`bindingMode?\` is optional, so a narrowed state type compiles fine and ` +
+      `then silently falls through to the raw flag.`,
+  );
+}
+
 console.log(
   `[build:excalidraw] done — ${FORK_EDITS.length} fork edits verified in the ` +
     `built declarations, and no cmd/ctrl grid-snap bypass in the fork source ` +
     `(${bypasses.length} allowlisted mid-draw site(s) skipped), and no ` +
-    `cmd/ctrl arrow-binding inversion.`,
+    `cmd/ctrl arrow-binding inversion, and no raw isBindingEnabled read ` +
+    `outside the selector (${rawReads.length} allowlisted).`,
 );

@@ -644,9 +644,10 @@ binding highlight still shows, elbow arrows still route as bound, and
 shape-recognition still binds. Real, but far narrower than the original entry
 implied.
 
-### Sixth, larger defect found while fixing the fifth: flow's lock is bypassed
+### Sixth, larger defect found while fixing the fifth: flow's lock was bypassed
 
-**Found 2026-08-19, verified by code reading, NOT fixed — needs its own branch.**
+**Found and FIXED 2026-08-19** on `fix/binding-lock-raw-reads` (submodule branch
+`flow-binding-lock-raw-reads`), immediately after the fifth collision.
 
 The same direct-read list above is a bug independent of any modifier.
 `src/App.tsx` pushes only `bindingMode` into appState; nothing ever syncs
@@ -666,10 +667,61 @@ made the direct reads *agree* with a `"off"` lock while held. Removing the
 inversion does not create this bug (it is present whenever the modifier is not
 held, i.e. almost always), but it does remove that accidental masking.
 
-Fix shape when picked up: route the direct reads through the
-`isBindingEnabled` selector rather than the raw field, and add a build guard in
-the shape of stage 6 that fails on a *raw* `state.isBindingEnabled` read
-outside `binding.ts`.
+**The fix.** Ten raw reads routed through the selector, across five files:
+`binding.ts` (2, the `bindOrUnbindBindingElementEdge` calls),
+`linearElementEditor.ts` (2, the options bag feeding `elbowArrow.ts`),
+`App.drawshape.ts` (3, shape recognition), `interactiveScene.ts` (1, the
+binding highlight) and `actionProperties.tsx` (2, elbow fixed-point). Counted
+mechanically before and after: **11 appState-shaped raw reads in those files
+before, 1 after** — the survivor being the selector's own read at
+`binding.ts:161`.
+
+**The trap that would have made this a silent no-op.** `interactiveScene.ts`
+receives `InteractiveCanvasAppState`, a narrowed type that did not carry
+`bindingMode` at all — and the selector's parameter is `bindingMode?:`
+*optional*. So calling `isBindingEnabled(appState)` there **compiles clean and
+always falls through to the raw flag**. The fix therefore also widens
+`InteractiveCanvasAppState` and maps the field in `InteractiveCanvas.tsx`.
+Making it *required* there does not work: `bindingMode` is optional on
+`AppState` itself, so a required field breaks 9 `AppState ->
+InteractiveCanvasAppState` assignments (App.tsx ×7, UnlockPopup, lasso). It is
+declared optional to match. **Any future selector call must be checked for this
+— optionality makes the compiler no help at all.**
+
+**Coverage is structural, and deliberately so.** `build-excalidraw.mjs` gained
+**stage 7**: it fails the build on any `appState|app.state|this.state|state`-
+shaped `.isBindingEnabled` read outside a small allowlist (the selector, App's
+3 preference-restore comparisons, InteractiveCanvas's prop mapping). Verified
+to fire on the pre-fix source. Its regex deliberately does NOT match
+`options?.isBindingEnabled` — that is options-bag plumbing carrying an
+already-resolved boolean, ~7 legitimate sites in `elbowArrow.ts` /
+`linearElementEditor.ts`; a first draft matched them and produced a meaningless
+allowlist.
+
+**Two behavioural tests were written for this and MEASURED VACUOUS — do not
+cite them as coverage.** `arrowBinding.test.tsx`'s "bindingMode lock (flow)"
+block asserts a locked-off arrow does not bind and a locked-on arrow does. Both
+**pass against the pre-fix source**, because arrow *drawing* already routed
+through the selector (`binding.ts:612`). The sites the fix actually changed are
+canvas rendering, elbow routing/outline snapping and shape recognition — none
+reachable from a jsdom draw gesture. They are kept as characterization tests
+with that fact written into the file, and stage 7 is the real guard. **This is
+the second time on this feature that an obvious-looking test turned out to
+prove nothing; measure vacuity by running the test against the unfixed source
+before claiming it as coverage.**
+
+**A note on `isBindingEnabled` as a parameter name.** At
+`actionProperties.tsx:2074/2088` the value is passed as
+`calculateFixedPointForElbowArrowBinding`'s 5th positional argument, whose
+parameter is named `shouldSnapToOutline`. So the lock now also suppresses
+outline snapping on elbow conversion, which is the semantically consistent
+result but is not what the call site's name suggests.
+
+**Vendor suite baseline.** `yarn vitest run packages/element packages/excalidraw`
+is **204 failed / 1462 passed (19 of 99 files)** on this fork *before* the
+change and identically after — those failures are pre-existing fork drift, not
+this work. The suite is not in flow's CI. Record the baseline before reading
+any number from it as a regression.
 
 This is the collision the paragraph at the top of this section predicted —
 "a fourth collision will present as *feature X is always on while selecting*."
