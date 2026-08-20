@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { openMenu } from "./helpers/menu";
+import { gotoApp } from "./helpers/app";
 
 /** A `.excalidraw` authored elsewhere: every flow-owned global differs from
  *  flow's defaults, plus one genuinely document-owned field. */
@@ -81,7 +82,7 @@ async function openLocalDoc(page: Page, contents: string) {
 test("opening a foreign document does not override flow's global preferences", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoApp(page);
   // Wait for the app to be interactive before touching window.h (mount race).
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 

@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
 import { railButton, dragGrip } from "./helpers/rails";
 import { openMenu } from "./helpers/menu";
+import { gotoApp, reloadApp } from "./helpers/app";
 
 test.describe("shapebar", () => {
   test("docks to the right of the toolbar, below the menu bar", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const tools = page.getByRole("toolbar", { name: "Tools" });
     const shapes = page.getByRole("toolbar", { name: "Shapes" });
     await expect(shapes).toBeVisible();
@@ -17,7 +18,7 @@ test.describe("shapebar", () => {
   });
 
   test("insets the canvas by both rail widths", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await expect(page.getByRole("toolbar", { name: "Shapes" })).toBeVisible();
     const reserved = await page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue("--flow-toolbar-reserved"),
@@ -26,7 +27,7 @@ test.describe("shapebar", () => {
   });
 
   test("holds the shape tools and selects them", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const rect = railButton(page, "Rectangle");
     await rect.click();
     await expect(rect).toHaveAttribute("aria-pressed", "true");
@@ -37,7 +38,7 @@ test.describe("shapebar", () => {
   });
 
   test("slides to the screen edge when the toolbar is hidden", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await openMenu(page, "View");
     await page.getByRole("menuitemcheckbox", { name: "Show Toolbar" }).click();
     await expect(page.getByRole("toolbar", { name: "Tools" })).toHaveCount(0);
@@ -46,7 +47,7 @@ test.describe("shapebar", () => {
   });
 
   test("tears off and re-docks into its own slot", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const shapes = page.getByRole("toolbar", { name: "Shapes" });
 
     await dragGrip(page, shapes, 500, 320);
@@ -62,18 +63,18 @@ test.describe("shapebar", () => {
   });
 
   test("hides from its own hamburger and persists across reload", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await page.getByRole("button", { name: "Shapebar options" }).click();
     await page.getByRole("menuitem", { name: "Hide shapebar" }).click();
     await expect(page.getByRole("toolbar", { name: "Shapes" })).toHaveCount(0);
-    await page.reload();
+    await reloadApp(page);
     await expect(page.getByRole("toolbar", { name: "Shapes" })).toHaveCount(0);
     // The toolbar is untouched by the shapebar's own key.
     await expect(page.getByRole("toolbar", { name: "Tools" })).toBeVisible();
   });
 
   test("View ▸ Show Shapebar brings it back and Reset Layout re-docks it", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await openMenu(page, "View");
     await page.getByRole("menuitemcheckbox", { name: "Show Shapebar" }).click();
     await expect(page.getByRole("toolbar", { name: "Shapes" })).toHaveCount(0);
@@ -93,11 +94,11 @@ test.describe("shapebar", () => {
   });
 
   test("hides one shape from its hamburger without touching the toolbar", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await page.getByRole("button", { name: "Shapebar options" }).click();
     await page.getByRole("checkbox", { name: "Diamond" }).uncheck();
     await expect(railButton(page, "Diamond")).toHaveCount(0);
-    await page.reload();
+    await reloadApp(page);
     await expect(railButton(page, "Diamond")).toHaveCount(0);
     await expect(railButton(page, "Rectangle")).toBeVisible();
   });

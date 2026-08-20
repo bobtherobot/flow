@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { openMenu } from "./helpers/menu";
+import { gotoApp } from "./helpers/app";
 
 type H = { state?: Record<string, unknown> };
 const readState = (page: Page) =>
@@ -11,7 +12,7 @@ async function clickViewToggle(page: Page, name: string) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await expect(page.getByRole("menuitem", { name: "View" })).toBeVisible();
 });
 

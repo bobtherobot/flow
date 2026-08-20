@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
 import { openMenu } from "./helpers/menu";
+import { gotoApp } from "./helpers/app";
 
 /**
  * The canvas region clear of the tool rail (left) and the docked controls panel
@@ -35,7 +36,7 @@ async function drawBox(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await expect(page.getByRole("toolbar", { name: "Tools" })).toBeVisible();
 });
 

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { gotoApp } from "./helpers/app";
 
 const OUT = "/tmp/claude-1000/-home-bob-projects-flow/97196cc9-5c01-4299-a65a-c305e9b38b42/scratchpad";
 
@@ -17,7 +18,7 @@ async function openAlignPanel(page: Page) {
 }
 
 test("align buttons are disabled without a 2+ selection", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await openAlignPanel(page);
   // No selection at all.
@@ -30,7 +31,7 @@ test("align buttons are disabled without a 2+ selection", async ({ page }) => {
 });
 
 test("align enables with 2 selected and dispatches; distribute needs 3", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await openAlignPanel(page);
 

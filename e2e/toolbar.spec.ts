@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
 import { railButton, dragGrip } from "./helpers/rails";
 import { openMenu } from "./helpers/menu";
+import { gotoApp, reloadApp } from "./helpers/app";
 
 test.describe("vertical tool bar", () => {
   test("renders docked on the left, below the menu bar", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const rail = page.getByRole("toolbar", { name: "Tools" });
     await expect(rail).toBeVisible();
     const box = await rail.boundingBox();
@@ -14,7 +15,7 @@ test.describe("vertical tool bar", () => {
   });
 
   test("selecting a tool marks it active", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const line = page.getByRole("toolbar", { name: "Tools" }).getByRole("button", {
       name: "Line",
       exact: true,
@@ -24,7 +25,7 @@ test.describe("vertical tool bar", () => {
   });
 
   test("each of the three arrow-shape tools activates the arrow tool", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const rail = page.getByRole("toolbar", { name: "Shapes" });
     for (const name of ["Arrow", "Curved arrow", "Elbow arrow"]) {
       const btn = rail.getByRole("button", { name, exact: true });
@@ -35,7 +36,7 @@ test.describe("vertical tool bar", () => {
   });
 
   test("pressing A repeatedly cycles the highlighted arrow shape and wraps", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const rail = page.getByRole("toolbar", { name: "Shapes" });
     const sharp = rail.getByRole("button", { name: "Arrow", exact: true });
     const curved = rail.getByRole("button", { name: "Curved arrow", exact: true });
@@ -61,26 +62,26 @@ test.describe("vertical tool bar", () => {
   });
 
   test("View ▸ Show Toolbar hides the rail and persists across reload", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await expect(page.getByRole("toolbar", { name: "Tools" })).toBeVisible();
 
     await openMenu(page, "View");
     await page.getByRole("menuitemcheckbox", { name: "Show Toolbar" }).click();
     await expect(page.getByRole("toolbar", { name: "Tools" })).toHaveCount(0);
 
-    await page.reload();
+    await reloadApp(page);
     await expect(page.getByRole("toolbar", { name: "Tools" })).toHaveCount(0);
   });
 
   test("the hamburger hides a tool and the choice persists", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await expect(page.getByRole("button", { name: "Frame" })).toBeVisible();
 
     await page.getByRole("button", { name: "Toolbar options" }).click();
     await page.getByRole("checkbox", { name: "Frame" }).uncheck();
     await expect(page.getByRole("button", { name: "Frame" })).toHaveCount(0);
 
-    await page.reload();
+    await reloadApp(page);
     await expect(page.getByRole("button", { name: "Frame" })).toHaveCount(0);
   });
 
@@ -92,7 +93,7 @@ test.describe("vertical tool bar", () => {
     // order). Assert paint order directly: the menu's own centre point must
     // resolve to something inside .flow-pnl-config, not inside the Shapes
     // rail sitting on top of it.
-    await page.goto("/");
+    await gotoApp(page);
     await page.getByRole("button", { name: "Toolbar options" }).click();
     const menu = page.locator(".flow-pnl-config");
     await expect(menu).toBeVisible();
@@ -107,7 +108,7 @@ test.describe("vertical tool bar", () => {
   });
 
   test("tearing off the top bar floats the rail", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const rail = page.getByRole("toolbar", { name: "Tools" });
     const before = await rail.boundingBox();
 
@@ -124,7 +125,7 @@ test.describe("vertical tool bar", () => {
   });
 
   test("View ▸ Reset Layout re-docks the rail and wipes its drag memory", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const rail = page.getByRole("toolbar", { name: "Tools" });
 
     // Detach and drag the rail far to the right.
@@ -148,7 +149,7 @@ test.describe("vertical tool bar", () => {
   });
 
   test("is 44px wide", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const box = await page.getByRole("toolbar", { name: "Tools" }).boundingBox();
     expect(Math.round(box!.width)).toBe(44);
   });
@@ -157,7 +158,7 @@ test.describe("vertical tool bar", () => {
     // The regression this refactor exists to prevent: the docked shell is
     // viewport-tall, and the tool grid used to absorb that height while the
     // color footer rode it to the bottom of the screen.
-    await page.goto("/");
+    await gotoApp(page);
     const rail = page.getByRole("toolbar", { name: "Tools" });
     const grid = rail.locator(".flow-toolbar__tools");
     const color = rail.locator(".flow-toolbar__color");
@@ -207,7 +208,7 @@ test.describe("vertical tool bar", () => {
     // of it clickable. Prove a shape tool is actually reachable through it —
     // a click landing "successfully" by luck of hit-testing order would not
     // catch this, so assert the tool actually activates.
-    await page.goto("/");
+    await gotoApp(page);
     await page.locator(".flow-toolbar__color").getByRole("radio", { name: /Fill/ }).click();
     await expect(page.locator(".flow-clr-popup")).toBeVisible();
 

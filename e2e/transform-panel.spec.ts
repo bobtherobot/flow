@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
+import { gotoApp } from "./helpers/app";
 
 /** Draw a shape with a rail tool; the new element ends up selected. */
 async function draw(page: Page, tool: string, x2: number, y2: number) {
@@ -12,7 +13,7 @@ async function draw(page: Page, tool: string, x2: number, y2: number) {
 
 test.describe("Transform panel", () => {
   test("sits above the Color panel in the dock", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await page.waitForSelector(".flow-pnl");
     const transform = page.getByText("Transform", { exact: true });
     const color = page.getByText("Color", { exact: true });
@@ -23,14 +24,14 @@ test.describe("Transform panel", () => {
   });
 
   test("fields are greyed with no selection", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await page.waitForSelector(".flow-pnl");
     await expect(page.getByLabel("Width", { exact: true })).toBeDisabled();
     await expect(page.getByLabel("Rotation", { exact: true })).toBeDisabled();
   });
 
   test("editing width resizes the selected element", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await page.waitForSelector(".flow-pnl");
     await draw(page, "Rectangle", 760, 480);
 
@@ -44,7 +45,7 @@ test.describe("Transform panel", () => {
   });
 
   test("editing X moves the selected element", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await page.waitForSelector(".flow-pnl");
     await draw(page, "Rectangle", 760, 480);
 
@@ -55,7 +56,7 @@ test.describe("Transform panel", () => {
   });
 
   test("editing rotation rotates the selected element", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await page.waitForSelector(".flow-pnl");
     await draw(page, "Rectangle", 760, 480);
 
@@ -68,7 +69,7 @@ test.describe("Transform panel", () => {
   // Corner radius now lives in the Stroke panel and text padding in the Text
   // panel — both cover multi-selections, so their specs moved with them.
   test("no longer carries the radius or padding rows", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await page.waitForSelector(".flow-pnl");
     await draw(page, "Rectangle", 760, 480);
 
@@ -78,7 +79,7 @@ test.describe("Transform panel", () => {
   });
 
   test("width is greyed for a text element", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await page.waitForSelector(".flow-pnl");
     // Draw a text element, then commit it with Escape so it stays selected.
     await pickTool(page, "Text");

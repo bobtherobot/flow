@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
 import { SHAPES } from "../src/ui/toolbar/tools";
 import { openMenu } from "./helpers/menu";
+import { gotoApp, reloadApp } from "./helpers/app";
 
 /**
  * Draw a rectangle from (400,200) to (700,400) and turn it into a flow shape.
@@ -80,7 +81,7 @@ test.describe("flow shape hit-testing", () => {
   test("a transparent shape selects on its real outline, not its bounding box", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoApp(page);
     // Transparent is this app's default background (see
     // e2e/drawing-defaults.spec.ts) — a transparent element only hit-tests
     // along its outline, never its interior, so both points below sit near
@@ -106,7 +107,7 @@ test.describe("flow shape hit-testing", () => {
   test("a filled shape selects on its real interior, not its bounding box", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoApp(page);
     // Non-transparent background flips shouldTestInside() to true, routing
     // the click through the *interior* test (isPointInElement ->
     // intersectElementWithLineSegment -> intersectRectanguloidWithLineSegment)
@@ -128,7 +129,7 @@ test.describe("flow shape hit-testing", () => {
 });
 
 test("the shapebar's Triangle tool draws a stamped rectangle", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await pickTool(page, "Triangle");
   await page.mouse.move(400, 200);
   await page.mouse.down();
@@ -143,7 +144,7 @@ test("the shapebar's Triangle tool draws a stamped rectangle", async ({ page }) 
 });
 
 test("switching to another tool disarms the shape", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await pickTool(page, "Triangle");
   await pickTool(page, "Rectangle");
   await page.mouse.move(400, 200);
@@ -170,7 +171,7 @@ test("switching to another tool disarms the shape", async ({ page }) => {
 test("pressing a tool's keyboard shortcut disarms a previously-armed flow shape", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await pickTool(page, "Triangle");
   // Plain `page.mouse.click`, not a locator-based click: the Controls dock's
   // resize handle can overlap this point depending on which panels are open,
@@ -208,7 +209,7 @@ const FLOW_SHAPE_TOOLS = SHAPES.filter((t) => t.flowShape);
 test.describe("every shapebar tool draws its own kind", () => {
   for (const tool of FLOW_SHAPE_TOOLS) {
     test(`${tool.label} draws a rectangle stamped with "${tool.flowShape}"`, async ({ page }) => {
-      await page.goto("/");
+      await gotoApp(page);
       await pickTool(page, tool.label);
       await page.mouse.move(400, 200);
       await page.mouse.down();
@@ -280,7 +281,7 @@ test.describe("dragging a handle", () => {
   test("dragging the skew dot changes the parameter and the outline hit-test follows the regenerated geometry", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await drawParallelogram(page);
     expect((await flowParams(page)).skew).toBeCloseTo(0.25);
 
@@ -316,7 +317,7 @@ test.describe("dragging a handle", () => {
   });
 
   test("a single Ctrl+Z undoes the whole drag, not one step of it", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await drawParallelogram(page);
     expect((await flowParams(page)).skew).toBeCloseTo(0.25);
 
@@ -348,7 +349,7 @@ test.describe("dragging a handle", () => {
 // carrier were ever swapped for a line, this test is the one that would
 // fail.
 test("an arrow ending inside a triangle binds to it", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await pickTool(page, "Triangle");
   await page.mouse.move(400, 200);
   await page.mouse.down();
@@ -387,7 +388,7 @@ test.describe("persistence, resize and graceful degradation", () => {
   test("saving, reloading and reopening preserves a dragged shape parameter", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await pickTool(page, "Cylinder");
     await page.mouse.move(400, 200);
     await page.mouse.down();
@@ -431,26 +432,35 @@ test.describe("persistence, resize and graceful degradation", () => {
     await page.getByLabel("Name").fill(docName);
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
-    await page.reload();
+    await reloadApp(page);
 
     await openMenu(page, "File");
     await page.getByRole("menuitem", { name: "Open…" }).click();
     await page.getByRole("option", { name: new RegExp(docName) }).click();
 
-    const restored = await page.evaluate(() => {
-      const el = (window as any).h.app.scene
-        .getNonDeletedElements()
-        .find((e: any) => e.customData?.flowShape?.kind === "cylinder");
-      return el ? (el.customData.flowShape as { kind: string; p: { cap: number } }) : null;
-    });
-    expect(restored?.kind).toBe("cylinder");
+    // Opening a stored document is asynchronous (IndexedDB read, then a scene
+    // swap), and clicking the option only *starts* it. Reading the scene
+    // straight afterwards races that swap and sees the pre-open scene, which
+    // is why this test flaked ~2 runs in 3. Poll for the shape to arrive
+    // instead — the same idiom `drawing-defaults.spec.ts` already uses after
+    // its own File ▸ Open round-trip.
+    const readCylinder = () =>
+      page.evaluate(() => {
+        const el = (window as any).h.app.scene
+          .getNonDeletedElements()
+          .find((e: any) => e.customData?.flowShape?.kind === "cylinder");
+        return el ? (el.customData.flowShape as { kind: string; p: { cap: number } }) : null;
+      });
+
+    await expect.poll(async () => (await readCylinder())?.kind).toBe("cylinder");
+    const restored = await readCylinder();
     expect(restored?.p.cap).toBeCloseTo(dragged.cap, 5);
   });
 
   test("resizing a star via a corner transform handle keeps it a flow shape", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await pickTool(page, "Star");
     await page.mouse.move(400, 200);
     await page.mouse.down();
@@ -512,7 +522,7 @@ test.describe("persistence, resize and graceful degradation", () => {
   test("an unregistered shape kind degrades to a selectable plain box instead of crashing", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await pickTool(page, "Rectangle");
     await page.mouse.move(400, 200);
     await page.mouse.down();

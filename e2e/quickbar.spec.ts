@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { openMenu } from "./helpers/menu";
+import { gotoApp, reloadApp } from "./helpers/app";
 
 test.describe("quick-actions bar", () => {
   test("renders docked in the top strip, right of the main menu", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Quick actions" });
     await expect(bar).toBeVisible();
     const box = await bar.boundingBox();
@@ -15,7 +16,7 @@ test.describe("quick-actions bar", () => {
   });
 
   test("shows actions/toggles but hides tools by default", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Quick actions" });
     await expect(bar.getByRole("button", { name: "Bring to front" })).toBeVisible();
     await expect(bar.getByRole("button", { name: "Snap to objects" })).toBeVisible();
@@ -25,7 +26,7 @@ test.describe("quick-actions bar", () => {
   });
 
   test("snap-to-objects is on by default and toggles off", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     // flow defaults object-snapping ON (seeded via initialData.appState).
     const snap = page.getByRole("button", { name: "Snap to objects" });
     await expect(snap).toHaveAttribute("aria-pressed", "true");
@@ -34,30 +35,30 @@ test.describe("quick-actions bar", () => {
   });
 
   test("arrow binding is on by default and toggles off, persisting across reload", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const binding = page.getByRole("button", { name: "Arrow binding" });
     await expect(binding).toHaveAttribute("aria-pressed", "true");
     await binding.click();
     await expect(binding).toHaveAttribute("aria-pressed", "false");
 
-    await page.reload();
+    await reloadApp(page);
     await expect(page.getByRole("button", { name: "Arrow binding" })).toHaveAttribute("aria-pressed", "false");
   });
 
   test("View ▸ Show Quick Actions hides the bar and persists", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await expect(page.getByRole("toolbar", { name: "Quick actions" })).toBeVisible();
 
     await openMenu(page, "View");
     await page.getByRole("menuitemcheckbox", { name: "Show Quick Actions" }).click();
     await expect(page.getByRole("toolbar", { name: "Quick actions" })).toHaveCount(0);
 
-    await page.reload();
+    await reloadApp(page);
     await expect(page.getByRole("toolbar", { name: "Quick actions" })).toHaveCount(0);
   });
 
   test("the config menu adds a tool and the choice persists", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Quick actions" });
     await expect(bar.getByRole("button", { name: "Rectangle" })).toHaveCount(0);
 
@@ -65,7 +66,7 @@ test.describe("quick-actions bar", () => {
     await bar.getByRole("checkbox", { name: "Rectangle" }).check();
     await expect(bar.getByRole("button", { name: "Rectangle" })).toBeVisible();
 
-    await page.reload();
+    await reloadApp(page);
     await expect(bar.getByRole("button", { name: "Rectangle" })).toBeVisible();
   });
 
@@ -79,7 +80,7 @@ test.describe("quick-actions bar", () => {
   // config menu and drawing with it must produce a real, stamped rectangle,
   // the same as picking it from the shapebar would.
   test("enabling a flow shape from the config menu draws the real shape", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Quick actions" });
 
     await page.getByRole("button", { name: "Quick actions options" }).click();
@@ -101,7 +102,7 @@ test.describe("quick-actions bar", () => {
   });
 
   test("tearing off the handle floats the bar", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Quick actions" });
     const before = await bar.boundingBox();
 

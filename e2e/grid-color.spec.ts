@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { openMenu } from "./helpers/menu";
+import { gotoApp, reloadApp } from "./helpers/app";
 
 /** Open the File dropdown.
  *
@@ -46,7 +47,7 @@ function readGridColors(page: Page) {
 }
 
 test("grid-color preference updates the live appState colors", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   // Wait for the app to be interactive before touching window.h (mount race).
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 
@@ -64,11 +65,11 @@ test("grid-color preference updates the live appState colors", async ({ page }) 
 });
 
 test("grid-color preference persists across reload", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 
   await setGridColor(page, "#3366aa");
-  await page.reload();
+  await reloadApp(page);
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
   await expect.poll(async () => (await readGridColors(page))?.gridColor).toBe("#3366aa");
   await expect
@@ -110,7 +111,7 @@ function readGridModeEnabled(page: Page) {
 test("grid-color preference repaints the static canvas, not just appState", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 
   // Turn grid mode on FIRST, through the real View menu control (not a

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
+import { gotoApp } from "./helpers/app";
 
 const OUT = "/tmp/claude-1000/-home-bob-projects-flow/5e8db4eb-bcda-424a-aaeb-fe2bb7d655e1/scratchpad";
 
@@ -34,7 +35,7 @@ const radiiByType = (page: Page) =>
   );
 
 test("arrow controls are disabled for a non-linear selection", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Rectangle", 820, 500);
 
@@ -45,7 +46,7 @@ test("arrow controls are disabled for a non-linear selection", async ({ page }) 
 });
 
 test("edits stroke width and dash style on the selected element", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Rectangle", 820, 500);
 
@@ -61,7 +62,7 @@ test("edits stroke width and dash style on the selected element", async ({ page 
 });
 
 test("arrowhead controls apply to an arrow", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Arrow", 860, 320);
 
@@ -76,7 +77,7 @@ test("arrowhead controls apply to an arrow", async ({ page }) => {
 });
 
 test("arrowhead size sliders track the arrowhead state", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Arrow", 860, 320);
 
@@ -103,7 +104,7 @@ test("arrowhead size sliders track the arrowhead state", async ({ page }) => {
 });
 
 test("arrowhead size is a new-arrow tool default", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   // With nothing selected, the End size slider edits the tool default.
@@ -118,7 +119,7 @@ test("arrowhead size is a new-arrow tool default", async ({ page }) => {
 });
 
 test("an arrowhead-size drag records exactly one undo entry", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Arrow", 860, 320);
 
@@ -147,7 +148,7 @@ test("an arrowhead-size drag records exactly one undo entry", async ({ page }) =
 });
 
 test("corner radius rounds a rectangle", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Rectangle", 820, 500);
 
@@ -162,7 +163,7 @@ test("corner radius rounds a rectangle", async ({ page }) => {
 });
 
 test("corner radius sharpens an elbow arrow's bends", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Elbow arrow", 900, 540); // diagonal so the elbow bends
 
@@ -177,7 +178,7 @@ test("corner radius sharpens an elbow arrow's bends", async ({ page }) => {
 });
 
 test("corner radius is greyed for an ellipse and with no selection", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await expect(page.getByLabel("Corner radius", { exact: true })).toBeDisabled();
 
@@ -188,7 +189,7 @@ test("corner radius is greyed for an ellipse and with no selection", async ({ pa
 test("corner radius applies across a multi-selection, skipping what it can't round", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawFrom(page, "Rectangle", 380, 260, 560, 380);
   await drawFrom(page, "Ellipse", 620, 260, 800, 380);
@@ -230,7 +231,7 @@ test("corner radius applies across a multi-selection, skipping what it can't rou
 });
 
 test("scrubbing the stroke width field changes the value in one undo entry", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Rectangle", 820, 500);
 

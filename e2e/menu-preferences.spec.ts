@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { openMenu } from "./helpers/menu";
+import { gotoApp, reloadApp } from "./helpers/app";
 
 test.describe("desktop menu bar + preferences", () => {
   test("menu bar sits above the canvas", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const bar = page.getByRole("menubar", { name: "Application menu" });
     await expect(bar).toBeVisible();
     const box = await bar.boundingBox();
@@ -11,7 +12,7 @@ test.describe("desktop menu bar + preferences", () => {
   });
 
   test("File menu exposes Open/Save/Export/Preferences", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await openMenu(page, "File");
     await expect(page.getByRole("menuitem", { name: "Open…" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Save…" })).toBeVisible();
@@ -20,7 +21,7 @@ test.describe("desktop menu bar + preferences", () => {
   });
 
   test("changing sloppiness persists across reload", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     // Draw a rectangle so there is an element to restyle.
     await page.keyboard.press("r");
     await page.mouse.move(300, 300);
@@ -33,14 +34,14 @@ test.describe("desktop menu bar + preferences", () => {
     await page.getByRole("radio", { name: "Cartoonist" }).check();
     await page.getByRole("button", { name: "Done" }).click();
 
-    await page.reload();
+    await reloadApp(page);
     await openMenu(page, "File");
     await page.getByRole("menuitem", { name: "Preferences…" }).click();
     await expect(page.getByRole("radio", { name: "Cartoonist" })).toBeChecked();
   });
 
   test("Help ▸ About shows both repo links", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await openMenu(page, "Help");
     await page.getByRole("menuitem", { name: "About flow…" }).click();
     await expect(page.getByRole("link", { name: /flow repository/i })).toBeVisible();
@@ -50,13 +51,13 @@ test.describe("desktop menu bar + preferences", () => {
   });
 
   test("library trigger and footer help icon are hidden", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await expect(page.locator(".excalidraw .default-sidebar-trigger")).toBeHidden();
     await expect(page.locator(".excalidraw .help-icon")).toBeHidden();
   });
 
   test("Help menu exposes Documentation, Submit an issue, and Keyboard Shortcuts", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await openMenu(page, "Help");
     await expect(page.getByRole("menuitem", { name: "Documentation" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Submit an issue" })).toBeVisible();
@@ -64,7 +65,7 @@ test.describe("desktop menu bar + preferences", () => {
   });
 
   test("Keyboard Shortcuts opens the shortcuts dialog with the link row hidden", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await openMenu(page, "Help");
     await page.getByRole("menuitem", { name: "Keyboard Shortcuts" }).click();
     // The built-in help/shortcuts dialog opens…

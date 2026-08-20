@@ -58,7 +58,7 @@ fix is also wrong: the root contains the Excalidraw container, so undo would
 double-fire. Any broader fix needs a `closest(".excalidraw")` exclusion and
 deserves its own spec.
 
-## Flaky e2e — menubar race FIXED, a second family remains (2026-08-19)
+## Flaky e2e — both families FIXED (2026-08-19); suite is deterministic
 
 **The "parallel load" framing recorded earlier today was wrong. Load was never
 the cause.** Keeping the correction visible because the wrong framing survived
@@ -102,34 +102,67 @@ twice). 32 call sites across 16 specs migrated; `grid-color`'s local workaround
 now delegates to it. **Menu-family timeouts: 2 per run before, 0 across 4 runs
 after.**
 
-### What remains (NOT fixed)
+### The state-read family (also FIXED, same day)
 
-Two distinct things, neither load-related:
+**Root cause: flow mounts in two phases and every readiness gate only covered
+the first.** Measured right after `page.goto("/")` resolves:
 
-1. **`text-panel.spec.ts` ×2 are genuine failures, not flakes** — "padding
-   rewraps a container's bound text" (Padding input stays `disabled`) and
-   "padding applies to every labelled container in a multi-selection" (undo
-   yields `45,45`, expected `30,30`). They fail in **every** run, parallel and
-   serial. No synchronisation change will fix them; they need real
-   investigation.
-2. **A sparse state-read family**, 0–2 per run, never the same twice:
-   `tool-override` ("object snapping", "two-click elbow arrow"), `shapes`
-   ("Summing Junction", "saving/reloading a dragged shape parameter"),
-   `stroke-panel` ("arrowhead-size drag records exactly one undo entry"). All
-   read app state shortly after a canvas interaction or an undo. Same class as
-   the one observed `window.h` being `undefined` right after the toolbar
-   appeared: **the gate the specs wait on does not imply the state they then
-   read.**
+| milestone | t |
+| --- | --- |
+| flow's `toolbar[name="Tools"]` | ~0ms |
+| `window.h` exists | ~0ms |
+| `h.state` / `h.app.scene` | ~160ms |
+| `canvas.interactive` | ~160ms |
 
-   Strong lead: **20 `waitForTimeout` fixed sleeps across 7 specs**, and the
-   two biggest offenders are exactly the two worst residual specs —
-   `text-panel` (7) and `stroke-panel` (5). Replacing fixed sleeps with
-   condition-based waits (`expect.poll` on the actual state) is the shape of
-   the fix. Not attempted; it is per-assertion work, not a helper swap.
+flow's own chrome (rails, menubar, panels) is up immediately; Excalidraw mounts
+~160ms later. Two traps followed, and the suite hit both:
+
+- **`window.h` is truthy long before it is useful.** It exists as an empty
+  shell at t=0, so `h?.state?.x` returns `undefined` instead of throwing and an
+  assertion silently reads a wrong answer — `tool-override`'s "tool lock is on
+  from the first paint" failing `expected true, received undefined`.
+- **Waiting on flow's toolbar proves nothing about Excalidraw**, being
+  satisfied at t=0. A spec that gates on it and then drags on the canvas races
+  a ~160ms window where no element is created, so
+  `scene.getNonDeletedElements().at(-1)` is `undefined` — exactly how
+  `shapes.spec.ts` failed. `shapes.spec.ts` had no gate at all.
+
+Fix: `e2e/helpers/app.ts` — `gotoApp` / `reloadApp` / `waitForApp`, gating on
+`h.app.scene` (last of the three to arrive, and the object specs actually
+read) plus a visible interactive canvas. **155 `goto` + 17 `reload` sites
+migrated across 26 specs.**
+
+Plus one genuinely separate bug: `shapes.spec.ts`'s Save/Open round-trip read
+the scene immediately after clicking the stored document, but opening is async
+(IndexedDB read, then scene swap). Now polls, matching the idiom
+`drawing-defaults.spec.ts` already used after its own File ▸ Open.
+
+**A prediction that was wrong, recorded because it cost time.** The previous
+entry called 20 `waitForTimeout` sleeps "the strong lead", on the strength of
+`text-panel` (7) and `stroke-panel` (5) being the worst offenders *and* the
+worst residual specs. That correlation was real and the inference was wrong:
+**not one sleep was removed, and the flakes went to zero anyway.** The sleeps
+are mostly canvas-repaint waits before pixel screenshots, where there is no DOM
+condition to poll. Correlation between "spec has sleeps" and "spec flakes" came
+from both tracking the same third thing — those specs do the most canvas work.
+
+**Result: three consecutive full runs at 183 passed / 2 failed, the same two
+failures every time.** The suite is deterministic; every remaining red is real.
+
+### Still genuinely broken (not flakes)
+
+`text-panel.spec.ts` ×2 — "padding rewraps a container's bound text" (the
+Padding input stays `disabled`) and "padding applies to every labelled
+container in a multi-selection" (undo yields `45,45`, expected `30,30`). They
+fail in **every** run, parallel and serial, and predate this work. Nothing
+about synchronisation will fix them; they need real investigation into the
+padding control and its undo entry.
 
 ### Standing rule
 
-`retries: 1` in CI still masks all of the above. Before calling any e2e red a
-regression, check it against this list — and note that a **serial** run is no
-longer the discriminator it was, since the menubar race reproduced serially
-too.
+`retries: 1` in CI now masks nothing worth masking, because the suite no longer
+flakes — but it would also hide the two real `text-panel` failures if they ever
+started passing intermittently. Since the suite is deterministic, **treat any
+red other than those two as a genuine regression**, and do not reach for
+`--workers=1` as a discriminator: neither family was load-related, and the
+menubar race reproduced serially too.

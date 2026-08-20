@@ -1,11 +1,12 @@
 import { test, expect } from "@playwright/test";
+import { gotoApp, reloadApp } from "./helpers/app";
 
 // Each Playwright test gets a fresh browser context, so localStorage starts
 // empty — no manual clearing needed (and clearing on reload would defeat the
 // persistence test below).
 
 test("dockable accordion replaces the Excalidraw island", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
 
   const panel = page.locator(".flow-pnl");
   await expect(panel).toBeVisible();
@@ -27,19 +28,19 @@ test("dockable accordion replaces the Excalidraw island", async ({ page }) => {
 });
 
 test("collapse persists across reload", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   const panel = page.locator(".flow-pnl");
   await expect(panel).toHaveClass(/flow-pnl--docked/);
 
   await page.getByRole("button", { name: "Collapse panel" }).click();
   await expect(panel).toHaveClass(/flow-pnl--collapsed/);
 
-  await page.reload();
+  await reloadApp(page);
   await expect(page.locator(".flow-pnl")).toHaveClass(/flow-pnl--collapsed/);
 });
 
 test("a sub-panel collapses its content", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   const colorSection = page.locator('.flow-pnl-sub[data-pid="color"]');
   await expect(colorSection.locator(".flow-pnl-sub__content")).toBeVisible();
 
@@ -48,7 +49,7 @@ test("a sub-panel collapses its content", async ({ page }) => {
 });
 
 test("detach floats the whole panel", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   const panel = page.locator(".flow-pnl");
   await page.getByRole("button", { name: "Panel options" }).click();
   await page.getByRole("menuitem", { name: "Detach panel" }).click();
@@ -56,7 +57,7 @@ test("detach floats the whole panel", async ({ page }) => {
 });
 
 test("config menu stays fully on-screen when the panel is docked right", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.getByRole("button", { name: "Panel options" }).click();
   const menu = page.locator(".flow-pnl-config");
   await expect(menu).toBeVisible();
@@ -71,7 +72,7 @@ test("config menu stays fully on-screen when the panel is docked right", async (
 });
 
 test("reordering a docked sub-panel persists after drop and reload", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   const titles = page.locator(".flow-pnl-sub__title");
   await expect(titles).toHaveText([
     "Transform",
@@ -112,6 +113,6 @@ test("reordering a docked sub-panel persists after drop and reload", async ({ pa
   ];
   await expect(titles).toHaveText(reordered);
 
-  await page.reload();
+  await reloadApp(page);
   await expect(page.locator(".flow-pnl-sub__title")).toHaveText(reordered);
 });

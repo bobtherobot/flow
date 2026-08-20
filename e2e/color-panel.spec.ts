@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { RECENT_PALETTE_ID, RECENT_PALETTE_NAME } from "../src/lib/color-palettes";
 import { dragGrip } from "./helpers/rails";
+import { gotoApp, reloadApp } from "./helpers/app";
 
 /** Draw a rectangle by dragging; leaves it selected. */
 async function drawRect(page: Page, x1: number, y1: number, x2: number, y2: number) {
@@ -119,7 +120,7 @@ async function pickInRailPopup(page: Page, fx: number, fy: number): Promise<stri
 }
 
 test("the dock has exactly one color panel", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await expect(page.getByRole("radiogroup", { name: "Color target" }).first()).toBeVisible();
   await expect(page.locator(".flow-clr-panel")).toHaveCount(1);
@@ -127,7 +128,7 @@ test("the dock has exactly one color panel", async ({ page }) => {
 });
 
 test("the panel follows the selection and writes back", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
@@ -144,7 +145,7 @@ test("the panel follows the selection and writes back", async ({ page }) => {
 });
 
 test("switching part retargets the picker", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
@@ -154,7 +155,7 @@ test("switching part retargets the picker", async ({ page }) => {
 });
 
 test("a hue slider drag is a single undo step", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
   await seedSaturation(page);
@@ -192,7 +193,7 @@ test("a hue slider drag is a single undo step", async ({ page }) => {
  * leaked `pending` flag swallowing the following commit.
  */
 test("a drag followed by two distinct edits produces three distinct undo steps", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
@@ -251,7 +252,7 @@ test("a drag followed by two distinct edits produces three distinct undo steps",
 });
 
 test("none on stroke zeroes the width and a color revives it", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
@@ -264,7 +265,7 @@ test("none on stroke zeroes the width and a color revives it", async ({ page }) 
 });
 
 test("swap exchanges fill and stroke", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
@@ -278,7 +279,7 @@ test("swap exchanges fill and stroke", async ({ page }) => {
 });
 
 test("the rail popup and the panel stay in step", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
   await seedSaturation(page);
@@ -303,7 +304,7 @@ test("two popup sessions accumulate two colors", async ({ page }) => {
   // recents cache became the Recent palette, and the rail popup's close is the
   // only automatic way into it. The accumulation this test exists for is real
   // and unchanged; only the way a color gets there moved.
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
@@ -323,7 +324,7 @@ test("quickSet white/grey/black does not pollute recents", async ({ page }) => {
   // docked panel) sit outside any picker session and write straight through
   // `useColorTarget`, so no picker session ever captures them — the Recent
   // palette must stay untouched by all three, on either surface.
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
@@ -341,7 +342,7 @@ test("quickSet white/grey/black does not pollute recents", async ({ page }) => {
 test("selecting text aims the chooser at text without dropping the other boxes", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   // `exact: true`: without it, "Text" also substring-matches the Text
@@ -367,7 +368,7 @@ test("selecting text aims the chooser at text without dropping the other boxes",
 test("the chooser and the saturation box stay the same height as the panel resizes", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   const heights = async () => {
@@ -407,7 +408,7 @@ test("the chooser and the saturation box stay the same height as the panel resiz
  * Escape until it didn't.
  */
 test("Escape abandons an in-progress palette rename", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   const select = page.locator(panel).getByLabel("Palette", { exact: true });
@@ -435,7 +436,7 @@ test("Escape abandons an in-progress palette rename", async ({ page }) => {
  * that created a new palette instead of renaming, both fail here.
  */
 test("renaming a palette through the gear updates the dropdown", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   const select = page.locator(panel).getByLabel("Palette", { exact: true });
@@ -465,7 +466,7 @@ test("renaming a palette through the gear updates the dropdown", async ({ page }
 });
 
 test("adding the current color to a palette persists", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
   await page.locator(panel).getByRole("button", { name: "Black" }).click();
@@ -473,7 +474,7 @@ test("adding the current color to a palette persists", async ({ page }) => {
   await page.locator(panel).getByRole("button", { name: "Add current color to palette" }).click();
   await expect(page.locator(panel).getByRole("button", { name: "Swatch #000000" })).toBeVisible();
 
-  await page.reload();
+  await reloadApp(page);
   await page.waitForSelector(".flow-pnl");
   await expect(page.locator(panel).getByRole("button", { name: "Swatch #000000" })).toBeVisible();
 });
@@ -487,7 +488,7 @@ test("adding the current color to a palette persists", async ({ page }) => {
 // measurement. These exercise PRE-EXISTING rail behavior at the new width.
 
 test("the rail's outer edge meets the canvas with no overlap or gap", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   // The toolbar's own right edge is 44px, but the reserved gutter is now the
   // sum of both rails — measure the outermost docked rail, the shapebar.
@@ -502,7 +503,7 @@ test("the rail's outer edge meets the canvas with no overlap or gap", async ({ p
 });
 
 test("the rail tears off and redocks at the new width", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-toolbar");
   // The grip glyph, not the whole `.flow-toolbar__topbar` header: the topbar
   // is a vertical flex column with the hamburger button directly beneath the
@@ -520,7 +521,7 @@ test("the rail tears off and redocks at the new width", async ({ page }) => {
 });
 
 test("hiding the toolbar reclaims its share of the canvas gutter", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-toolbar");
   const reserved = () =>
     page.evaluate(() =>
@@ -537,7 +538,7 @@ test("hiding the toolbar reclaims its share of the canvas gutter", async ({ page
 });
 
 test("dragging a swatch onto the trash deletes it", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   const swatches = page.locator(panel).getByRole("button", { name: /^Swatch /i });
@@ -556,7 +557,7 @@ test("dragging a swatch onto the trash deletes it", async ({ page }) => {
 });
 
 test("the rail's color control fits the rail without overflowing", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-toolbar");
 
   // A labelled container is the tallest case: three parts, so the stack is
@@ -607,7 +608,7 @@ test("the rail's color control fits the rail without overflowing", async ({ page
 // the scene are three surfaces that have to agree. Hence these live here.
 
 test("a color picked in the rail popup joins the Recent palette on close", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
@@ -639,7 +640,7 @@ test("a color picked in the rail popup joins the Recent palette on close", async
 test("the popup's strip shows what the Recent palette holds", async ({ page }) => {
   // The strip and the dropdown's Recent entry are one array, not two stores
   // kept in step — this is the assertion that would catch them drifting apart.
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
@@ -660,7 +661,7 @@ test("a color set from the docked panel does NOT join the Recent palette", async
   // the assertion that fails if recording ever drifts back into the shared
   // useColorTarget write path — `setColor` is one method again, and the docked
   // panel's saturation box calls exactly the same one the popup does.
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
@@ -677,7 +678,7 @@ test("a color set from the docked panel does NOT join the Recent palette", async
 });
 
 test("the Recent palette cannot be deleted", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await selectPalette(page, RECENT_PALETTE_NAME);
 
@@ -738,7 +739,7 @@ test("the Recent palette cannot be deleted", async ({ page }) => {
  * color would satisfy for free.
  */
 test("copying a swatch from Recent lands it in another palette", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
@@ -785,13 +786,13 @@ test("copying a swatch from Recent lands it in another palette", async ({ page }
 });
 
 test("the Recent palette survives a reload", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawRect(page, 560, 300, 680, 380);
 
   const applied = await pickInRailPopup(page, 0.8, 0.3);
 
-  await page.reload();
+  await reloadApp(page);
   await page.waitForSelector(".flow-pnl");
   await selectPalette(page, RECENT_PALETTE_NAME);
   await expect(page.locator(panel).getByRole("button", { name: `Swatch ${applied}` })).toBeVisible();

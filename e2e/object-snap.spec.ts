@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { gotoApp } from "./helpers/app";
 
 // flow overrides Excalidraw's stock default (object-snapping off) to ON, seeded
 // via initialData.appState.objectsSnapModeEnabled. Read the live value through
@@ -14,7 +15,7 @@ function readObjectsSnap(page: Page) {
 }
 
 test("object-snapping is enabled by default", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 
   await expect.poll(() => readObjectsSnap(page)).toBe(true);

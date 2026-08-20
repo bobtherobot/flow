@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
 import { openMenu } from "./helpers/menu";
+import { gotoApp } from "./helpers/app";
 
 /** Draw a shape with a rail tool; the new element ends up selected. */
 async function draw(page: Page, tool: string, x2: number, y2: number) {
@@ -51,7 +52,7 @@ function strokeWidths(page: Page) {
 }
 
 test("a fresh rectangle has square corners", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await draw(page, "Rectangle", 760, 480);
 
@@ -60,7 +61,7 @@ test("a fresh rectangle has square corners", async ({ page }) => {
 });
 
 test("a fresh diamond has square corners", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await draw(page, "Diamond", 760, 480);
 
@@ -68,7 +69,7 @@ test("a fresh diamond has square corners", async ({ page }) => {
 });
 
 test("the Transform panel still rounds a shape on demand", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await draw(page, "Rectangle", 760, 480);
 
@@ -79,7 +80,7 @@ test("the Transform panel still rounds a shape on demand", async ({ page }) => {
 });
 
 test("the stroke width field spans 0 to 10px", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await draw(page, "Rectangle", 760, 480);
 
@@ -90,7 +91,7 @@ test("the stroke width field spans 0 to 10px", async ({ page }) => {
 });
 
 test("a zero stroke width still floors the cross-hatch fill instead of leaving the shape empty", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await draw(page, "Rectangle", 760, 480);
 
@@ -153,7 +154,7 @@ test("a zero stroke width paints no outline at all", async ({ page }) => {
   // lineWidth and keeps the previous draw's value, so a 0-width element would
   // paint a stray hairline in whatever width the last element used. Drawing a
   // 10px shape first makes that failure loud.
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await draw(page, "Rectangle", 700, 420);
   const width = page.getByLabel("Stroke width");
@@ -199,7 +200,7 @@ test("a zero stroke width does not break a curved arrow", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
 
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await draw(page, "Rectangle", 760, 480);
 
@@ -277,7 +278,7 @@ test("copy/paste preserves a 0 stroke width", async ({ page, context }) => {
   // replaced by 2. Unreachable upstream (Excalidraw's own picker offers 1/2/4),
   // but flow's slider starts at 0. Every sibling field on that object uses `??`.
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   await draw(page, "Rectangle", 760, 480);
@@ -294,7 +295,7 @@ test("copy/paste preserves a 0 stroke width", async ({ page, context }) => {
 test("opening a document preserves a 0 stroke width", async ({ page }) => {
   // Same `restoreElement` line, reached through the file-open path: a saved flow
   // document with a 0-width shape silently came back at 2.
-  await page.goto("/");
+  await gotoApp(page);
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 
   const chooser = page.waitForEvent("filechooser");

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { openMenu } from "./helpers/menu";
+import { gotoApp, reloadApp } from "./helpers/app";
 
 async function setGridSize(page: Page, value: number) {
   await openMenu(page, "File");
@@ -19,7 +20,7 @@ function readGridSize(page: Page) {
 }
 
 test("grid-size preference updates the live appState.gridSize", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   // Wait for the app to be interactive before touching window.h (mount race).
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 
@@ -31,11 +32,11 @@ test("grid-size preference updates the live appState.gridSize", async ({ page })
 });
 
 test("grid-size preference persists across reload", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 
   await setGridSize(page, 40);
-  await page.reload();
+  await reloadApp(page);
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
   await expect.poll(() => readGridSize(page)).toBe(40);
 });

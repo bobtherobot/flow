@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
+import { gotoApp } from "./helpers/app";
 
 /**
  * The shared panel number field (src/ui/panels/controls/NumberInput.tsx), driven
@@ -43,7 +44,7 @@ function elementStrokeWidth(page: Page) {
 }
 
 test("a spin-button click writes through to the selected element", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Rectangle", 820, 500);
 
@@ -61,7 +62,7 @@ test("a spin-button click writes through to the selected element", async ({ page
 });
 
 test("holding a spin button batches its auto-repeat into one undo entry", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Rectangle", 820, 500);
 
@@ -91,7 +92,7 @@ test("holding a spin button batches its auto-repeat into one undo entry", async 
 });
 
 test("the field body still scrubs beside the spin buttons", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Rectangle", 820, 500);
 

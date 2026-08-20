@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
 import { openMenu } from "./helpers/menu";
+import { gotoApp } from "./helpers/app";
 
 /**
  * File ▸ New calls Excalidraw's `resetScene()`, which replaces the whole
@@ -39,7 +40,7 @@ test("a box drawn after File ▸ New gets the dragged dimensions", async ({ page
   // array into the scene. appState.newElement kept pointing at the original
   // object, so every subsequent drag mutation landed on an orphan and the
   // element in the scene stayed 0x0.
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await fileNew(page);
 
@@ -59,7 +60,7 @@ test("a box drawn after File ▸ New gets the dragged dimensions", async ({ page
 });
 
 test("File ▸ New keeps flow's app-wide appState preferences", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   const before = await readState(page);
@@ -78,7 +79,7 @@ test("File ▸ New keeps flow's app-wide appState preferences", async ({ page })
 });
 
 test("File ▸ New still clears the canvas", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   await pickTool(page, "Rectangle");

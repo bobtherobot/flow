@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
 import { openMenu } from "./helpers/menu";
+import { gotoApp } from "./helpers/app";
 
 /** Draw a rectangle at a fixed spot (bounds ≈ x[560,820] y[320,500]); leaves it
  *  selected. Mirrors the color-panel helper (native tool island is CSS-hidden). */
@@ -37,7 +38,7 @@ async function setSelectionMode(page: Page, label: "marquee touch" | "marquee en
 // The Transform panel's Width field is enabled only when a single element is
 // selected — a clean DOM signal for "did the marquee select the rectangle?".
 test("marquee touch selects an element the rectangle only intersects", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await setSelectionMode(page, "marquee touch");
 
   await drawRectangle(page);
@@ -54,7 +55,7 @@ test("marquee touch selects an element the rectangle only intersects", async ({ 
 });
 
 test("marquee enclose ignores a mere intersect but selects a full enclosure", async ({ page }) => {
-  await page.goto("/"); // default mode = enclose
+  await gotoApp(page); // default mode = enclose
 
   await drawRectangle(page);
   // flow keeps Rectangle active after the draw (permanent tool lock); without

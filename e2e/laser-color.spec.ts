@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { SEED_VERSION } from "../src/lib/color-palettes";
 import { openMenu } from "./helpers/menu";
+import { gotoApp } from "./helpers/app";
 
 /**
  * Pin the picker's presets to a fixed set before the app boots — these tests
@@ -28,7 +29,7 @@ async function openPreferences(page: Page) {
 
 test("laser color round-trips through the Preferences swatch", async ({ page }) => {
   await pinPresets(page);
-  await page.goto("/");
+  await gotoApp(page);
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 
   await openPreferences(page);
@@ -47,7 +48,7 @@ test("laser color round-trips through the Preferences swatch", async ({ page }) 
 
 test("the laser trail renders in the chosen color", async ({ page }) => {
   await pinPresets(page);
-  await page.goto("/");
+  await gotoApp(page);
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 
   await openPreferences(page);

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
 import { openMenu } from "./helpers/menu";
+import { gotoApp } from "./helpers/app";
 
 const OUT = "/tmp/claude-1000/-home-bob-projects-flow/5e8db4eb-bcda-424a-aaeb-fe2bb7d655e1/scratchpad";
 
@@ -13,7 +14,7 @@ async function drawWith(page: Page, toolLabel: string, x2: number, y2: number) {
 }
 
 test("Edit menu exposes z-order, group and align actions", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   await openMenu(page, "Edit");
@@ -25,7 +26,7 @@ test("Edit menu exposes z-order, group and align actions", async ({ page }) => {
 });
 
 test("arrow elbow applies via the executeAction fork export", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Arrow", 900, 560); // diagonal so elbow routing is visible
 
@@ -37,7 +38,7 @@ test("arrow elbow applies via the executeAction fork export", async ({ page }) =
 });
 
 test("Edit ▸ Duplicate runs the action without error", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Rectangle", 760, 480);
 

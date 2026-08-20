@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
+import { gotoApp } from "./helpers/app";
 
 /**
  * Non-overlapping footprints in the clear canvas region between the tool rail
@@ -69,7 +70,7 @@ function readElements(page: Page) {
 // which adds an intervening different-category draw the vanilla behavior
 // cannot survive.
 test("an arrow's stroke width does not reach the next box", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   // Give the shape bucket a distinctive width.
@@ -92,7 +93,7 @@ test("an arrow's stroke width does not reach the next box", async ({ page }) => 
 });
 
 test("selecting an element adopts its style for the next one of that kind", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   await draw(page, "Rectangle", ...BOX_A);
@@ -136,7 +137,7 @@ test("selecting an element adopts its style for the next one of that kind", asyn
 test("stroke width survives an intervening text-tool detour, panel and element alike", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   await draw(page, "Rectangle", ...BOX_A);
@@ -155,7 +156,7 @@ test("stroke width survives an intervening text-tool detour, panel and element a
 });
 
 test("a second box inherits the first box's corner radius", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   await draw(page, "Rectangle", ...BOX_A);
@@ -181,7 +182,7 @@ test("a second box inherits the first box's corner radius", async ({ page }) => 
 });
 
 test("an ellipse is never stamped with a remembered corner radius", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   await draw(page, "Rectangle", ...BOX_A);

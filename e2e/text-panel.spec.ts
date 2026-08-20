@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { gotoApp } from "./helpers/app";
 
 const OUT = "/tmp/claude-1000/-home-bob-projects-flow/5e8db4eb-bcda-424a-aaeb-fe2bb7d655e1/scratchpad";
 
@@ -41,7 +42,7 @@ const containerPaddings = (page: Page) =>
   );
 
 test("text controls are disabled without a text selection", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await page.getByRole("button", { name: "Rectangle" }).click();
   await page.mouse.move(560, 320);
@@ -54,7 +55,7 @@ test("text controls are disabled without a text selection", async ({ page }) => 
 });
 
 test("edits font size, align and family on a text element", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await addText(page, "Flow");
 
@@ -77,7 +78,7 @@ test("edits font size, align and family on a text element", async ({ page }) => 
 });
 
 test("font-size field reflects a preset, and a custom value deselects presets", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await addText(page, "Flow");
 
@@ -98,7 +99,7 @@ test("font-size field reflects a preset, and a custom value deselects presets", 
 });
 
 test("changing size recenters text bound to a container (no resize needed)", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   // A rectangle with bound (container) text.
@@ -141,7 +142,7 @@ test("changing size recenters text bound to a container (no resize needed)", asy
 });
 
 test("changing font family recenters text bound to a container", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
 
   await page.getByRole("button", { name: "Rectangle" }).click();
@@ -181,7 +182,7 @@ test("changing font family recenters text bound to a container", async ({ page }
 });
 
 test("padding is greyed without a labelled container", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await expect(page.getByLabel("Padding", { exact: true })).toBeDisabled();
 
@@ -199,7 +200,7 @@ test("padding is greyed without a labelled container", async ({ page }) => {
 });
 
 test("padding rewraps a container's bound text", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await addLabelledBox(page, "The quick brown fox jumps over the lazy dog", 560, 300, 900, 520);
 
@@ -223,7 +224,7 @@ test("padding rewraps a container's bound text", async ({ page }) => {
 });
 
 test("padding applies to every labelled container in a multi-selection", async ({ page }) => {
-  await page.goto("/");
+  await gotoApp(page);
   await page.waitForSelector(".flow-pnl");
   await addLabelledBox(page, "First label here", 340, 260, 620, 420);
   await addLabelledBox(page, "Second label here", 700, 260, 980, 420);

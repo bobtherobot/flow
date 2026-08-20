@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
 import { SEED_VERSION } from "../src/lib/color-palettes";
 import { openMenu } from "./helpers/menu";
+import { gotoApp, reloadApp } from "./helpers/app";
 
 test.describe("bottom bar", () => {
   test("renders docked at the bottom-left", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Bottom bar" });
     await expect(bar).toBeVisible();
     const box = await bar.boundingBox();
@@ -16,7 +17,7 @@ test.describe("bottom bar", () => {
   });
 
   test("shows grid, zen, zoom, background and search", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Bottom bar" });
     await expect(bar.getByRole("button", { name: "Toggle grid" })).toBeVisible();
     await expect(bar.getByRole("button", { name: "Zen mode" })).toBeVisible();
@@ -26,12 +27,12 @@ test.describe("bottom bar", () => {
   });
 
   test("hides Excalidraw's native bottom-left footer (zoom relocated)", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await expect(page.locator(".excalidraw .App-menu_bottom")).toBeHidden();
   });
 
   test("toggling grid reflects the active state", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     // Scope to the bottom bar — the quick-actions bar has a same-named toggle.
     const grid = page.getByRole("toolbar", { name: "Bottom bar" }).getByRole("button", { name: "Toggle grid" });
     await expect(grid).toHaveAttribute("aria-pressed", "false");
@@ -40,7 +41,7 @@ test.describe("bottom bar", () => {
   });
 
   test("zoom cluster changes the percentage and resets", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const zoomIn = page.getByRole("button", { name: "Zoom in" });
     const reset = page.getByRole("button", { name: /Zoom \d+%/ });
     await expect(reset).toHaveText("100%");
@@ -61,7 +62,7 @@ test.describe("bottom bar", () => {
       localStorage.setItem("flow.defaultPaletteId", "e2e");
       localStorage.setItem("flow.paletteSeedVersion", version);
     }, String(SEED_VERSION));
-    await page.goto("/");
+    await gotoApp(page);
     await page.getByRole("button", { name: "Canvas background" }).click();
     // Pick a preset from the popover (ColorSwatch grid). `exact` matters: the
     // Swatches panel's tiles are named "Swatch #hex", which substring-matches.
@@ -74,7 +75,7 @@ test.describe("bottom bar", () => {
   });
 
   test("executing a search opens the flow Search sub-panel with the query", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await page.waitForSelector(".flow-pnl");
     await page.getByRole("searchbox", { name: "Search canvas", exact: true }).fill("hello");
     await page.getByRole("button", { name: "Run search" }).click();
@@ -89,19 +90,19 @@ test.describe("bottom bar", () => {
   });
 
   test("View ▸ Show Bottom Bar hides the bar and persists", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     await expect(page.getByRole("toolbar", { name: "Bottom bar" })).toBeVisible();
 
     await openMenu(page, "View");
     await page.getByRole("menuitemcheckbox", { name: "Show Bottom Bar" }).click();
     await expect(page.getByRole("toolbar", { name: "Bottom bar" })).toHaveCount(0);
 
-    await page.reload();
+    await reloadApp(page);
     await expect(page.getByRole("toolbar", { name: "Bottom bar" })).toHaveCount(0);
   });
 
   test("the config menu hides an item and the choice persists", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Bottom bar" });
     await expect(bar.getByRole("button", { name: "Zen mode" })).toBeVisible();
 
@@ -109,12 +110,12 @@ test.describe("bottom bar", () => {
     await page.getByRole("checkbox", { name: "Zen mode" }).uncheck();
     await expect(bar.getByRole("button", { name: "Zen mode" })).toHaveCount(0);
 
-    await page.reload();
+    await reloadApp(page);
     await expect(bar.getByRole("button", { name: "Zen mode" })).toHaveCount(0);
   });
 
   test("tearing off the handle floats the bar", async ({ page }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Bottom bar" });
     const before = await bar.boundingBox();
 
@@ -132,7 +133,7 @@ test.describe("bottom bar", () => {
   test("docked sits flush in the corner (no offset/shadow); floating gains a shadow", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Bottom bar" });
     const vp = page.viewportSize()!;
     const rail = await page.evaluate(
