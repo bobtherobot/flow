@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
+import { openMenu } from "./helpers/menu";
 
 /**
  * The canvas region clear of the tool rail (left) and the docked controls panel
@@ -275,7 +276,7 @@ async function ensureObjectSnapOff(page: Page) {
   if (!enabled) {
     return;
   }
-  await page.getByRole("menuitem", { name: "View" }).click();
+  await openMenu(page, "View");
   await page.getByRole("menuitemcheckbox", { name: "Snap to Objects" }).click();
   await expect
     .poll(() =>
@@ -319,7 +320,7 @@ async function ensureObjectSnapOn(page: Page) {
   if (enabled) {
     return;
   }
-  await page.getByRole("menuitem", { name: "View" }).click();
+  await openMenu(page, "View");
   await page.getByRole("menuitemcheckbox", { name: "Snap to Objects" }).click();
   await expect
     .poll(() =>
@@ -405,7 +406,7 @@ async function enableGridMode(page: Page) {
   if (enabled) {
     return;
   }
-  await page.getByRole("menuitem", { name: "View" }).click();
+  await openMenu(page, "View");
   await page.getByRole("menuitemcheckbox", { name: "Grid", exact: true }).click();
   await expect
     .poll(() =>

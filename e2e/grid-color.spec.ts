@@ -1,17 +1,16 @@
 import { test, expect, type Page } from "@playwright/test";
+import { openMenu } from "./helpers/menu";
 
-/** Open the File dropdown. Radix's menubar can occasionally leave a
- *  just-closed dropdown's own trigger "active" so an immediate click on a
- *  *different* top-level trigger only highlights it instead of opening its
- *  dropdown — seen when File is opened right after toggling an item in the
- *  View menu (see the pixel test below). Retry once if that happens; a
- *  second click reliably opens it. */
+/** Open the File dropdown.
+ *
+ *  This used to carry its own one-shot retry, with a note that clicking a
+ *  *different* top-level trigger right after toggling an item in the View menu
+ *  only highlights it instead of opening its dropdown. That observation was
+ *  correct and is the same defect `openMenu` now handles suite-wide — see the
+ *  helper for why a bare trigger click is not enough. Kept as a named wrapper
+ *  because the call sites below read better for it. */
 async function openFileMenu(page: Page) {
-  const fileMenu = page.getByRole("menuitem", { name: "File" });
-  await fileMenu.click();
-  if (!(await page.getByRole("menuitem", { name: "Preferences…" }).isVisible())) {
-    await fileMenu.click();
-  }
+  await openMenu(page, "File");
 }
 
 /** `closeDialog: false` leaves the Preferences dialog open after committing
@@ -121,7 +120,7 @@ test("grid-color preference repaints the static canvas, not just appState", asyn
   // color for free (gridModeEnabled itself forces a repaint), which would
   // pass even with the memo-comparator bug this test exists to catch.
   await expect.poll(() => readGridModeEnabled(page)).toBe(false);
-  await page.getByRole("menuitem", { name: "View" }).click();
+  await openMenu(page, "View");
   await page.getByRole("menuitemcheckbox", { name: "Grid", exact: true }).click();
   await expect.poll(() => readGridModeEnabled(page)).toBe(true);
 

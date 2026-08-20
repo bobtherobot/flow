@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
+import { openMenu } from "./helpers/menu";
 
 /** Draw a shape with a rail tool; the new element ends up selected. */
 async function draw(page: Page, tool: string, x2: number, y2: number) {
@@ -297,7 +298,7 @@ test("opening a document preserves a 0 stroke width", async ({ page }) => {
   await expect(page.getByRole("menuitem", { name: "File" })).toBeVisible();
 
   const chooser = page.waitForEvent("filechooser");
-  await page.getByRole("menuitem", { name: "File" }).click();
+  await openMenu(page, "File");
   await page.getByRole("menuitem", { name: "Open…" }).click();
   await page.getByRole("radio", { name: "Local system" }).check();
   await page.getByRole("button", { name: "Open", exact: true }).click();

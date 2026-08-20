@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { SEED_VERSION } from "../src/lib/color-palettes";
+import { openMenu } from "./helpers/menu";
 
 test.describe("bottom bar", () => {
   test("renders docked at the bottom-left", async ({ page }) => {
@@ -91,7 +92,7 @@ test.describe("bottom bar", () => {
     await page.goto("/");
     await expect(page.getByRole("toolbar", { name: "Bottom bar" })).toBeVisible();
 
-    await page.getByRole("menuitem", { name: "View" }).click();
+    await openMenu(page, "View");
     await page.getByRole("menuitemcheckbox", { name: "Show Bottom Bar" }).click();
     await expect(page.getByRole("toolbar", { name: "Bottom bar" })).toHaveCount(0);
 

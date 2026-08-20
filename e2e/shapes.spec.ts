@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
 import { SHAPES } from "../src/ui/toolbar/tools";
+import { openMenu } from "./helpers/menu";
 
 /**
  * Draw a rectangle from (400,200) to (700,400) and turn it into a flow shape.
@@ -425,14 +426,14 @@ test.describe("persistence, resize and graceful degradation", () => {
     // other e2e specs reload-test, so round-tripping through Save/Open is
     // what actually proves customData.flowShape survives serialization).
     const docName = `flow-shapes-e2e-cylinder-${Date.now()}`;
-    await page.getByRole("menuitem", { name: "File" }).click();
+    await openMenu(page, "File");
     await page.getByRole("menuitem", { name: "Save…" }).click();
     await page.getByLabel("Name").fill(docName);
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
     await page.reload();
 
-    await page.getByRole("menuitem", { name: "File" }).click();
+    await openMenu(page, "File");
     await page.getByRole("menuitem", { name: "Open…" }).click();
     await page.getByRole("option", { name: new RegExp(docName) }).click();
 

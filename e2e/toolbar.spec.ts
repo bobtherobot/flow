@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { railButton, dragGrip } from "./helpers/rails";
+import { openMenu } from "./helpers/menu";
 
 test.describe("vertical tool bar", () => {
   test("renders docked on the left, below the menu bar", async ({ page }) => {
@@ -63,7 +64,7 @@ test.describe("vertical tool bar", () => {
     await page.goto("/");
     await expect(page.getByRole("toolbar", { name: "Tools" })).toBeVisible();
 
-    await page.getByRole("menuitem", { name: "View" }).click();
+    await openMenu(page, "View");
     await page.getByRole("menuitemcheckbox", { name: "Show Toolbar" }).click();
     await expect(page.getByRole("toolbar", { name: "Tools" })).toHaveCount(0);
 
@@ -136,7 +137,7 @@ test.describe("vertical tool bar", () => {
     expect((await rail.boundingBox())!.x).toBeGreaterThan(300);
 
     // Reset Layout → docked back at the left edge.
-    await page.getByRole("menuitem", { name: "View" }).click();
+    await openMenu(page, "View");
     await page.getByRole("menuitem", { name: "Reset Layout" }).click();
     expect((await rail.boundingBox())!.x).toBeLessThan(10);
 

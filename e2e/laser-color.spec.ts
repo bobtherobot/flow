@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { SEED_VERSION } from "../src/lib/color-palettes";
+import { openMenu } from "./helpers/menu";
 
 /**
  * Pin the picker's presets to a fixed set before the app boots — these tests
@@ -21,7 +22,7 @@ async function pinPresets(page: Page) {
 }
 
 async function openPreferences(page: Page) {
-  await page.getByRole("menuitem", { name: "File" }).click();
+  await openMenu(page, "File");
   await page.getByRole("menuitem", { name: "Preferences…" }).click();
 }
 

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
+import { openMenu } from "./helpers/menu";
 
 const OUT = "/tmp/claude-1000/-home-bob-projects-flow/5e8db4eb-bcda-424a-aaeb-fe2bb7d655e1/scratchpad";
 
@@ -15,7 +16,7 @@ test("Edit menu exposes z-order, group and align actions", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".flow-pnl");
 
-  await page.getByRole("menuitem", { name: "Edit" }).click();
+  await openMenu(page, "Edit");
   await expect(page.getByRole("menuitem", { name: "Duplicate" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: /^Group/ })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Bring to Front" })).toBeVisible();
@@ -40,7 +41,7 @@ test("Edit ▸ Duplicate runs the action without error", async ({ page }) => {
   await page.waitForSelector(".flow-pnl");
   await drawWith(page, "Rectangle", 760, 480);
 
-  await page.getByRole("menuitem", { name: "Edit" }).click();
+  await openMenu(page, "Edit");
   await page.getByRole("menuitem", { name: "Duplicate" }).click();
 
   // The app is still alive and the panel intact (the action dispatched cleanly).

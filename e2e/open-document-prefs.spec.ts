@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { openMenu } from "./helpers/menu";
 
 /** A `.excalidraw` authored elsewhere: every flow-owned global differs from
  *  flow's defaults, plus one genuinely document-owned field. */
@@ -44,7 +45,7 @@ function readAppState(page: Page): Promise<FlowGlobals> {
 }
 
 async function setGridSize(page: Page, value: number) {
-  await page.getByRole("menuitem", { name: "File" }).click();
+  await openMenu(page, "File");
   await page.getByRole("menuitem", { name: "Preferences…" }).click();
   const input = page.getByLabel("Grid size");
   await input.fill(String(value));
@@ -53,7 +54,7 @@ async function setGridSize(page: Page, value: number) {
 }
 
 async function setGridColor(page: Page, hex: string) {
-  await page.getByRole("menuitem", { name: "File" }).click();
+  await openMenu(page, "File");
   await page.getByRole("menuitem", { name: "Preferences…" }).click();
   await page.getByRole("button", { name: "Grid color" }).click();
   const field = page.getByLabel("Grid color hex");
@@ -64,7 +65,7 @@ async function setGridColor(page: Page, hex: string) {
 
 async function openLocalDoc(page: Page, contents: string) {
   const chooser = page.waitForEvent("filechooser");
-  await page.getByRole("menuitem", { name: "File" }).click();
+  await openMenu(page, "File");
   await page.getByRole("menuitem", { name: "Open…" }).click();
   await page.getByRole("radio", { name: "Local system" }).check();
   await page.getByRole("button", { name: "Open", exact: true }).click();

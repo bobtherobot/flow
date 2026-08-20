@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
+import { openMenu } from "./helpers/menu";
 
 /**
  * File ▸ New calls Excalidraw's `resetScene()`, which replaces the whole
@@ -8,7 +9,7 @@ import { pickTool } from "./helpers/rails";
  * it has to be re-seeded afterwards — see `flowSeedAppState`.
  */
 async function fileNew(page: Page) {
-  await page.getByRole("menuitem", { name: "File" }).click();
+  await openMenu(page, "File");
   await page.getByRole("menuitem", { name: "New", exact: true }).click();
   await page.waitForTimeout(200);
 }

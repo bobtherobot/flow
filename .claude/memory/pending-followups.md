@@ -58,37 +58,78 @@ fix is also wrong: the root contains the Excalidraw container, so undo would
 double-fire. Any broader fix needs a `closest(".excalidraw")` exclusion and
 deserves its own spec.
 
-## Flaky e2e under parallel load (added 2026-08-05, widened 2026-08-19)
-`e2e/quickbar.spec.ts` (arrow-binding persistence) flakes under parallel load.
-Pre-existing, unrelated to the scrub work. CI sets `retries: 1` so it cannot
-produce false reds, which masks rather than fixes it.
+## Flaky e2e — menubar race FIXED, a second family remains (2026-08-19)
 
-**This is broader than one spec.** Four full-suite runs during the
-`fix/arrow-binding-modifier` / `fix/binding-lock-raw-reads` work (2026-08-19)
-each failed a *different* set, while every one of them passed in isolation:
+**The "parallel load" framing recorded earlier today was wrong. Load was never
+the cause.** Keeping the correction visible because the wrong framing survived
+two weeks and shaped how every red run was read.
 
-| Run | Parallel failures beyond the 2 known `text-panel` ones | In isolation |
-| --- | --- | --- |
-| 1 | `tool-override.spec.ts:335` snap toggle produces guides; `:365` snap toggle stays on while modifier held | 15/15 pass |
-| 2 | `drawing-defaults.spec.ts:69` Transform panel rounds a shape; `tool-override.spec.ts:45` drawing tool stays active | 24/24 pass |
-| 3 | `new-document.spec.ts:60` File ▸ New keeps flow's appState preferences | pass, plus 6/6 over 3× `--repeat-each=2` |
-| 4 | **`--workers=1`: none** — 183 passed, only the 2 known `text-panel` failures, 3.1m | n/a |
+### What it actually was (fixed)
 
-So the flaky set is at least `quickbar`, `tool-override` (3 different tests),
-`drawing-defaults` and `new-document` — i.e. *no particular spec*, which points
-at shared load/timing rather than a bug in any one test. The failures present
-as **locator timeouts** (e.g. 30s waiting for
-`getByRole("menuitemcheckbox", { name: "Snap to Objects" })`), not assertion
-mismatches, which fits the same reading.
+Clicking a Radix menubar trigger while the previously-opened menu is still
+mounted is **swallowed** — the menu toggles open and shut inside one gesture,
+leaving nothing open. The test then waits for a menu item that will never
+appear and dies on the 30s test timeout.
 
-**The operational lesson, and why this matters more than the flakes
-themselves:** a parallel full-suite red is not evidence of a regression here,
-and a different spec failing each run is the tell. The only run that
-distinguishes a real break from load noise is `npx playwright test
---workers=1` (~3.1m vs ~45-95s). Do that before concluding a change broke
-something — and before treating a green parallel run as proof it didn't.
+Evidence that killed the load theory:
 
-Not investigated: whether the cause is worker count vs. the dev server, whether
-`fullyParallel` / `workers` in `playwright.config.ts` should be capped, or
-whether the shared vite server is the contention point. Any real fix belongs in
-config, not in the individual specs.
+- A reproduction opening the View menu 4× in a row failed **8/12 at
+  `--workers=8` and 5/12 at `--workers=1`.** Serial reproduction is what ruled
+  load out.
+- Passing tests in the same runs sat at **p50 1.4s / p90 2.1s / p99 2.7s**
+  against a 30s timeout. No starvation tail; lowering `workers` would have
+  fixed nothing.
+- Failures were **bimodal** — nothing between 2.9s and a hard 30s wall. That is
+  a block, not slowness.
+- An instrumented vite dev server logged **zero** reloads/errors/restarts
+  across a full run, ruling out dev-server churn.
+- Clicking the menubar immediately after `goto` with no readiness gate passed
+  **12/12**, ruling out a hydration race.
+- Two consecutive pre-fix runs failed **the same two specs** (`shapebar` "Show
+  Shapebar", `tool-override` "snap toggle … real menu"), both menu-driven.
+  "Different spec each run" was an artifact of small samples across the whole
+  suite, not randomness.
+
+`grid-color.spec.ts` had already carried a hand-rolled one-shot retry for this
+exact behaviour, with a comment describing it precisely — found, worked around
+locally, never generalised. **Look for existing local workarounds before
+theorising; one was sitting in the suite the whole time.**
+
+Fix: `e2e/helpers/menu.ts` `openMenu()` — waits for any previous menu to
+detach, then asserts the menu opened and re-clicks if it did not (both halves
+needed; the swallow is a race, so losing it once does not mean losing it
+twice). 32 call sites across 16 specs migrated; `grid-color`'s local workaround
+now delegates to it. **Menu-family timeouts: 2 per run before, 0 across 4 runs
+after.**
+
+### What remains (NOT fixed)
+
+Two distinct things, neither load-related:
+
+1. **`text-panel.spec.ts` ×2 are genuine failures, not flakes** — "padding
+   rewraps a container's bound text" (Padding input stays `disabled`) and
+   "padding applies to every labelled container in a multi-selection" (undo
+   yields `45,45`, expected `30,30`). They fail in **every** run, parallel and
+   serial. No synchronisation change will fix them; they need real
+   investigation.
+2. **A sparse state-read family**, 0–2 per run, never the same twice:
+   `tool-override` ("object snapping", "two-click elbow arrow"), `shapes`
+   ("Summing Junction", "saving/reloading a dragged shape parameter"),
+   `stroke-panel` ("arrowhead-size drag records exactly one undo entry"). All
+   read app state shortly after a canvas interaction or an undo. Same class as
+   the one observed `window.h` being `undefined` right after the toolbar
+   appeared: **the gate the specs wait on does not imply the state they then
+   read.**
+
+   Strong lead: **20 `waitForTimeout` fixed sleeps across 7 specs**, and the
+   two biggest offenders are exactly the two worst residual specs —
+   `text-panel` (7) and `stroke-panel` (5). Replacing fixed sleeps with
+   condition-based waits (`expect.poll` on the actual state) is the shape of
+   the fix. Not attempted; it is per-assertion work, not a helper swap.
+
+### Standing rule
+
+`retries: 1` in CI still masks all of the above. Before calling any e2e red a
+regression, check it against this list — and note that a **serial** run is no
+longer the discriminator it was, since the menubar race reproduced serially
+too.

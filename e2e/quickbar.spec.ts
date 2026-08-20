@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { openMenu } from "./helpers/menu";
 
 test.describe("quick-actions bar", () => {
   test("renders docked in the top strip, right of the main menu", async ({ page }) => {
@@ -47,7 +48,7 @@ test.describe("quick-actions bar", () => {
     await page.goto("/");
     await expect(page.getByRole("toolbar", { name: "Quick actions" })).toBeVisible();
 
-    await page.getByRole("menuitem", { name: "View" }).click();
+    await openMenu(page, "View");
     await page.getByRole("menuitemcheckbox", { name: "Show Quick Actions" }).click();
     await expect(page.getByRole("toolbar", { name: "Quick actions" })).toHaveCount(0);
 

@@ -1,11 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
+import { openMenu } from "./helpers/menu";
 
 type H = { state?: Record<string, unknown> };
 const readState = (page: Page) =>
   page.evaluate(() => (window as unknown as { h?: H }).h?.state ?? null);
 
 async function clickViewToggle(page: Page, name: string) {
-  await page.getByRole("menuitem", { name: "View" }).click();
+  await openMenu(page, "View");
   await page.getByRole("menuitemcheckbox", { name, exact: true }).click();
 }
 

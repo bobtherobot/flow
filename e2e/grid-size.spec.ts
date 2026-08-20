@@ -1,7 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
+import { openMenu } from "./helpers/menu";
 
 async function setGridSize(page: Page, value: number) {
-  await page.getByRole("menuitem", { name: "File" }).click();
+  await openMenu(page, "File");
   await page.getByRole("menuitem", { name: "Preferences…" }).click();
   const input = page.getByLabel("Grid size");
   await input.fill(String(value));

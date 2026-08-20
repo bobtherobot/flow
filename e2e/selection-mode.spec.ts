@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { pickTool } from "./helpers/rails";
+import { openMenu } from "./helpers/menu";
 
 /** Draw a rectangle at a fixed spot (bounds ≈ x[560,820] y[320,500]); leaves it
  *  selected. Mirrors the color-panel helper (native tool island is CSS-hidden). */
@@ -27,7 +28,7 @@ async function pickSelection(page: Page) {
 }
 
 async function setSelectionMode(page: Page, label: "marquee touch" | "marquee enclose") {
-  await page.getByRole("menuitem", { name: "File" }).click();
+  await openMenu(page, "File");
   await page.getByRole("menuitem", { name: "Preferences…" }).click();
   await page.getByRole("radio", { name: label }).click();
   await page.getByRole("button", { name: "Done" }).click();

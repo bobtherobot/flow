@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { railButton, dragGrip } from "./helpers/rails";
+import { openMenu } from "./helpers/menu";
 
 test.describe("shapebar", () => {
   test("docks to the right of the toolbar, below the menu bar", async ({ page }) => {
@@ -37,7 +38,7 @@ test.describe("shapebar", () => {
 
   test("slides to the screen edge when the toolbar is hidden", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("menuitem", { name: "View" }).click();
+    await openMenu(page, "View");
     await page.getByRole("menuitemcheckbox", { name: "Show Toolbar" }).click();
     await expect(page.getByRole("toolbar", { name: "Tools" })).toHaveCount(0);
     const s = (await page.getByRole("toolbar", { name: "Shapes" }).boundingBox())!;
@@ -73,18 +74,18 @@ test.describe("shapebar", () => {
 
   test("View ▸ Show Shapebar brings it back and Reset Layout re-docks it", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("menuitem", { name: "View" }).click();
+    await openMenu(page, "View");
     await page.getByRole("menuitemcheckbox", { name: "Show Shapebar" }).click();
     await expect(page.getByRole("toolbar", { name: "Shapes" })).toHaveCount(0);
 
-    await page.getByRole("menuitem", { name: "View" }).click();
+    await openMenu(page, "View");
     await page.getByRole("menuitemcheckbox", { name: "Show Shapebar" }).click();
     await expect(page.getByRole("toolbar", { name: "Shapes" })).toBeVisible();
 
     // Float it, then let Reset Layout put it back in its slot.
     await dragGrip(page, page.getByRole("toolbar", { name: "Shapes" }), 600, 400);
 
-    await page.getByRole("menuitem", { name: "View" }).click();
+    await openMenu(page, "View");
     await page.getByRole("menuitem", { name: "Reset Layout" }).click();
     const s = (await page.getByRole("toolbar", { name: "Shapes" }).boundingBox())!;
     const t = (await page.getByRole("toolbar", { name: "Tools" }).boundingBox())!;

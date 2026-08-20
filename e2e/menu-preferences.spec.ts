@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { openMenu } from "./helpers/menu";
 
 test.describe("desktop menu bar + preferences", () => {
   test("menu bar sits above the canvas", async ({ page }) => {
@@ -11,7 +12,7 @@ test.describe("desktop menu bar + preferences", () => {
 
   test("File menu exposes Open/Save/Export/Preferences", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("menuitem", { name: "File" }).click();
+    await openMenu(page, "File");
     await expect(page.getByRole("menuitem", { name: "Open…" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Save…" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Export" })).toBeVisible();
@@ -27,20 +28,20 @@ test.describe("desktop menu bar + preferences", () => {
     await page.mouse.move(460, 420);
     await page.mouse.up();
 
-    await page.getByRole("menuitem", { name: "File" }).click();
+    await openMenu(page, "File");
     await page.getByRole("menuitem", { name: "Preferences…" }).click();
     await page.getByRole("radio", { name: "Cartoonist" }).check();
     await page.getByRole("button", { name: "Done" }).click();
 
     await page.reload();
-    await page.getByRole("menuitem", { name: "File" }).click();
+    await openMenu(page, "File");
     await page.getByRole("menuitem", { name: "Preferences…" }).click();
     await expect(page.getByRole("radio", { name: "Cartoonist" })).toBeChecked();
   });
 
   test("Help ▸ About shows both repo links", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("menuitem", { name: "Help" }).click();
+    await openMenu(page, "Help");
     await page.getByRole("menuitem", { name: "About flow…" }).click();
     await expect(page.getByRole("link", { name: /flow repository/i })).toBeVisible();
     // The upstream link renders as plain "Excalidraw" (AboutDialog.tsx); `exact`
@@ -56,7 +57,7 @@ test.describe("desktop menu bar + preferences", () => {
 
   test("Help menu exposes Documentation, Submit an issue, and Keyboard Shortcuts", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("menuitem", { name: "Help" }).click();
+    await openMenu(page, "Help");
     await expect(page.getByRole("menuitem", { name: "Documentation" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Submit an issue" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Keyboard Shortcuts" })).toBeVisible();
@@ -64,7 +65,7 @@ test.describe("desktop menu bar + preferences", () => {
 
   test("Keyboard Shortcuts opens the shortcuts dialog with the link row hidden", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("menuitem", { name: "Help" }).click();
+    await openMenu(page, "Help");
     await page.getByRole("menuitem", { name: "Keyboard Shortcuts" }).click();
     // The built-in help/shortcuts dialog opens…
     await expect(page.locator(".excalidraw .HelpDialog")).toBeVisible();
