@@ -222,6 +222,45 @@ test("modifier + shift-click on an already-selected element removes it", async (
   await expect.poll(() => selectedCount(page)).toBe(1);
 });
 
+test("modifier + drag on one of several selected elements moves them all", async ({ page }) => {
+  // The real selection tool moves the whole selection when you grab any member
+  // of it. The modifier-held selection tool used to collapse the selection to
+  // the grabbed element instead and move only that one, because upstream's
+  // cmd/ctrl "deep selection" branch replaced `selectedElementIds` wholesale
+  // via `editGroupForSelectedElement` before the drag started. Rotation never
+  // showed the bug because it goes through the transform handles, not this
+  // hit-test path.
+  await drawBox(page);
+  await drawSecondBox(page);
+  await page.locator("canvas.interactive").first().click({ position: { x: 5, y: 5 } });
+  await pickTool(page, "Rectangle");
+
+  await page.keyboard.down("ControlOrMeta");
+  await page.mouse.click(BOX_EDGE[0], BOX_EDGE[1]);
+  await page.keyboard.down("Shift");
+  await page.mouse.click(BOX2_EDGE[0], BOX2_EDGE[1]);
+  await page.keyboard.up("Shift");
+  await expect.poll(() => selectedCount(page)).toBe(2);
+
+  const xs = () =>
+    page.evaluate(() =>
+      (window as unknown as { h: { elements: { x: number }[] } }).h.elements.map((e) => e.x),
+    );
+  const before = await xs();
+
+  // Grab the FIRST box (a member of the selection, not the one just clicked)
+  // and drag. Both boxes must move, and the selection must survive.
+  await page.mouse.move(BOX_EDGE[0], BOX_EDGE[1]);
+  await page.mouse.down();
+  await page.mouse.move(BOX_EDGE[0] + 60, BOX_EDGE[1], { steps: 10 });
+  await page.mouse.up();
+  await page.keyboard.up("ControlOrMeta");
+
+  expect(await selectedCount(page)).toBe(2);
+  const after = await xs();
+  expect(after.map((x, i) => Math.round(x - before[i]))).toEqual([60, 60]);
+});
+
 test("modifier + shift-drag moves the selection instead of deselecting", async ({ page }) => {
   // Note on what this does and does not prove: unlike the two shift tests
   // above, this one passed BEFORE the deep-select shift fix as well as after,
