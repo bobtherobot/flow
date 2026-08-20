@@ -581,6 +581,40 @@ the automated backstop if a replay silently restores one.
 > `canEngage` makes unreachable, and marquee select-through's `withCmdOrCtrl`
 > is untouched by design.
 
+### A sixth collision site: drag collapsed a multi-selection (FIXED 2026-08-20)
+
+**User-reported**, and the report's own shape is the useful part: *"multiple
+items selected, then moving the collection drops the selection and only the
+grabbed item moves — but rotation works correctly."*
+
+Cause: upstream's cmd/ctrl **deep-selection** branch (`App.tsx`, the
+`if (event[KEYS.CTRL_OR_CMD])` block that already needed the shift fix in Part
+A) falls straight into `editGroupForSelectedElement`, which **replaces**
+`selectedElementIds` with just the hit element, and then returns `false` so the
+drag proceeds — on a selection of one. Under flow the modifier is held for the
+whole interaction, so *every* drag on a multi-selection took that path.
+
+**Why rotation was fine, and why that detail mattered:** transform handles are
+hit earlier in the handler and never reach this branch. A bug report that says
+"X breaks but the neighbouring Y works" is localising the defect for you — here
+it ruled out the drag machinery and pointed straight at the hit-test path.
+
+Fix: return early, changing no state, when the hit element is already part of
+the selection. That is precisely the rule the **real** selection tool encodes a
+few lines below, where all its work sits behind
+`if (!this.state.selectedElementIds[hitElement.id])`. Submodule `74eadf68`.
+
+Verified as parity, not just "the bug is gone": probed real tool vs override
+across both grab points (on a selected element, and inside the selection's
+common bounding box) — all four cases keep the selection at 2 and move both
+elements 60px. Deep-select into a group from an *unselected* state still works
+(cmd-click a member of an unselected group still drills in and sets
+`editingGroupId`), so the change is narrower than "deep select removed".
+
+Note this is the **third** modification to that one deep-selection block
+(drag suppression 2026-08-14, shift 2026-08-15, this). When touching it again,
+assume there is a fourth behaviour fused into it.
+
 ### The fifth collision: arrow binding (FIXED 2026-08-19)
 
 Recorded 2026-08-16, **corrected and fixed 2026-08-19** on
