@@ -6,6 +6,7 @@ import {
   getBindingMode, setBindingMode,
   getLaserColor, setLaserColor,
   getSelectionMode, setSelectionMode,
+  getPastePosition, setPastePosition,
   getGridSize, setGridSize,
   getGridColor, setGridColor,
   getColorPalettes,
@@ -166,6 +167,26 @@ describe("selection mode persistence", () => {
   it("falls back to enclose for a corrupt stored value", () => {
     localStorage.setItem("flow.selectionMode", "banana");
     expect(getSelectionMode()).toBe("enclose");
+  });
+});
+
+describe("paste position persistence", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to pasting in place when unset", () => {
+    expect(getPastePosition()).toBe("original");
+  });
+
+  it("round-trips every mode", () => {
+    for (const mode of ["pointer", "viewport", "offset", "original"] as const) {
+      setPastePosition(mode);
+      expect(getPastePosition()).toBe(mode);
+    }
+  });
+
+  it("falls back to the default for a corrupt stored value", () => {
+    localStorage.setItem("flow.pastePosition", "middle-of-nowhere");
+    expect(getPastePosition()).toBe("original");
   });
 });
 

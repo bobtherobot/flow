@@ -10,6 +10,11 @@ import {
   SELECTION_MODE_LABELS,
   type SelectionMode,
 } from "../lib/selection-mode";
+import {
+  PASTE_POSITION_ORDER,
+  PASTE_POSITION_LABELS,
+  type PastePosition,
+} from "../lib/paste-position";
 import { MIN_GRID_SIZE, MAX_GRID_SIZE, GRID_SIZE_STEP } from "../lib/grid";
 import { splitColorAlpha, combineColorAlpha } from "../lib/color-alpha";
 import { NumberInput } from "./panels/controls/NumberInput";
@@ -27,6 +32,10 @@ export interface PreferencesDialogProps {
   onChangeUnits: (value: Unit) => void;
   selectionMode: SelectionMode;
   onChangeSelectionMode: (value: SelectionMode) => void;
+  /** Where a clipboard paste of elements lands — a global preference read by
+   *  the fork's paste path, not a per-document setting. */
+  pastePosition: PastePosition;
+  onChangePastePosition: (value: PastePosition) => void;
   gridSize: number;
   onChangeGridSize: (value: number) => void;
   /** Canvas grid line color as `#rrggbb` — a global preference. The bold
@@ -58,6 +67,8 @@ export function PreferencesDialog({
   onChangeUnits,
   selectionMode,
   onChangeSelectionMode,
+  pastePosition,
+  onChangePastePosition,
   gridSize,
   onChangeGridSize,
   gridColor,
@@ -181,6 +192,40 @@ export function PreferencesDialog({
                   ))}
                 </div>
               </div>
+            )}
+
+            {category === "general" && (
+              <fieldset
+                className="flow-choice"
+                // Unlike Sloppiness (the panel's first field, flush with the top
+                // padding) this one needs the same 1rem rhythm every other field
+                // below carries.
+                style={{ border: 0, margin: "1rem 0 0", padding: 0 }}
+              >
+                <legend
+                  style={{
+                    fontSize: "0.8125rem",
+                    fontWeight: 600,
+                    color: "#4a5163",
+                    marginBottom: "0.375rem",
+                  }}
+                >
+                  Paste position
+                </legend>
+                {PASTE_POSITION_ORDER.map((value) => (
+                  <label className="flow-option" key={value}>
+                    <input
+                      type="radio"
+                      name="paste-position"
+                      checked={pastePosition === value}
+                      onChange={() => onChangePastePosition(value)}
+                    />
+                    <span className="flow-option__label">
+                      {PASTE_POSITION_LABELS[value]}
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
             )}
 
             {category === "general" && (

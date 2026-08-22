@@ -1,10 +1,21 @@
 /* Preferences gets a wider dialog with a left category rail. */
 .flow-prefs {
   width: min(560px, 100%);
+  /* The General category keeps growing as preferences are added, and a dialog
+     centered in the backdrop grows off BOTH edges — so on a short viewport the
+     footer's Done button ends up unreachable. Cap the dialog to the viewport
+     and let the settings panel scroll instead; the header and footer stay put.
+     `dvh` (not `vh`) so a mobile browser's collapsing URL bar can't hide it. */
+  max-height: calc(100dvh - 2rem);
+  display: flex;
+  flex-direction: column;
 }
 .flow-prefs__body {
   display: grid;
   grid-template-columns: 140px 1fr;
+  /* Also the floor the body may shrink to under the cap above: an explicit
+     min-height (rather than the flex default `auto`) is what lets it shrink
+     below its content at all. */
   min-height: 220px;
 }
 .flow-prefs__nav {
@@ -36,6 +47,11 @@
 }
 .flow-prefs__panel {
   padding: 1rem 1.25rem;
+  /* Scrolls when the settings outgrow the capped dialog. A grid item's
+     automatic minimum size would otherwise stretch the row to fit and leave
+     nothing to scroll. */
+  overflow-y: auto;
+  min-height: 0;
 }
 .flow-prefs__keyboard {
   display: flex;

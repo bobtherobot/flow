@@ -107,6 +107,11 @@ const FORK_EDITS = [
     file: "dist/types/excalidraw/index.d.ts",
     why: "lets flow's pickers open the vendor eyedropper (see src/lib/eyedropper.ts)",
   },
+  {
+    symbol: "pastePosition",
+    file: "dist/types/excalidraw/types.d.ts",
+    why: "paste-position preference read by the clipboard paste path (see src/lib/paste-position.ts)",
+  },
 ];
 
 const missing = FORK_EDITS.filter(({ symbol, file }) => {

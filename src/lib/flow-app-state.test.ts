@@ -15,6 +15,7 @@ const PREFS = {
   bindingMode: "on",
   laserColor: "#ff0000",
   selectionMode: "enclose",
+  pastePosition: "original",
   gridSize: 20,
   gridColor: "#dddddd",
 } as const;
@@ -26,6 +27,7 @@ describe("flowSeedAppState", () => {
       bindingMode: "on",
       laserColor: "#ff0000",
       selectionMode: "enclose",
+      pastePosition: "original",
       gridSize: 20,
       gridColor: "#dddddd",
       gridColorBold: "#e5e5e5",

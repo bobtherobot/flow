@@ -2,6 +2,7 @@ import { FONT_FAMILY } from "@excalidraw/excalidraw";
 import type { Sloppiness } from "./roughness";
 import type { BindingMode } from "./binding-mode";
 import type { SelectionMode } from "./selection-mode";
+import type { PastePosition } from "./paste-position";
 import { boldGridColor } from "./grid";
 
 export interface FlowAppStatePrefs {
@@ -9,6 +10,7 @@ export interface FlowAppStatePrefs {
   bindingMode: BindingMode;
   laserColor: string;
   selectionMode: SelectionMode;
+  pastePosition: PastePosition;
   gridSize: number;
   gridColor: string;
 }
@@ -31,6 +33,7 @@ export function flowSeedAppState({
   bindingMode,
   laserColor,
   selectionMode,
+  pastePosition,
   gridSize,
   gridColor,
 }: FlowAppStatePrefs) {
@@ -46,6 +49,9 @@ export function flowSeedAppState({
     laserColor,
     // Seed the marquee selection mode at init (same fork-field rationale).
     selectionMode,
+    // Seed where pasted elements land (same fork-field rationale) — a paste can
+    // happen before any effect has run, e.g. straight after File ▸ New.
+    pastePosition,
     // flow: no shape tool armed at startup. Seeded (not merely defaulted) for
     // the same reason as the fields above — File ▸ New replaces the whole
     // appState, and an unseeded field there means a stale shape could survive
@@ -96,6 +102,7 @@ export const FLOW_GLOBAL_APP_STATE_KEYS = [
   "bindingMode",
   "laserColor",
   "selectionMode",
+  "pastePosition",
   "gridSize",
   "gridColor",
   "gridColorBold",

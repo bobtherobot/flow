@@ -19,12 +19,14 @@ import {
   getBindingMode, setBindingMode,
   getLaserColor, setLaserColor,
   getSelectionMode, setSelectionMode,
+  getPastePosition, setPastePosition,
   getGridSize, setGridSize,
   getGridColor, setGridColor,
 } from "./app/preferences";
 import { type Unit } from "./lib/units";
 import { type BindingMode, isBindingActive, toggledBindingMode } from "./lib/binding-mode";
 import { type SelectionMode } from "./lib/selection-mode";
+import { type PastePosition } from "./lib/paste-position";
 import { clampGridSize, DEFAULT_GRID_COLOR, boldGridColor } from "./lib/grid";
 import { scrubHex } from "./lib/color-palettes";
 import { flowSeedAppState } from "./lib/flow-app-state";
@@ -222,6 +224,24 @@ export default function App() {
     } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
   }, [excalidrawApi, selectionMode]);
 
+  // Paste position: where a clipboard paste of elements lands. Applied to
+  // appState so the fork's clipboard paste path reads it at the one call site
+  // that inserts pasted elements.
+  const [pastePosition, setPastePositionState] = useState<PastePosition>(() =>
+    getPastePosition(),
+  );
+  const handleChangePastePosition = useCallback((next: PastePosition) => {
+    setPastePositionState(next);
+    setPastePosition(next);
+  }, []);
+  // pastePosition isn't in the vendor .d.ts yet (fork addition) so cast the arg.
+  useEffect(() => {
+    if (!excalidrawApi) return;
+    excalidrawApi.updateScene({
+      appState: { pastePosition },
+    } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
+  }, [excalidrawApi, pastePosition]);
+
   // Grid size: flow's app-wide grid-cell size (px). Native appState field, so
   // no cast is needed (unlike selectionMode/bindingMode/laserColor above).
   const [gridSize, setGridSizeState] = useState<number>(() => getGridSize());
@@ -267,6 +287,7 @@ export default function App() {
     bindingMode,
     laserColor,
     selectionMode,
+    pastePosition,
     gridSize,
     gridColor,
   };
@@ -547,6 +568,8 @@ export default function App() {
           onChangeUnits={handleChangeUnits}
           selectionMode={selectionMode}
           onChangeSelectionMode={handleChangeSelectionMode}
+          pastePosition={pastePosition}
+          onChangePastePosition={handleChangePastePosition}
           gridSize={gridSize}
           onChangeGridSize={handleChangeGridSize}
           gridColor={gridColor}

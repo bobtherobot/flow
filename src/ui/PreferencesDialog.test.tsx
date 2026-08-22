@@ -7,6 +7,7 @@ function setup(overrides = {}) {
   const onChangeSloppiness = vi.fn();
   const onChangeUnits = vi.fn();
   const onChangeSelectionMode = vi.fn();
+  const onChangePastePosition = vi.fn();
   const onChangeGridSize = vi.fn();
   const onChangeGridColor = vi.fn();
   const onChangeLaserColor = vi.fn();
@@ -20,6 +21,8 @@ function setup(overrides = {}) {
       onChangeUnits={onChangeUnits}
       selectionMode="enclose"
       onChangeSelectionMode={onChangeSelectionMode}
+      pastePosition="original"
+      onChangePastePosition={onChangePastePosition}
       gridSize={20}
       onChangeGridSize={onChangeGridSize}
       gridColor="#dddddd"
@@ -35,6 +38,7 @@ function setup(overrides = {}) {
     onChangeSloppiness,
     onChangeUnits,
     onChangeSelectionMode,
+    onChangePastePosition,
     onChangeGridSize,
     onChangeGridColor,
     onChangeLaserColor,
@@ -63,6 +67,29 @@ describe("PreferencesDialog", () => {
     expect(select).toHaveValue("px");
     await userEvent.selectOptions(select, "mm");
     expect(onChangeUnits).toHaveBeenCalledWith("mm");
+  });
+
+  it("shows every paste position and reflects the current one", () => {
+    setup({ pastePosition: "offset" });
+    expect(screen.getByRole("radio", { name: /Offset \d+px from original/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "At mouse pointer" })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: "Center of view" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Same position as original" })).toBeInTheDocument();
+  });
+
+  it("fires onChangePastePosition with the chosen mode", async () => {
+    const { onChangePastePosition } = setup({ pastePosition: "original" });
+    await userEvent.click(screen.getByRole("radio", { name: "Center of view" }));
+    expect(onChangePastePosition).toHaveBeenCalledWith("viewport");
+  });
+
+  it("keeps the paste-position radios in their own group, apart from sloppiness", async () => {
+    // Both are plain radio fieldsets in the same panel; a shared `name` would
+    // make choosing a paste position silently clear the sloppiness choice.
+    const { onChangeSloppiness } = setup({ sloppiness: 0, pastePosition: "original" });
+    await userEvent.click(screen.getByRole("radio", { name: "At mouse pointer" }));
+    expect(onChangeSloppiness).not.toHaveBeenCalled();
+    expect(screen.getByRole("radio", { name: "Architect" })).toBeChecked();
   });
 
   it("shows the marquee selection mode as radios and reflects the current mode", () => {

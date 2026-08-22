@@ -15,6 +15,11 @@ import {
   type SelectionMode,
 } from "../lib/selection-mode";
 import {
+  DEFAULT_PASTE_POSITION,
+  isPastePosition,
+  type PastePosition,
+} from "../lib/paste-position";
+import {
   clampGridSize,
   isGridSize,
   DEFAULT_GRID_SIZE,
@@ -181,6 +186,27 @@ export function getSelectionMode(): SelectionMode {
 export function setSelectionMode(value: SelectionMode): void {
   try {
     localStorage.setItem(SELECTION_MODE_KEY, value);
+  } catch {
+    // Quota / disabled storage: preference simply won't persist this session.
+  }
+}
+
+const PASTE_POSITION_KEY = "flow.pastePosition";
+
+/** Read the persisted paste-position preference (default on miss/corrupt). */
+export function getPastePosition(): PastePosition {
+  try {
+    const raw = localStorage.getItem(PASTE_POSITION_KEY);
+    return isPastePosition(raw) ? raw : DEFAULT_PASTE_POSITION;
+  } catch {
+    return DEFAULT_PASTE_POSITION;
+  }
+}
+
+/** Persist the paste-position preference. */
+export function setPastePosition(value: PastePosition): void {
+  try {
+    localStorage.setItem(PASTE_POSITION_KEY, value);
   } catch {
     // Quota / disabled storage: preference simply won't persist this session.
   }
