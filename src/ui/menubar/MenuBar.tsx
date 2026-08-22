@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import * as Menubar from "@radix-ui/react-menubar";
 import type { ExcalidrawAPI, ImageFormat } from "../../lib/excalidraw-scene";
 import { useViewToggles } from "./useViewToggles";
+import { useZenMode } from "../useZenMode";
 import "./menubar.css";
 
 export interface MenuBarProps {
@@ -74,6 +76,27 @@ const contentProps = { align: "start", sideOffset: 4, className: "flow-menu" } a
  */
 export function MenuBar(props: MenuBarProps) {
   const view = useViewToggles(props.api);
+  const { zen } = useZenMode(props.api);
+
+  // Unmounting the bar is not enough: App insets <Excalidraw> by
+  // --flow-menubar-h, so without collapsing it zen would strand an empty 36px
+  // band where the menu used to be. Set as an inline custom property on the
+  // root so it overrides the stylesheet's `:root { --flow-menubar-h: 36px }`,
+  // and removed on cleanup so leaving zen restores it. Hooks run before the
+  // early return below, per the rules of hooks.
+  useEffect(() => {
+    if (!zen) return;
+    const root = document.documentElement;
+    root.style.setProperty("--flow-menubar-h", "0px");
+    return () => {
+      root.style.removeProperty("--flow-menubar-h");
+    };
+  }, [zen]);
+
+  // Zen hides every flow surface but the primary tool rail, which carries the
+  // toggle back out (see useZenMode / ToolRails).
+  if (zen) return null;
+
   return (
     <Menubar.Root className="flow-menubar" aria-label="Application menu">
       <Menubar.Menu>

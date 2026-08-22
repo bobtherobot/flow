@@ -55,7 +55,7 @@ describe("withHiddenToggled", () => {
 
   it("does not mutate the input", () => {
     const before = [...base.hiddenItems];
-    withHiddenToggled(base, "zenMode");
+    withHiddenToggled(base, "gridMode");
     expect(base.hiddenItems).toEqual(before);
   });
 });

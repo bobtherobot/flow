@@ -11,6 +11,7 @@ import { BackgroundControl } from "./BackgroundControl";
 import { SearchControl } from "./SearchControl";
 import { BottombarConfigMenu } from "./BottombarConfigMenu";
 import { useBottomActions } from "./useBottomActions";
+import { useZenMode } from "../useZenMode";
 import { shouldRedock, withHiddenToggled, type BottombarState } from "./bottombar-state";
 
 /** Fallback bar height before the shell is measured (for redock math). */
@@ -40,6 +41,7 @@ interface BottomBarProps {
  */
 export function BottomBar({ api, state, onChange, onSearch, toolbarReserved }: BottomBarProps) {
   const actions = useBottomActions(api);
+  const { zen } = useZenMode(api);
   const [menuOpen, setMenuOpen] = useState(false);
   const dockLeft = toolbarReserved > 0 ? toolbarReserved + RAIL_GAP : 0;
   const shellRef = useRef<HTMLDivElement>(null);
@@ -75,7 +77,9 @@ export function BottomBar({ api, state, onChange, onSearch, toolbarReserved }: B
     },
   });
 
-  if (!state.visible) return null;
+  // Zen hides every flow surface but the primary tool rail, which carries the
+  // toggle back out (see useZenMode / ToolRails).
+  if (!state.visible || zen) return null;
 
   const shellStyle: CSSProperties = state.floating
     ? { top: state.y, left: state.x }

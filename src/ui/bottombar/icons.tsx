@@ -28,14 +28,6 @@ export const gridIcon = (
   </Svg>
 );
 
-/** Zen mode: focus frame with a center dot (mirrors the quickbar zen glyph). */
-export const zenIcon = (
-  <Svg>
-    <path d="M4 7V4h3M16 7V4h-3M4 13v3h3M16 13v3h-3" />
-    <circle cx="10" cy="10" r="1.6" fill="currentColor" stroke="none" />
-  </Svg>
-);
-
 /** Minus for zoom out. */
 export const minusIcon = (
   <Svg>
@@ -61,6 +53,5 @@ export const searchIcon = (
 /** Icon lookup for the two `toggle` items, keyed by item id. */
 export function bottomIcon(id: string): ReactNode {
   if (id === "gridMode") return gridIcon;
-  if (id === "zenMode") return zenIcon;
   return null;
 }

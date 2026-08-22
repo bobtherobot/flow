@@ -139,3 +139,80 @@ describe("two rails", () => {
     expect(screen.queryByRole("menuitem", { name: "Detach toolbar" })).not.toBeInTheDocument();
   });
 });
+
+describe("ToolRails in zen mode", () => {
+  function zenApi(zenModeEnabled: boolean) {
+    return {
+      getSceneElements: () => [],
+      getAppState: () => ({
+        activeTool: { type: "selection", locked: false },
+        currentItemArrowType: "sharp",
+        currentItemBackgroundColor: "transparent",
+        currentItemStrokeColor: "#1e1e1e",
+        currentItemTextColor: "#1e1e1e",
+        selectedElementIds: {},
+        zenModeEnabled,
+      }),
+      onChange: () => () => {},
+      setActiveTool: vi.fn(),
+      updateScene: vi.fn(),
+      executeAction: vi.fn(),
+    };
+  }
+
+  function renderZen(api: ReturnType<typeof zenApi>) {
+    return render(
+      <ToolRails
+        api={api as unknown as ExcalidrawAPI}
+        toolbar={DEFAULT_TOOLBAR_STATE}
+        onToolbarChange={() => {}}
+        shapebar={DEFAULT_SHAPEBAR_STATE}
+        onShapebarChange={() => {}}
+      />,
+    );
+  }
+
+  it("puts a zen toggle on the Tools rail, after the laser", () => {
+    const { container } = renderZen(zenApi(false));
+    const labels = [
+      ...container.querySelectorAll('[aria-label="Tools"] .flow-toolbar__tools button'),
+    ].map((b) => b.getAttribute("aria-label"));
+    expect(labels[labels.length - 1]).toBe("Zen mode");
+    expect(labels[labels.length - 2]).toBe("Laser pointer");
+  });
+
+  it("keeps the zen toggle off the Shapes rail", () => {
+    const { container } = renderZen(zenApi(false));
+    expect(
+      container.querySelector('[aria-label="Shapes"] button[aria-label="Zen mode"]'),
+    ).toBeNull();
+  });
+
+  it("dispatches the zenMode action when the toggle is clicked", async () => {
+    const user = userEvent.setup();
+    const api = zenApi(false);
+    renderZen(api);
+    await user.click(screen.getByRole("button", { name: "Zen mode" }));
+    expect(api.executeAction).toHaveBeenCalledWith("zenMode");
+  });
+
+  it("hides the Shapes rail while zen is on", () => {
+    renderZen(zenApi(true));
+    expect(screen.getByRole("toolbar", { name: "Tools" })).toBeInTheDocument();
+    expect(screen.queryByRole("toolbar", { name: "Shapes" })).toBeNull();
+  });
+
+  it("collapses the gutter to the Tools rail alone while zen is on", () => {
+    renderZen(zenApi(true));
+    expect(document.documentElement.style.getPropertyValue("--flow-toolbar-reserved"))
+      .toBe("44px");
+  });
+
+  it("marks the zen toggle pressed while zen is on", () => {
+    renderZen(zenApi(true));
+    expect(screen.getByRole("button", { name: "Zen mode" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+});

@@ -20,7 +20,7 @@ export interface BottomItem {
   /** Excalidraw action name for `toggle` items dispatched via `executeAction`. */
   actionName?: string;
   /** For toggles: the `appState` boolean that reflects the on-state. */
-  toggleFlag?: "gridModeEnabled" | "zenModeEnabled";
+  toggleFlag?: "gridModeEnabled";
   /** Shown in the tooltip when present. */
   shortcut?: string;
 }
@@ -35,15 +35,6 @@ export const BOTTOM_ITEMS: readonly BottomItem[] = [
     actionName: "gridMode",
     toggleFlag: "gridModeEnabled",
     shortcut: "Ctrl+'",
-  },
-  {
-    id: "zenMode",
-    label: "Zen mode",
-    kind: "toggle",
-    group: "view",
-    actionName: "zenMode",
-    toggleFlag: "zenModeEnabled",
-    shortcut: "Alt+Z",
   },
   { id: "zoom", label: "Zoom", kind: "zoom", group: "zoom" },
   { id: "background", label: "Canvas background", kind: "background", group: "canvas" },

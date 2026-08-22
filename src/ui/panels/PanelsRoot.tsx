@@ -5,6 +5,7 @@ import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { Unit } from "../../lib/units";
 import { historyShortcutFor, isTextEntry } from "../../lib/history-shortcuts";
 import { useSelectionStyle } from "./useSelectionStyle";
+import { useZenMode } from "../useZenMode";
 import { TransformPanel } from "./TransformPanel";
 import { ColorPanel } from "./ColorPanel";
 import { StrokePanel } from "./StrokePanel";
@@ -35,6 +36,7 @@ interface PanelsRootProps {
  */
 export function PanelsRoot({ api, units, search }: PanelsRootProps) {
   const sel = useSelectionStyle(api);
+  const { zen } = useZenMode(api);
 
   const defs: PanelDef[] = [
     { id: "transform", label: "Transform", render: () => <TransformPanel sel={sel} api={api} /> },
@@ -45,6 +47,11 @@ export function PanelsRoot({ api, units, search }: PanelsRootProps) {
     { id: "search", label: "Search", render: () => <SearchPanel api={api} signal={search} /> },
     { id: "layers", label: "Layers", render: () => <LayersPlaceholder /> },
   ];
+
+  // Zen hides the whole dock. Unmounting `PanelDock` also fires its cleanup,
+  // which drops --flow-panel-reserved, so the canvas widens into the freed
+  // space rather than leaving a reserved-but-empty column on the right.
+  if (zen) return null;
 
   return (
     <div

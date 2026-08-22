@@ -87,9 +87,10 @@ body,
  * live in the quick-actions bar (src/ui/quickbar) and zoom lives in the bottom
  * bar (src/ui/bottombar). `.App-menu_bottom` is the stable footer wrapper from
  * vendor Footer.tsx; hiding it removes the redundant zoom/undo cluster. The
- * footer's exit-zen-mode button goes with it, but the bottom bar's zen toggle
- * (which stays visible in zen mode as it lives outside the Excalidraw tree)
- * covers exiting zen. Degrades gracefully if the class ever changes.
+ * footer's exit-zen-mode button goes with it; flow's own zen toggle lives on the
+ * primary tool rail (src/ui/toolbar), the one surface zen deliberately leaves on
+ * screen, so exiting zen is always one click away. Degrades gracefully if the
+ * class ever changes.
  */
 .excalidraw .App-menu_bottom {
   display: none;

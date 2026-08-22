@@ -16,11 +16,13 @@ test.describe("bottom bar", () => {
     expect(box!.x).toBeLessThan(vp.width / 2);
   });
 
-  test("shows grid, zen, zoom, background and search", async ({ page }) => {
+  test("shows grid, zoom, background and search", async ({ page }) => {
     await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Bottom bar" });
     await expect(bar.getByRole("button", { name: "Toggle grid" })).toBeVisible();
-    await expect(bar.getByRole("button", { name: "Zen mode" })).toBeVisible();
+    // Zen moved to the Tools rail — it is the one surface zen leaves on screen,
+    // so it is the only place the toggle can also be the way back out.
+    await expect(bar.getByRole("button", { name: "Zen mode" })).toHaveCount(0);
     await expect(bar.getByRole("group", { name: "Zoom" })).toBeVisible();
     await expect(bar.getByRole("button", { name: "Canvas background" })).toBeVisible();
     await expect(bar.getByRole("searchbox", { name: "Search canvas" })).toBeVisible();
@@ -104,14 +106,14 @@ test.describe("bottom bar", () => {
   test("the config menu hides an item and the choice persists", async ({ page }) => {
     await gotoApp(page);
     const bar = page.getByRole("toolbar", { name: "Bottom bar" });
-    await expect(bar.getByRole("button", { name: "Zen mode" })).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Toggle grid" })).toBeVisible();
 
     await page.getByRole("button", { name: "Bottom bar options" }).click();
-    await page.getByRole("checkbox", { name: "Zen mode" }).uncheck();
-    await expect(bar.getByRole("button", { name: "Zen mode" })).toHaveCount(0);
+    await page.getByRole("checkbox", { name: "Toggle grid" }).uncheck();
+    await expect(bar.getByRole("button", { name: "Toggle grid" })).toHaveCount(0);
 
     await reloadApp(page);
-    await expect(bar.getByRole("button", { name: "Zen mode" })).toHaveCount(0);
+    await expect(bar.getByRole("button", { name: "Toggle grid" })).toHaveCount(0);
   });
 
   test("tearing off the handle floats the bar", async ({ page }) => {

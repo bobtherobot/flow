@@ -29,6 +29,26 @@ const FLOAT_BOTTOM_GAP = 8;
  */
 const MIN_FLOAT_H = 120;
 
+/**
+ * A non-tool button pinned into the rail's grid after the last tool. Used for
+ * the zen toggle, which must live on the rail because zen hides every other
+ * flow surface — but is deliberately NOT a `ToolDef`: `TOOLS` feeds `ALL_TOOLS`
+ * feeds the quick-actions bar's tool registry, where a "zen" entry would mint a
+ * bogus tool item next to that bar's own zen toggle.
+ */
+export interface RailExtra {
+  /** Stable id (React key). */
+  id: string;
+  /** Accessible name + tooltip. */
+  label: string;
+  /** Optional shortcut appended to the tooltip. */
+  shortcut?: string;
+  icon: ReactNode;
+  /** Highlighted when the thing it toggles is on. */
+  active: boolean;
+  onClick: () => void;
+}
+
 interface ToolRailProps {
   api: ExcalidrawAPI | null;
   /** The tools this rail renders, top to bottom. */
@@ -47,6 +67,15 @@ interface ToolRailProps {
   onChange: (next: ToolbarState) => void;
   /** Pinned under the tool grid. The toolbar passes the color control here. */
   footer?: ReactNode;
+  /** Toggle buttons rendered in the grid after the last tool. */
+  extras?: readonly RailExtra[];
+  /**
+   * Whether zen mode is on. Only the primary rail is given this: zen hides every
+   * other flow surface, so the rail renders even when `state.visible` is false —
+   * otherwise entering zen with the rail hidden leaves nothing on screen but the
+   * vendor's Alt+Z shortcut as a way back.
+   */
+  zen?: boolean;
 }
 
 /**
@@ -67,6 +96,8 @@ export function ToolRail({
   state,
   onChange,
   footer,
+  extras,
+  zen = false,
 }: ToolRailProps) {
   const { activeType, arrowType, flowShapeKind, setTool } = useActiveTool(api);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -119,7 +150,8 @@ export function ToolRail({
     },
   });
 
-  if (!state.visible) return null;
+  // `|| zen` is the escape hatch, not a styling nicety — see the `zen` prop.
+  if (!state.visible && !zen) return null;
 
   const shellStyle: CSSProperties = state.floating
     ? {
@@ -190,6 +222,16 @@ export function ToolRail({
                 />
               );
             })}
+          {extras?.map((x) => (
+            <ToolButton
+              key={x.id}
+              icon={x.icon}
+              label={x.label}
+              shortcut={x.shortcut}
+              active={x.active}
+              onClick={x.onClick}
+            />
+          ))}
         </div>
         {footer}
       </div>

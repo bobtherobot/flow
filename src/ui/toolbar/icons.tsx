@@ -188,3 +188,13 @@ export const TOOL_ICONS: Record<ToolId, ReactNode> = {
     </Svg>
   ),
 };
+
+/** Zen mode: focus frame with a center dot. Shared glyph language with the
+ *  quickbar/bottombar zen icons, redrawn here so the rail stays icon-independent
+ *  of the bars. Not part of TOOL_ICONS — zen is a toggle, not a tool. */
+export const zenIcon: ReactNode = (
+  <Svg>
+    <path d="M4 7V4h3M16 7V4h-3M4 13v3h3M16 13v3h-3" />
+    <circle cx="10" cy="10" r="1.6" fill="currentColor" stroke="none" />
+  </Svg>
+);

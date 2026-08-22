@@ -265,3 +265,78 @@ describe("ToolRail", () => {
     expect(shell!.style.maxHeight).toContain("max(120px,");
   });
 });
+
+describe("ToolRail extras", () => {
+  const extra = (onClick = vi.fn(), active = false) => ({
+    id: "zenMode",
+    label: "Zen mode",
+    shortcut: "Alt+Z",
+    icon: <svg data-testid="zen-glyph" />,
+    active,
+    onClick,
+  });
+
+  function renderWithExtras(
+    extras = [extra()],
+    state = DEFAULT_TOOLBAR_STATE,
+    zen = false,
+  ) {
+    return render(
+      <ToolRail
+        api={fakeApi()}
+        tools={TOOLS}
+        width={TOOL_RAIL_WIDTH}
+        columns={1}
+        label="Tools"
+        noun="toolbar"
+        dockLeft={0}
+        state={state}
+        onChange={() => {}}
+        extras={extras}
+        zen={zen}
+      />,
+    );
+  }
+
+  it("renders each extra as a button in the tool grid", () => {
+    renderWithExtras();
+    expect(screen.getByRole("button", { name: "Zen mode" })).toBeInTheDocument();
+  });
+
+  it("renders extras after the last tool, so zen follows the laser", () => {
+    const { container } = renderWithExtras();
+    const labels = [...container.querySelectorAll(".flow-toolbar__tools button")].map((b) =>
+      b.getAttribute("aria-label"),
+    );
+    expect(labels[labels.length - 1]).toBe("Zen mode");
+    expect(labels[labels.length - 2]).toBe("Laser pointer");
+  });
+
+  it("fires the extra's own callback rather than selecting a tool", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    renderWithExtras([extra(onClick)]);
+    await user.click(screen.getByRole("button", { name: "Zen mode" }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("reflects the extra's active state", () => {
+    renderWithExtras([extra(vi.fn(), true)]);
+    expect(screen.getByRole("button", { name: "Zen mode" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("stays mounted while zen is on even if the rail was hidden", () => {
+    // Escape hatch: zen hides every other surface, so a hidden rail would leave
+    // no way back out short of Alt+Z.
+    renderWithExtras([extra()], { ...DEFAULT_TOOLBAR_STATE, visible: false }, true);
+    expect(screen.getByRole("toolbar", { name: "Tools" })).toBeInTheDocument();
+  });
+
+  it("still hides when it is hidden and zen is off", () => {
+    renderWithExtras([extra()], { ...DEFAULT_TOOLBAR_STATE, visible: false }, false);
+    expect(screen.queryByRole("toolbar", { name: "Tools" })).toBeNull();
+  });
+});

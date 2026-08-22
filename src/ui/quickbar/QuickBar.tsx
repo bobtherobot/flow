@@ -8,6 +8,7 @@ import { quickIcon } from "./icons";
 import { QuickButton } from "./QuickButton";
 import { QuickbarConfigMenu } from "./QuickbarConfigMenu";
 import { useQuickActions } from "./useQuickActions";
+import { useZenMode } from "../useZenMode";
 import { shouldRedock, withHiddenToggled, type QuickbarState } from "./quickbar-state";
 import type { BindingMode } from "../../lib/binding-mode";
 
@@ -43,6 +44,7 @@ function measureDockLeft(): number {
  */
 export function QuickBar({ api, state, onChange, bindingMode, onSetBindingMode }: QuickBarProps) {
   const { isActive, trigger } = useQuickActions(api, bindingMode, onSetBindingMode);
+  const { zen } = useZenMode(api);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dockLeft, setDockLeft] = useState(DEFAULT_DOCK_LEFT);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -85,7 +87,9 @@ export function QuickBar({ api, state, onChange, bindingMode, onSetBindingMode }
     },
   });
 
-  if (!state.visible) return null;
+  // Zen hides every flow surface but the primary tool rail, which carries the
+  // toggle back out (see useZenMode / ToolRails).
+  if (!state.visible || zen) return null;
 
   const shellStyle: CSSProperties = state.floating
     ? { top: state.y, left: state.x }
