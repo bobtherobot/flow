@@ -45,6 +45,22 @@ describe("NumericFields", () => {
     expect(screen.queryByLabelText("Hue")).not.toBeInTheDocument();
   });
 
+  /**
+   * The select leads the row in every mode, and shows the mode as text.
+   *
+   * Both halves matter: it used to trail the fields drawn as a bare chevron
+   * stack, with the format named nowhere in the row — the per-field R/G/B/A
+   * captions that once carried that job are gone, so the select's own text is
+   * the only label left.
+   */
+  it.each(["hsla", "rgba", "hex"] as const)("puts the format select first in %s mode", (mode) => {
+    setup(mode);
+    const select = screen.getByLabelText(/color format/i);
+    const row = select.parentElement!;
+    expect(row.firstElementChild).toBe(select);
+    expect(select).toHaveDisplayValue(mode.toUpperCase());
+  });
+
   it("switches mode through the select", () => {
     const { onModeChange } = setup();
     fireEvent.change(screen.getByLabelText(/color format/i), { target: { value: "rgba" } });

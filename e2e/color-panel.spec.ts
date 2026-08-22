@@ -399,6 +399,86 @@ test("the chooser and the saturation box stay the same height as the panel resiz
 });
 
 /**
+ * The two tracks under the saturation box are the same run of pixels as the
+ * box itself — same left edge, same width — and stay that way at any dock
+ * width.
+ *
+ * They did not used to be. The eyedropper (28px) and the chooser column
+ * (44px) are different sizes, so a plain flex row started the tracks 16px to
+ * the left of the box and ran them 16px wider. The row now restates the top
+ * section's geometry as a grid, which is the thing this test pins: measured at
+ * one width it would also pass on a lucky pair of control sizes.
+ */
+test("the hue and alpha tracks line up with the saturation box at any width", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.waitForSelector(".flow-pnl");
+
+  const edges = async () => {
+    const sat = (await page.locator(panel).getByRole("application").boundingBox())!;
+    const tracks = await page.locator(panel).getByRole("slider").all();
+    const boxes = await Promise.all(tracks.map(async (t) => (await t.boundingBox())!));
+    expect(boxes).toHaveLength(2); // hue and alpha, not one of them silently gone
+    return { sat, boxes };
+  };
+
+  const check = async () => {
+    const { sat, boxes } = await edges();
+    for (const track of boxes) {
+      expect(Math.round(track.x)).toBe(Math.round(sat.x));
+      expect(Math.round(track.width)).toBe(Math.round(sat.width));
+    }
+    return sat.width;
+  };
+
+  const before = await check();
+
+  const grip = page.locator(".flow-pnl__resize--left").first();
+  const box = (await grip.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 120, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+
+  const after = await check();
+  expect(after).toBeGreaterThan(before);
+});
+
+/**
+ * The quick-colour chips and the saturation box end on the same line — the
+ * line a user can see, which is not the line the layout boxes end on.
+ *
+ * A chip's 1px `--flow-ink` border is its visible edge and sits inside its
+ * box; the saturation box's last pixel is a near-invisible hairline, so its
+ * colour stops one pixel short of its own box. Two equal-height columns
+ * therefore looked a pixel out of step. The box's border width is read from
+ * the browser rather than written as 1 here, so restyling the hairline fails
+ * this test instead of quietly re-opening the gap.
+ */
+test("the quick-colour chips and the saturation box share a visible bottom edge", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.waitForSelector(".flow-pnl");
+
+  const chips = await page.locator(panel).locator(".flow-clr-chip").all();
+  expect(chips).toHaveLength(4);
+  const chipBottoms = await Promise.all(
+    chips.map(async (c) => Math.round((await c.boundingBox())!.y + (await c.boundingBox())!.height)),
+  );
+
+  const sat = page.locator(panel).getByRole("application");
+  const satBox = (await sat.boundingBox())!;
+  const hairline = await sat.evaluate(
+    (el) => parseFloat(getComputedStyle(el).borderBottomWidth),
+  );
+  const painted = Math.round(satBox.y + satBox.height - hairline);
+
+  expect(Math.max(...chipBottoms)).toBe(painted);
+});
+
+/**
  * Renaming is a dialog off the gear menu now — double-clicking the select
  * does nothing. Escape has to discard the edit, and only a real browser can
  * show the whole path: the dialog portals out of the docked panel, the key is

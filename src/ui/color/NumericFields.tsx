@@ -27,11 +27,14 @@ const MODE_LABELS: Record<NumericMode, string> = {
 };
 
 /**
- * The numeric row. HSLA by default; RGBA and HEX behind the format select.
+ * The numeric row: the format select, then that format's fields.
  *
- * The switcher is a real `<select>` even though the reference design draws it
- * as a chevron stack: a cycle button would be unreachable by keyboard and
- * nameless to a screen reader. CSS makes it look the part.
+ * The select leads the row rather than trailing it, and shows its current
+ * value as text (RGBA / HSLA / HEX) — it is the row's label as much as its
+ * control, which is why the per-field captions (R, G, B, A) it replaced are
+ * gone. It is drawn as an ordinary select, matching the palette picker further
+ * down the same panel; an earlier version hid the text behind a chevron stack
+ * and left the row with nothing naming the format it was showing.
  *
  * H/S/L and R/G/B ride on `NumberInput`, so they inherit drag-to-scrub and the
  * cross-engine spin-button handling that control already solved.
@@ -94,6 +97,7 @@ export function NumericFields({
     };
     return (
       <div className="flow-clr-numrow">
+        {switcher}
         <input
           type="text"
           className="flow-clr-hex"
@@ -106,7 +110,6 @@ export function NumericFields({
             if (e.key === "Escape") setHexText(null);
           }}
         />
-        {switcher}
       </div>
     );
   }
@@ -117,11 +120,11 @@ export function NumericFields({
       emit({ hsv: rgbToHsv({ ...rgb, [key]: v }) }, transient);
     return (
       <div className="flow-clr-numrow">
+        {switcher}
         <NumberInput value={Math.round(rgb.r)} min={0} max={255} onChange={setChannel("r")} ariaLabel="Red" className="flow-clr-num" />
         <NumberInput value={Math.round(rgb.g)} min={0} max={255} onChange={setChannel("g")} ariaLabel="Green" className="flow-clr-num" />
         <NumberInput value={Math.round(rgb.b)} min={0} max={255} onChange={setChannel("b")} ariaLabel="Blue" className="flow-clr-num" />
         {alphaField}
-        {switcher}
       </div>
     );
   }
@@ -132,11 +135,11 @@ export function NumericFields({
 
   return (
     <div className="flow-clr-numrow">
+      {switcher}
       <NumberInput value={Math.round(hsl.h)} min={0} max={360} onChange={setHsl("h")} ariaLabel="Hue" className="flow-clr-num" />
       <NumberInput value={Math.round(hsl.s)} min={0} max={100} onChange={setHsl("s")} ariaLabel="Saturation" className="flow-clr-num" />
       <NumberInput value={Math.round(hsl.l)} min={0} max={100} onChange={setHsl("l")} ariaLabel="Lightness" className="flow-clr-num" />
       {alphaField}
-      {switcher}
     </div>
   );
 }

@@ -110,9 +110,11 @@
   opacity: 0.4;
 }
 
+/* 4px, not the 6px of the rows above it: the format select moved in beside
+   the fields, and the four gaps are what pays for it. */
 .flow-clr-numrow {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
 }
 
@@ -121,29 +123,61 @@
   flex: 1 1 0;
 }
 
-/* Drawn as a compact chevron stack; still a real select underneath. */
-.flow-clr-mode {
-  width: 22px;
-  height: 28px;
-  flex: 0 0 auto;
-  padding: 0;
-  cursor: pointer;
-  color: transparent;
-  background: transparent
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='16' fill='none' stroke='%23868e96' stroke-width='1.5'><path d='M2 6 5 3l3 3M2 10l3 3 3-3'/></svg>")
-    no-repeat center;
-  border: none;
+/*
+ * Let the field inside actually shrink to the slot it was given.
+ *
+ * `NumberInput` sizes its input at a fixed 64px, which is right in the wide
+ * panels it was built for and far too wide for four fields sharing this row.
+ * The wrapper already shrinks (flex 1 1 0, min-width 0) but the input did not
+ * follow it: as a flex item its `min-width: auto` resolves to a form control's
+ * intrinsic minimum, so all four rendered at ~60px, overlapped each other, and
+ * the last one hung 25px past the panel's right edge. Only the wrapper's own
+ * width was ever honoured — which is why the row *looked* right.
+ */
+.flow-clr-num .flow-ctl-num__input {
+  width: 100%;
+  min-width: 0;
+  padding: 3px 4px;
+}
+
+/*
+ * No spin buttons on these four, unlike every other `NumberInput` in flow.
+ *
+ * Chromium's buttons claim ~15px the moment the pointer enters the field, and
+ * a ~38px field has nowhere to find it: "255" became "25" under the cursor —
+ * clipped at exactly the moment you were reaching for it. The two gestures
+ * that survive are the two that cost no width: drag-to-scrub, and ↑/↓ once
+ * focused. `.flow-ctl-num--mixed` already suppresses them the same way, for
+ * the same reason of "there is nothing here to step".
+ */
+.flow-clr-num .flow-ctl-num__input::-webkit-outer-spin-button,
+.flow-clr-num .flow-ctl-num__input::-webkit-inner-spin-button {
   appearance: none;
+  margin: 0;
 }
 
-.flow-clr-mode:focus-visible {
-  outline: 2px solid var(--flow-accent);
-  outline-offset: 1px;
+.flow-clr-num .flow-ctl-num__input[type="number"] {
+  appearance: textfield;
 }
 
-/* The options themselves must stay readable when the closed control is not. */
-.flow-clr-mode option {
+/*
+ * An ordinary select, left of the fields it labels — the same plain control
+ * the palette picker at the bottom of this panel uses, so the panel has one
+ * kind of dropdown rather than two. Its closed state reads "RGBA"/"HSLA"/"HEX",
+ * which is the only thing in the row naming the format the numbers are in.
+ *
+ * Sized down to 11px and allowed to shrink: it and four number fields share
+ * one row inside a dock the user can narrow, and the fields (flex 1 1 0) would
+ * otherwise pay for every pixel the select takes.
+ */
+.flow-clr-mode {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 24px;
+  font-family: inherit;
+  font-size: 11px;
   color: var(--flow-ink);
+  cursor: pointer;
 }
 
 .flow-clr-hex {
@@ -169,16 +203,29 @@
  * over 1.5. Change a chip size or gap and the stack follows by construction —
  * these two used to be independent numbers that drifted 69px against 44px.
  */
+/*
+ * Declared on the panel as well as on the chooser — one block, two selectors,
+ * so there is still exactly one set of numbers. The panel needs them because
+ * the row under the top section reserves a first column of `--flow-clr-group-w`
+ * to keep the hue/alpha tracks flush with the saturation box; the chooser needs
+ * them standalone because the rail popup mounts it outside any panel.
+ *
+ * `.flow-clr-chooser--compact` overrides the chip size after this block, so a
+ * compact chooser still wins on its own element wherever it is mounted.
+ */
+.flow-clr-panel,
+.flow-clr-chooser {
+  --flow-clr-chip-size: 20px;
+  --flow-clr-chip-gap: 4px;
+  --flow-clr-group-w: calc(2 * var(--flow-clr-chip-size) + var(--flow-clr-chip-gap));
+  --flow-clr-part-size: calc(var(--flow-clr-group-w) / 1.5);
+}
+
 .flow-clr-chooser {
   display: flex;
   flex-direction: column;
   gap: 8px;
   align-items: flex-start;
-
-  --flow-clr-chip-size: 20px;
-  --flow-clr-chip-gap: 4px;
-  --flow-clr-group-w: calc(2 * var(--flow-clr-chip-size) + var(--flow-clr-chip-gap));
-  --flow-clr-part-size: calc(var(--flow-clr-group-w) / 1.5);
 }
 
 .flow-clr-chooser--compact {
@@ -432,6 +479,25 @@
 }
 
 /*
+ * The chooser column ends one pixel below its bottom row of chips.
+ *
+ * Both columns are the same box height — flex `stretch` guarantees it — but
+ * they do not *paint* to the same line: the quartet's chips carry a 1px
+ * `--flow-ink` border that reads as their edge, while the saturation box spends
+ * its last pixel on a near-invisible `--flow-border` hairline. So the chips'
+ * dark edge landed a pixel below where the box's colour stopped. The padding
+ * grows this column by the one pixel the box spends on its hairline, which puts
+ * the two visible bottom edges on the same row.
+ *
+ * The alternative was giving the saturation box a chip-weight border, which
+ * would drag the two hue/alpha tracks below it along for consistency and put a
+ * hard dark rectangle around the middle of the panel.
+ */
+.flow-clr-panel__top > .flow-clr-chooser {
+  padding-bottom: 1px;
+}
+
+/*
  * In the panel the saturation box scales on ONE axis. Its `aspect-ratio` is
  * dropped here — kept on the base rule for the rail popup, where the box spans
  * the full width with nothing beside it to match — because an aspect ratio ties
@@ -447,6 +513,27 @@
   width: auto;
   height: auto;
   aspect-ratio: auto;
+}
+
+/*
+ * The hue and alpha tracks run exactly as wide as the saturation box above
+ * them, and start exactly where it starts.
+ *
+ * A flex row could not promise that: the eyedropper is 28px and the chooser
+ * column is 44px, so the tracks began 16px to the left of the box and ran
+ * that much wider. Restating the top row's own geometry as a grid — one
+ * chooser-width column, one gap, the rest — makes the alignment structural
+ * rather than a coincidence of two control sizes, and it holds when either
+ * one changes. The eyedropper is centred in the column it inherits.
+ */
+.flow-clr-panel > .flow-clr-row {
+  display: grid;
+  grid-template-columns: var(--flow-clr-group-w) 1fr;
+  gap: 10px;
+}
+
+.flow-clr-panel > .flow-clr-row > .flow-clr-eyedropper {
+  justify-self: center;
 }
 
 /* The rail's compact picker (Task 16): saturation box, eyedropper/preview/hue/

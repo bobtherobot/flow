@@ -537,3 +537,66 @@ test fails loudly on the count instead of quietly reverting to measuring the
 rail.clientHeight` is `0` for the real 3-part case at a 1440×900 viewport —
 the product risk the plan flagged is resolved, and now the test that says so
 actually proves it.
+
+---
+
+## Fourth pass — 2026-08-22: panel alignment and the format select
+
+Three UI-only tweaks to the docked panel. No change to how colour is read or
+written.
+
+**The hue/alpha tracks now measure exactly the saturation box.** They never did:
+the eyedropper is 28px and the chooser column is 44px, so a plain flex row
+started the tracks 16px left of the box and ran them 16px wider (measured
+`x=1074 w=188` against the box's `x=1092 w=170`). `.flow-clr-panel >
+.flow-clr-row` is now a grid restating the top section's own geometry —
+`grid-template-columns: var(--flow-clr-group-w) 1fr`, same 10px gap — so the
+alignment survives either control changing size. That required
+`--flow-clr-group-w` outside `.flow-clr-chooser`; it is declared in **one block
+on two selectors** (`.flow-clr-panel, .flow-clr-chooser`) rather than
+duplicated, because this file already records the 69px-vs-44px drift that
+independent copies of that number caused. `--compact` still overrides after the
+block, so the rail popup's chooser is unaffected — as is the popup's own picker
+row, whose tracks are still narrower than its full-width box (deliberate: no
+chooser column there to align to).
+
+**The 1px edge mismatch was never a layout bug.** Flex `stretch` makes the two
+columns identical box heights and an existing test asserts it. The columns
+*paint* differently: a quartet chip's visible edge is its 1px `--flow-ink`
+border, inside its box, while the saturation box spends its last pixel on a
+near-invisible `--flow-border` hairline — so the chips' dark edge landed a pixel
+below where the box's colour stopped. Fixed with `padding-bottom: 1px` on the
+panel's chooser column (grow the column by the pixel the box spends on its
+hairline). The rejected alternative was giving the box a chip-weight border,
+which would drag the two tracks below it along for consistency and put a hard
+dark rectangle through the middle of the panel.
+
+**The format select leads the numeric row and shows its value as text.** It was
+trailing, drawn as a chevron stack with `color: transparent`; now it is an
+ordinary select matching the palette picker at the bottom of the same panel. It
+is the only thing in the row naming the format, since the per-field R/G/B/A
+captions are long gone.
+
+**That surfaced a pre-existing overflow worth remembering: only the *wrapper*
+of a `NumberInput` shrinks.** `.flow-clr-num` is `flex: 1 1 0; min-width: 0`,
+but `.flow-ctl-num__input` inside it is a fixed 64px and, as a flex item, its
+`min-width: auto` resolves to a form control's intrinsic minimum. All four
+fields rendered ~57–64px inside 44.5px wrappers, overlapped each other, and the
+last hung 25px past the panel's right edge — invisible in a screenshot because
+the *wrappers* were laid out correctly. `width: 100%; min-width: 0` fixes it.
+**Anywhere `NumberInput` is packed more than two-up, check the input, not the
+wrapper.**
+
+Fixing that shrank the fields to ~38px, where **Chromium's spin buttons claim
+~15px the moment the pointer enters the field** — "255" rendered as "25"
+exactly while you were reaching for it. The four colour fields now suppress the
+spin buttons (`appearance: textfield` + the `::-webkit-*-spin-button` pair, the
+same technique `.flow-ctl-num--mixed` already uses); drag-to-scrub and ↑/↓
+survive. Shrinking type or the select does not buy enough room to keep them —
+the arithmetic leaves 11–16px for a ~19–21px string.
+
+Both new e2e tests were **run against reverted CSS to confirm they fail**, per
+the vacuous-test lesson recorded above. The bottom-edge test reads the
+hairline's width from `getComputedStyle` rather than hardcoding 1, so restyling
+the border fails the test instead of quietly reopening the gap. Unit 1258/1258,
+e2e 198/198.
