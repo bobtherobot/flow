@@ -72,13 +72,17 @@ describe("useHoverTarget", () => {
     expect(result.current?.id).toBe("r");
   });
 
-  it("drops the element only after the grace period", () => {
+  it("drops the element only after the grace period, not merely on the next tick", () => {
     const { api } = makeApi([rect()]);
     const { result } = renderHook(() => useHoverTarget(api));
     movePointer(50, 25);
     movePointer(500, 500);
-    expect(result.current?.id, "still held during the grace window").toBe("r");
-    act(() => void vi.advanceTimersByTime(150));
+    // Two advances, not one. A single "advance past the window" assertion
+    // passes for ANY delay from 0 upward, because timers never fire
+    // synchronously — so it would not notice the grace period being lost.
+    act(() => void vi.advanceTimersByTime(100)); // still inside the 120ms window
+    expect(result.current?.id, "still held before the window closes").toBe("r");
+    act(() => void vi.advanceTimersByTime(30)); // 130ms total, past it
     expect(result.current).toBeNull();
   });
 
@@ -138,6 +142,18 @@ describe("useHoverTarget", () => {
     const { api } = makeApi([rect()]);
     const { result } = renderHook(() => useHoverTarget(api));
     movePointer(50, 25, 1);
+    expect(result.current).toBeNull();
+  });
+
+  it("returns nothing, and drops any stale target, once the api goes away", () => {
+    const { api } = makeApi([rect()]);
+    const { result, rerender } = renderHook(
+      ({ a }: { a: ExcalidrawAPI | null }) => useHoverTarget(a),
+      { initialProps: { a: api as ExcalidrawAPI | null } },
+    );
+    movePointer(50, 25);
+    expect(result.current?.id).toBe("r");
+    rerender({ a: null });
     expect(result.current).toBeNull();
   });
 });

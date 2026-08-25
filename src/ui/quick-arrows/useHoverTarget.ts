@@ -56,7 +56,14 @@ export function useHoverTarget(api: ExcalidrawAPI | null): SceneElement | null {
   const graceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!api) return;
+    if (!api) {
+      // Clear, don't just bail. Without this the hook keeps handing back the
+      // last element it resolved even though there is no live API to resolve
+      // against. `useShapeSelection` has no equivalent gap because it derives
+      // its result synchronously on every render.
+      setTarget(null);
+      return;
+    }
 
     const clearGrace = () => {
       if (graceTimer.current !== null) {
