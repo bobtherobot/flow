@@ -280,3 +280,94 @@ test("the arrows follow the shape when it is panned, and do not scale with zoom"
     0,
   );
 });
+
+/* The (suspendedTool, gesture) quadrant, in a real browser.
+ *
+ * Three of its four states shipped broken. All three are Cmd/Ctrl-held: the
+ * override has suspended the user's tool for selection, and a quick-arrow
+ * press claims the same tool. `src/ui/toolbar/tool-restore.ts` documents the
+ * quadrant; these are the browser-level proofs, because the bugs are in the
+ * seam between a keyup handled by one hook and a pointerup handled by another
+ * and each hook looks correct on its own. */
+
+const activeTool = (page: Page) =>
+  page.evaluate(() => (window as any).h.app.state.activeTool.type);
+
+test("a Cmd/Ctrl-held click on a glyph leaves the armed tool intact", async ({ page }) => {
+  await gotoApp(page);
+  await drawRect(page, 400, 300, 600, 400);
+  await pickTool(page, "Ellipse");
+
+  await page.mouse.move(500, 350);
+  await page.keyboard.down("Control");
+  await expect(rightArrow(page), "the override reveals the arrows").toBeVisible();
+
+  const glyph = await rightArrow(page).boundingBox();
+  await page.mouse.move(glyph!.x + glyph!.width / 2, glyph!.y + glyph!.height / 2);
+  await page.mouse.down();
+  await page.keyboard.up("Control");
+  // A realistic click hold, and past one animation frame — the same reason
+  // the plain-click test above waits.
+  await page.waitForTimeout(60);
+  await page.mouse.up();
+
+  // A click is still a total no-op on the scene...
+  expect((await scene(page)).map((e: any) => e.type)).toEqual(["rectangle"]);
+  // ...but the tool must come back. Before the fix this was stuck on
+  // "selection" and Ellipse was gone until re-picked: the keyup cleared the
+  // override's record of the tool and then deferred to the gesture, and the
+  // gesture's click path restored nothing.
+  await expect.poll(() => activeTool(page)).toBe("ellipse");
+});
+
+test("releasing Cmd/Ctrl before the first move still restores the suspended tool", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await drawRect(page, 300, 300, 450, 400);
+  await pickTool(page, "Ellipse");
+
+  await page.mouse.move(375, 350);
+  await page.keyboard.down("Control");
+  await rightArrow(page).hover();
+  await page.mouse.down();
+  // Before the first qualifying move, and that ordering is the whole test.
+  // The tool to restore used to be read when the drag was CONFIRMED, one
+  // keyup too late, so it read null and fell back to the override's own
+  // "selection". (The existing mid-drag test above releases AFTER the first
+  // move and therefore never exercised this window.)
+  await page.keyboard.up("Control");
+  await page.mouse.move(650, 460, { steps: 10 });
+  await page.mouse.up();
+
+  const arrow = (await scene(page)).find((e: any) => e.type === "arrow");
+  expect(arrow, "the arrow was still drawn").toBeTruthy();
+  expect(arrow.start, "and still bound to its source").not.toBeNull();
+  await expect.poll(() => activeTool(page)).toBe("ellipse");
+});
+
+test("a Cmd/Ctrl-held drag leaves the override engaged for the rest of the hold", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await drawRect(page, 300, 300, 450, 400);
+  await pickTool(page, "Ellipse");
+
+  await page.mouse.move(375, 350);
+  await page.keyboard.down("Control");
+  await rightArrow(page).hover();
+  await page.mouse.down();
+  await page.mouse.move(650, 460, { steps: 10 });
+  await page.mouse.up();
+
+  // Ctrl is still down. The gesture used to re-arm Ellipse here, which
+  // defeated the override for the remainder of the hold: the arrows stopped
+  // appearing and a canvas drag drew an ellipse instead of marquee-selecting.
+  await expect.poll(() => activeTool(page)).toBe("selection");
+  await page.mouse.move(375, 350);
+  await expect(rightArrow(page), "so the arrows still appear").toBeVisible();
+
+  // And the override still hands the real tool back on its own keyup.
+  await page.keyboard.up("Control");
+  await expect.poll(() => activeTool(page)).toBe("ellipse");
+});

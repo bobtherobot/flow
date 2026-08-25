@@ -6,7 +6,7 @@ import type { StyleMemoryHandle } from "../useStyleMemory";
 import {
   beginToolGesture,
   endToolGesture,
-  getSuspendedTool,
+  markToolGestureArmed,
   restoreTool,
 } from "../toolbar/tool-restore";
 import { edgeMidpoint, toViewport, type QuickArrowSide, type Viewport } from "./quick-arrow-geometry";
@@ -88,7 +88,7 @@ function removeGestureEndListeners(handler: () => void): void {
  * first `pointermove` to clear `MOVE_THRESHOLD_SQ`, exactly the gate
  * `useDrag.ts` uses for the same click-vs-drag question.
  *
- * **The gesture flag is claimed at pointerdown, before movement is even
+ * **The tool claim is made at pointerdown, before movement is even
  * confirmed — everything else waits, this doesn't.** `useHoverTarget`
  * treats any held button as "some other gesture owns the canvas" and arms a
  * 120ms grace timer to clear the hovered target; that timer, once armed,
@@ -102,9 +102,15 @@ function removeGestureEndListeners(handler: () => void): void {
  * ever arrived, stranding the arrow tool armed). Claiming the flag here,
  * before `useHoverTarget`'s own first `pointermove` handler can ever see
  * this press, keeps that timer from arming in the first place.
- * `onUnarmedEnd` releases the flag again if the press never becomes a drag,
+ * `onUnarmedEnd` releases the claim again if the press never becomes a drag,
  * so a plain click still leaves `isToolGestureActive()` false once it's
- * done.
+ * done. The claim also records **which tool to hand back**, for a second and
+ * independent reason: the Cmd/Ctrl override can release its own claim at any
+ * moment, including between this pointerdown and the first qualifying move.
+ * Reading the suspended tool later — at `arm()` — meant a keyup landing in
+ * that gap had already cleared it, and the gesture handed back the override's
+ * own `"selection"` instead of the user's tool. `tool-restore.ts` documents
+ * the full `(suspendedTool, gesture)` quadrant, all four states of it.
  *
  * **The origin is the grabbed edge's midpoint, not the pointer.**
  * `maxBindingDistance_simple` is only ~15px at zoom 1, so a gesture
@@ -166,18 +172,35 @@ export function useQuickArrowDrag({
 
       // Claimed immediately — see the hook docstring's second point. Every
       // OTHER consequence of a press (focus, tool change, the dispatch)
-      // still waits for confirmed movement; only this flag can't, because
-      // `useHoverTarget`'s grace timer doesn't re-check it once armed.
-      beginToolGesture();
+      // still waits for confirmed movement; only this claim can't, because
+      // `useHoverTarget`'s grace timer doesn't re-check it once armed and
+      // because the tool it captures stops being readable the moment the
+      // Cmd/Ctrl modifier comes up.
+      beginToolGesture((api.getAppState() as unknown as DragAppState).activeTool.type);
+
+      /**
+       * Hand the tool back, if anything is owed. `endToolGesture` answers
+       * *what* is owed and returns null when the answer is "nothing" — the
+       * normal case for a plain click, which must stay a total no-op. Both
+       * ends of the gesture go through here: `onUnarmedEnd` below, and the
+       * armed `restore()` inside `arm()`.
+       */
+      const releaseClaim = () => {
+        const tool = endToolGesture();
+        if (tool && api) restoreTool(api, tool, styleMemory);
+      };
 
       // Nothing else has been armed yet: no focus change, no tool change. A
-      // release before movement is a genuine no-op click, so there is
-      // nothing to restore beyond handing the gesture flag back.
+      // release before movement is a genuine no-op click — but it is NOT
+      // automatically a no-op *restore*. If the Cmd/Ctrl modifier came up
+      // while this press was held, the override deliberately did not restore
+      // and left the obligation here; dropping it on the floor (which this
+      // used to do) permanently lost the user's armed tool.
       const onUnarmedEnd = () => {
         removeGestureEndListeners(onUnarmedEnd);
         window.removeEventListener("pointermove", onMove);
         cleanup.current = null;
-        endToolGesture();
+        releaseClaim();
       };
 
       const onMove = (moveEvent: PointerEvent) => {
@@ -198,7 +221,7 @@ export function useQuickArrowDrag({
       cleanup.current = () => {
         window.removeEventListener("pointermove", onMove);
         removeGestureEndListeners(onUnarmedEnd);
-        endToolGesture();
+        releaseClaim();
       };
 
       /** Movement confirmed a drag: arm the tool and start the real gesture. */
@@ -230,10 +253,11 @@ export function useQuickArrowDrag({
         const mid = edgeMidpoint(element, side);
         const origin = toViewport(mid.x, mid.y, v);
 
-        // What to hand back afterwards. While the Cmd/Ctrl override is
-        // engaged the active tool reads "selection", but the tool the user
-        // actually wants back is the one the override suspended.
-        const previousTool = getSuspendedTool() ?? state.activeTool.type;
+        // What to hand back afterwards was captured at pointerdown by
+        // `beginToolGesture`, and is deliberately NOT re-derived here: by now
+        // the modifier may have come up and cleared the override's own record
+        // of it. Only the arrow-type preference is snapshotted at arm time,
+        // because this is the moment before the gesture overwrites it.
         const previousArrowType = state.currentItemArrowType;
 
         const setAppState = (appState: Record<string, unknown>) =>
@@ -241,14 +265,13 @@ export function useQuickArrowDrag({
 
         /** Hand the tool, and the arrow-type preference, back. */
         const restore = () => {
-          endToolGesture();
-          // Before restoreTool, not after: its style-memory reload reads
-          // `currentItemArrowType` and would otherwise fold this gesture's
-          // temporary "elbow" into the linear bucket as if the user had
-          // chosen it. The already-drawn arrow keeps its own elbowed
+          // Before releaseClaim, not after: restoreTool's style-memory reload
+          // reads `currentItemArrowType` and would otherwise fold this
+          // gesture's temporary "elbow" into the linear bucket as if the user
+          // had chosen it. The already-drawn arrow keeps its own elbowed
           // geometry — this only puts the *next* arrow's default back.
           setAppState({ currentItemArrowType: previousArrowType });
-          restoreTool(api, previousTool, styleMemory);
+          releaseClaim();
         };
 
         // Released before the dispatch: the frame lost its race, a rare but
@@ -274,7 +297,7 @@ export function useQuickArrowDrag({
           removeGestureEndListeners(onGestureUp);
           if (frame.current !== null) cancelAnimationFrame(frame.current);
           frame.current = null;
-          endToolGesture();
+          restore();
         };
         addGestureEndListeners(onEarlyUp);
 
@@ -282,6 +305,11 @@ export function useQuickArrowDrag({
         // point: arm() runs outside React's own event dispatch, so without
         // this the rAF below can fire before the state update actually
         // commits.
+        // From here the tool has genuinely been taken, so the claim owes a
+        // restore of its own — not just whatever the override may have handed
+        // it. Below this line every end path has something to give back.
+        markToolGestureArmed();
+
         flushSync(() => {
           setAppState({ currentItemArrowType: "elbow" });
           api.setActiveTool({ type: "arrow", locked: true } as SetToolArg);

@@ -4,8 +4,8 @@ import { canEngage, overrideKeyFor, type OverrideState } from "./tool-override";
 import { isTextEntry } from "../../lib/history-shortcuts";
 import type { StyleMemoryHandle } from "../useStyleMemory";
 import {
+  deferRestoreToGesture,
   getSuspendedTool,
-  isToolGestureActive,
   restoreTool,
   setSuspendedTool,
 } from "./tool-restore";
@@ -47,12 +47,15 @@ export function useToolOverride(
     const restore = () => {
       const type = getSuspendedTool();
       if (!type) return;
+      // A canvas gesture (a quick-arrow drag) is mid-flight, so hand it the
+      // obligation rather than discharging it here: restoring now would switch
+      // the tool out from under vendor's live drag. Note what is NOT done in
+      // that branch — `setSuspendedTool(null)`. Clearing it here (which this
+      // used to do, before the early return) left the gesture with nothing to
+      // read and lost the user's tool for good; the gesture clears it when it
+      // discharges. See the quadrant comment in tool-restore.ts.
+      if (deferRestoreToGesture()) return;
       setSuspendedTool(null);
-      // A canvas gesture (a quick-arrow drag) is mid-flight and now owns the
-      // restore: it captured this same tool at its start and hands it back on
-      // pointer-up. Restoring here would switch the tool out from under
-      // vendor's live drag.
-      if (isToolGestureActive()) return;
       restoreTool(api, type, styleMemory);
     };
 

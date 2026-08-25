@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useQuickArrowDrag } from "./useQuickArrowDrag";
 import {
+  deferRestoreToGesture,
+  getSuspendedTool,
   isToolGestureActive,
   resetToolRestoreState,
   setSuspendedTool,
@@ -82,7 +84,7 @@ function pointerDownEvent() {
 function movePointer(dx = 10, dy = 0) {
   act(() =>
     void window.dispatchEvent(
-      new PointerEvent("pointermove", { clientX: 130 + dx, clientY: 25 + dy }),
+      new PointerEvent("pointermove", { clientX: 130 + dx, clientY: 25 + dy, pointerId: 7 }),
     ),
   );
 }
@@ -214,9 +216,12 @@ describe("useQuickArrowDrag", () => {
     expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: "rectangle", locked: true });
   });
 
-  it("restores the tool the Cmd/Ctrl override was suspending, not selection", () => {
-    // The override is engaged: the active tool reads "selection", but the tool
-    // the user actually wants back is the one it suspended.
+  it("leaves selection behind when the Cmd/Ctrl modifier is still held at the end", () => {
+    // Quadrant (T, gesture) with the modifier STILL DOWN. Measured bug: the
+    // gesture used to re-arm the suspended tool here, which defeated the
+    // override for the rest of the hold -- the quick arrows stopped appearing
+    // and a canvas drag drew an ellipse instead of marquee-selecting. The
+    // override still owns "ellipse"; the gesture only owes the effective tool.
     setSuspendedTool("ellipse");
     const api = makeApi("selection");
     installCanvas();
@@ -227,7 +232,54 @@ describe("useQuickArrowDrag", () => {
     movePointer();
     flushFrame();
     act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
+    expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: "selection", locked: true });
+    expect(getSuspendedTool(), "the override keeps its claim").toBe("ellipse");
+  });
+
+  it("restores the suspended tool when the modifier was released before the first move", () => {
+    // Quadrant (T, gesture) with the modifier released DURING the press, and
+    // released before the drag was even confirmed. `deferRestoreToGesture` is
+    // what `useToolOverride.restore` calls on that keyup; the whole point of
+    // capturing the tool at pointerdown is that this still knows what to hand
+    // back afterwards. Measured bug: it used to hand back the override's own
+    // "selection".
+    setSuspendedTool("ellipse");
+    const api = makeApi("selection");
+    installCanvas();
+    const { result } = renderHook(() =>
+      useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
+    );
+    act(() => result.current(pointerDownEvent()));
+    deferRestoreToGesture(); // the Cmd/Ctrl keyup, before any movement
+    movePointer();
+    flushFrame();
+    act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
     expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: "ellipse", locked: true });
+    expect(getSuspendedTool(), "the obligation is discharged, not left open").toBeNull();
+  });
+
+  it("hands the suspended tool back after a Cmd-held click that never became a drag", () => {
+    // The Critical. Nothing arms, so the gesture has nothing of its OWN to
+    // restore -- but the override released mid-press and deliberately did not
+    // restore either, precisely because this gesture had claimed the tool. If
+    // this end path does nothing, the user's armed tool is gone until they
+    // re-pick it: measured as `activeTool` stuck on "selection" with the
+    // Ellipse tool simply lost.
+    setSuspendedTool("ellipse");
+    const api = makeApi("selection");
+    const { seen } = installCanvas();
+    const { result } = renderHook(() =>
+      useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
+    );
+    act(() => result.current(pointerDownEvent()));
+    deferRestoreToGesture(); // the Cmd/Ctrl keyup, while the button is held
+    flushFrame();
+    act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
+
+    expect(seen, "a click still draws nothing").toHaveLength(0);
+    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "ellipse", locked: true });
+    expect(isToolGestureActive()).toBe(false);
+    expect(getSuspendedTool()).toBeNull();
   });
 
   it("restores the tool AFTER vendor finalizes, not before", () => {

@@ -158,7 +158,7 @@ describe("useHoverTarget", () => {
     movePointer(50, 25);
     expect(result.current?.id).toBe("r");
 
-    beginToolGesture();
+    beginToolGesture("selection");
     movePointer(50, 25, 1);
     expect(result.current?.id, "held during the gesture despite buttons!=0").toBe("r");
     act(() => void vi.advanceTimersByTime(200)); // well past the grace window
