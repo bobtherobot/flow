@@ -32,3 +32,15 @@ export function isBindableForQuickArrows(element: SceneElement): boolean {
       return false;
   }
 }
+
+/**
+ * Is this one of the two frame-like bindable types?
+ *
+ * Frames are bindable, so they get quick arrows of their own — but they are
+ * also the one type whose position in the element array lies about its paint
+ * order (see `useHoverTarget`'s `resolve`), so hover resolution has to be able
+ * to tell them apart from everything else.
+ */
+export function isFrameLikeForQuickArrows(element: SceneElement): boolean {
+  return element.type === "frame" || element.type === "magicframe";
+}

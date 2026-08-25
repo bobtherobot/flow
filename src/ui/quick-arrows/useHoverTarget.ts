@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { SceneElement } from "../shapes/useShapeSelection";
-import { isBindableForQuickArrows } from "./bindable";
+import { isBindableForQuickArrows, isFrameLikeForQuickArrows } from "./bindable";
 import { isInHaloRegion, type Viewport } from "./quick-arrow-geometry";
 import { isToolGestureActive } from "../toolbar/tool-restore";
 
@@ -123,11 +123,25 @@ function resolve(api: ExcalidrawAPI, x: number, y: number): SceneElement | null 
 
   const v = viewportOf(state);
   const elements = api.getSceneElements();
-  // Last in the array paints on top, so walk backwards to find the topmost.
+  // Last in the array paints on top, so walk backwards to find the topmost —
+  // with exactly one exception, and it is not a small one. Excalidraw stores a
+  // frame AFTER its own children but renders it BEHIND them, so a plain
+  // backwards walk hands back the FRAME for every shape sitting inside one:
+  // the glyphs appear at the frame's edge midpoints and the arrow binds to the
+  // frame, leaving the child's own arrows unreachable for as long as it is in
+  // a frame. So a frame is only ever a fallback: keep the topmost one seen and
+  // carry on looking. Any non-frame bindable under the pointer wins, and a
+  // frame still gets its own arrows when nothing else is there.
+  let frame: SceneElement | null = null;
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i];
     if (!isBindableForQuickArrows(el)) continue;
-    if (isInHaloRegion(el, v, x, y)) return el;
+    if (!isInHaloRegion(el, v, x, y)) continue;
+    if (isFrameLikeForQuickArrows(el)) {
+      if (!frame) frame = el;
+      continue;
+    }
+    return el;
   }
-  return null;
+  return frame;
 }

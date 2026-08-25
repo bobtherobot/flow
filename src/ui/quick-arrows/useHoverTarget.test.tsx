@@ -97,6 +97,33 @@ describe("useHoverTarget", () => {
     expect(result.current?.id).toBe("over");
   });
 
+  it("prefers a shape inside a frame over the frame itself", () => {
+    // Excalidraw stores a frame AFTER its children but paints it BEHIND them,
+    // so the plain "last in the array is topmost" walk handed back the FRAME
+    // for every shape inside one: the glyphs appeared at the frame's edge
+    // midpoints and the arrow bound to the frame, leaving the child's own
+    // arrows unreachable. Array order here is the real one — child first,
+    // frame last.
+    const { api } = makeApi([
+      rect({ id: "child", x: 20, y: 10, width: 40, height: 20 }),
+      rect({ id: "frame", type: "frame", x: 0, y: 0, width: 200, height: 120 }),
+    ]);
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(40, 20); // inside both
+    expect(result.current?.id).toBe("child");
+  });
+
+  it("still gives a frame its own arrows when nothing else is under the pointer", () => {
+    // The frame must stay a fallback, not become invisible to hover.
+    const { api } = makeApi([
+      rect({ id: "child", x: 20, y: 10, width: 40, height: 20 }),
+      rect({ id: "frame", type: "frame", x: 0, y: 0, width: 400, height: 300 }),
+    ]);
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(300, 250); // inside the frame, far from the child and its halo
+    expect(result.current?.id).toBe("frame");
+  });
+
   it("returns nothing while a drawing tool is armed", () => {
     const { api } = makeApi([rect()], { activeTool: { type: "rectangle" } });
     const { result } = renderHook(() => useHoverTarget(api));
