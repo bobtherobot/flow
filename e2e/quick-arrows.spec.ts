@@ -121,6 +121,7 @@ test("dropping on empty canvas leaves the end unbound", async ({ page }) => {
   await page.mouse.up();
 
   const arrow = (await scene(page)).find((e: any) => e.type === "arrow");
+  expect(arrow).toBeTruthy();
   expect(arrow.start).not.toBeNull();
   expect(arrow.end).toBeNull();
 });
@@ -161,7 +162,16 @@ test("the previous tool is restored after a gesture", async ({ page }) => {
   await page.mouse.move(375, 350);
   await rightArrow(page).hover();
   await page.mouse.down();
-  await page.mouse.move(700, 550, { steps: 12 });
+  await page.mouse.move(600, 450, { steps: 6 });
+  // Deliberate, and load-bearing for the same reason test 5's 60ms hold is.
+  // If `beginToolGesture()` ever regressed back to firing only after the
+  // movement threshold, useHoverTarget's 120ms grace timer would arm on this
+  // first move and then unmount the dragged triangle, tearing down the
+  // listener that restores the tool. That only shows up if the drag actually
+  // outlives the grace window -- so span it on purpose rather than relying on
+  // CDP round-trip latency to do it for us.
+  await page.waitForTimeout(200);
+  await page.mouse.move(700, 550, { steps: 6 });
   await page.mouse.up();
 
   await expect
