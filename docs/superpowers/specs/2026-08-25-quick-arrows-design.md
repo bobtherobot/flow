@@ -53,9 +53,10 @@ registers its move/up listeners on **`window`**, not on the pointerdown target
 (`App.tsx:8919`). So one synthetic event is enough to hand the entire rest of
 the gesture — driven by the user's genuine pointer — to vendor.
 
-This was **measured, not assumed.** A throwaway Playwright spike (written to a session scratchpad outside the
-repo, deliberately not committed) installed a real DOM button over the canvas, drove it with Playwright's real mouse, and asserted on
-the resulting scene:
+This was **measured, not assumed.** A throwaway Playwright spike (written to a
+session scratchpad outside the repo, deliberately not committed) installed a
+real DOM button over the canvas, drove it with Playwright's real mouse, and
+asserted on the resulting scene:
 
 | Probe | Result |
 |---|---|
@@ -118,11 +119,11 @@ Each arrow anchors at the N/E/S/W midpoint of the element's bounds, offset
 outward by a fixed **screen-space** distance of **14px** from the bounds to the
 triangle's base, with a triangle roughly **18px** wide and **12px** deep. Those
 three numbers are the starting point, tunable during implementation against the
-mockup; nothing else in the design depends on their exact values. Screen-space,
-not scene-space:
-like `ShapeHandles`' fixed 10px dot, the affordance stays the same physical
-size and the same physical distance out at every zoom level, so it is equally
-grabbable zoomed in or out.
+mockup; nothing else in the design depends on their exact values.
+
+Screen-space, not scene-space: like `ShapeHandles`' fixed 10px dot, the
+affordance stays the same physical size and the same physical distance out at
+every zoom level, so it is equally grabbable zoomed in or out.
 
 On a rotated element the anchor rotates about the element centre (reusing the
 `rotateAboutCenter` convention from `src/ui/shapes/ShapeHandles.tsx`) and the
