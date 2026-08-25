@@ -1,9 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import { canEngage, overrideKeyFor, type OverrideState } from "./tool-override";
 import { isTextEntry } from "../../lib/history-shortcuts";
-import { categoryOfTool } from "../../lib/style-memory";
 import type { StyleMemoryHandle } from "../useStyleMemory";
+import {
+  getSuspendedTool,
+  isToolGestureActive,
+  restoreTool,
+  setSuspendedTool,
+} from "./tool-restore";
 
 /** `setActiveTool` takes a discriminated union keyed on `type`; our string is a
  *  subset of it, so cast at this single boundary (mirrors useActiveTool). */
@@ -35,54 +40,20 @@ export function useToolOverride(
   api: ExcalidrawAPI | null,
   styleMemory?: StyleMemoryHandle | null,
 ): void {
-  // The tool a held modifier is currently suspending, or null when idle. A ref
-  // rather than state: nothing renders off it, and keyup must read what keydown
-  // wrote without waiting for a re-render.
-  const suspended = useRef<string | null>(null);
-
   useEffect(() => {
     if (!api) return;
     const overrideKey = overrideKeyFor(navigator.platform);
 
     const restore = () => {
-      const type = suspended.current;
+      const type = getSuspendedTool();
       if (!type) return;
-      suspended.current = null;
-      // Read the selection FRESH. A snapshot taken at engage time would clobber
-      // anything that changed during the hold — most sharply a Cmd+Z, whose
-      // undo restores its own selection.
-      const { selectedElementIds, selectedGroupIds, editingGroupId } = api.getAppState();
-      // Restores the tool's own cursor, but clears the selection on the way:
-      // the vendor resets it for every non-selection tool (App.tsx:4758) ...
-      api.setActiveTool({ type, locked: true } as SetToolArg);
-      // ... so put it back. Omitting `elements` leaves the scene alone — the
-      // vendor guards the replace on `if (sceneData.elements)` (App.tsx:3972).
-      api.updateScene({
-        appState: { selectedElementIds, selectedGroupIds, editingGroupId },
-      });
-      // flow: re-applying the selection above creates a state style memory's
-      // design never had to account for — a drawing tool active with
-      // elements selected. useStyleMemory's own adopt-on-select cannot tell
-      // "the override just restored what was already selected" apart from a
-      // genuine new selection, so it re-fires here and leaves currentItem*
-      // holding the reselected element's OWN style, from a possibly
-      // different category, instead of the restored tool's bucket. Treat the
-      // release like a tool change and ask style memory to reload the
-      // restored tool's category — but through its own `reloadCategory`
-      // handle, NOT a hand-rolled `updateScene` here. A hand-rolled write
-      // (this file's first attempt) bypasses the bookkeeping that keeps
-      // useStyleMemory's drift watcher from re-reading the write as an
-      // unexplained edit, and folding it into whichever category the
-      // still-selected foreign element belongs to — corrupting THAT bucket
-      // instead. Routing through the handle is what avoids it: see
-      // [[style-memory]] and [[tool-override]] for the full trace.
-      const category = categoryOfTool(type);
-      if (category && styleMemory) {
-        const { currentItemArrowType } = api.getAppState() as unknown as {
-          currentItemArrowType?: string;
-        };
-        styleMemory.reloadCategory(category, type, currentItemArrowType ?? "sharp");
-      }
+      setSuspendedTool(null);
+      // A canvas gesture (a quick-arrow drag) is mid-flight and now owns the
+      // restore: it captured this same tool at its start and hands it back on
+      // pointer-up. Restoring here would switch the tool out from under
+      // vendor's live drag.
+      if (isToolGestureActive()) return;
+      restoreTool(api, type, styleMemory);
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -103,10 +74,10 @@ export function useToolOverride(
       }
       if (e.key !== overrideKey) return;
       // A held modifier auto-repeats keydown; only the first one engages.
-      if (suspended.current) return;
+      if (getSuspendedTool()) return;
       const state = api.getAppState() as unknown as OverrideState;
       if (!canEngage(state, e.target)) return;
-      suspended.current = state.activeTool.type;
+      setSuspendedTool(state.activeTool.type);
       // Switching TO selection preserves the selection (vendor App.tsx:4758
       // guards its reset on the target not being selection) and sets the
       // cursor, so the swap-in needs nothing further.

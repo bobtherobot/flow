@@ -4,6 +4,12 @@ import { renderHook } from "@testing-library/react";
 import { useToolOverride } from "./useToolOverride";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { StyleMemoryHandle } from "../useStyleMemory";
+import { resetToolRestoreState } from "./tool-restore";
+
+// Module state in tool-restore.ts is shared across every test in this file
+// (and would otherwise leak between them, e.g. a test that presses without
+// releasing leaving `suspendedTool` set for the next one).
+beforeEach(() => resetToolRestoreState());
 
 /** Mutable appState behind the fake api, so a test can model the canvas
  *  changing between engage and restore (an undo landing mid-hold). */
