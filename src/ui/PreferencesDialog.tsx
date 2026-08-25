@@ -19,6 +19,7 @@ import { MIN_GRID_SIZE, MAX_GRID_SIZE, GRID_SIZE_STEP } from "../lib/grid";
 import { splitColorAlpha, combineColorAlpha } from "../lib/color-alpha";
 import { NumberInput } from "./panels/controls/NumberInput";
 import { ColorSwatch } from "./panels/controls/ColorSwatch";
+import { ConfirmDialog } from "./ConfirmDialog";
 import "./dialogs.css";
 // ColorSwatch/NumberInput carry their .flow-ctl-* styles in panels.css; import
 // it here too so the dialog doesn't depend on the panels being mounted.
@@ -47,6 +48,10 @@ export interface PreferencesDialogProps {
   laserColor: string;
   onChangeLaserColor: (value: string) => void;
   onShowShortcuts: () => void;
+  /** Wipe every stored preference and restart the app on its defaults. Owned by
+   *  the caller because it ends this dialog's life along with everything else;
+   *  the dialog only asks. */
+  onRestoreDefaults: () => void;
   onClose: () => void;
 }
 
@@ -76,9 +81,11 @@ export function PreferencesDialog({
   laserColor,
   onChangeLaserColor,
   onShowShortcuts,
+  onRestoreDefaults,
   onClose,
 }: PreferencesDialogProps) {
   const [category, setCategory] = useState<Category>("general");
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const titleId = useId();
   const unitsId = useId();
   const gridSizeId = useId();
@@ -289,6 +296,23 @@ export function PreferencesDialog({
               </div>
             )}
 
+            {category === "general" && (
+              <div className="flow-prefs__reset">
+                <span className="flow-prefs__reset-label">Restore factory settings</span>
+                <p className="flow-prefs__hint">
+                  Puts every setting back the way flow shipped. Your saved
+                  drawings are not affected.
+                </p>
+                <button
+                  type="button"
+                  className="flow-btn flow-btn--ghost flow-prefs__reset-btn"
+                  onClick={() => setConfirmingReset(true)}
+                >
+                  Restore Factory Settings
+                </button>
+              </div>
+            )}
+
             {category === "keyboard" && (
               <div className="flow-prefs__keyboard">
                 <p className="flow-prefs__hint">
@@ -313,6 +337,35 @@ export function PreferencesDialog({
           </button>
         </div>
       </div>
+
+      {confirmingReset && (
+        <ConfirmDialog
+          title="Restore factory settings?"
+          confirmLabel="Restore Factory Settings"
+          destructive
+          onCancel={() => setConfirmingReset(false)}
+          onConfirm={onRestoreDefaults}
+        >
+          <p className="flow-prefs__warn">
+            This cannot be undone. Everything below goes back to how flow
+            shipped:
+          </p>
+          <ul className="flow-prefs__warn-list">
+            <li>Toolbars, the shape bar, the quick actions bar and the bottom bar</li>
+            <li>Panel layouts, including any layouts you have saved by name</li>
+            <li>Grid, units, sloppiness, selection and paste behaviour</li>
+            <li>
+              <strong>Every colour palette</strong> you have created or edited,
+              and your recently used colours
+            </li>
+          </ul>
+          <p className="flow-prefs__warn">
+            Your saved drawings are kept. flow will reload, so the canvas starts
+            empty — anything on it now has been auto-saved and can be reopened
+            from <span className="flow-nowrap">File ▸ Open</span>.
+          </p>
+        </ConfirmDialog>
+      )}
     </div>
   );
 }

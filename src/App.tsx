@@ -22,6 +22,7 @@ import {
   getPastePosition, setPastePosition,
   getGridSize, setGridSize,
   getGridColor, setGridColor,
+  resetFactorySettings,
 } from "./app/preferences";
 import { type Unit } from "./lib/units";
 import { type BindingMode, isBindingActive, toggledBindingMode } from "./lib/binding-mode";
@@ -331,6 +332,19 @@ export default function App() {
     }, AUTOSAVE_DELAY_MS);
   }, [provider, currentId, currentName]);
 
+  // Wipe every stored preference, then reload. A reload rather than an in-place
+  // re-render because the settings this clears are read once at mount by a dozen
+  // independent surfaces (both tool rails, the quick bar, the bottom bar, the
+  // panel dock, the palette store); pushing new values into all of them by hand
+  // would leave whichever one was missed showing its old state, and a *partial*
+  // factory reset reads as a bug rather than an omission. Saved documents live
+  // in IndexedDB and are untouched — including the working scene, which the
+  // autosave above has already written there.
+  const handleRestoreDefaults = useCallback(() => {
+    resetFactorySettings();
+    window.location.reload();
+  }, []);
+
   const openSaveDialog = useCallback(() => setSaveOpen(true), []);
   const openOpenDialog = useCallback(async () => {
     setInternalDocs(await provider.list());
@@ -577,6 +591,7 @@ export default function App() {
           laserColor={laserColor}
           onChangeLaserColor={handleChangeLaserColor}
           onShowShortcuts={handleShowShortcuts}
+          onRestoreDefaults={handleRestoreDefaults}
           onClose={() => setPrefsOpen(false)}
         />
       )}

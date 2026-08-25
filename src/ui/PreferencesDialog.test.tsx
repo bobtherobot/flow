@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PreferencesDialog } from "./PreferencesDialog";
 
@@ -12,6 +12,7 @@ function setup(overrides = {}) {
   const onChangeGridColor = vi.fn();
   const onChangeLaserColor = vi.fn();
   const onShowShortcuts = vi.fn();
+  const onRestoreDefaults = vi.fn();
   const onClose = vi.fn();
   render(
     <PreferencesDialog
@@ -30,6 +31,7 @@ function setup(overrides = {}) {
       laserColor="#ff0000"
       onChangeLaserColor={onChangeLaserColor}
       onShowShortcuts={onShowShortcuts}
+      onRestoreDefaults={onRestoreDefaults}
       onClose={onClose}
       {...overrides}
     />,
@@ -43,6 +45,7 @@ function setup(overrides = {}) {
     onChangeGridColor,
     onChangeLaserColor,
     onShowShortcuts,
+    onRestoreDefaults,
     onClose,
   };
 }
@@ -219,5 +222,76 @@ describe("PreferencesDialog", () => {
     const { onClose } = setup();
     await userEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("restore factory settings", () => {
+  const open = () => screen.getByRole("button", { name: "Restore Factory Settings" });
+  const warning = () => screen.queryByRole("alertdialog");
+
+  it("asks before doing anything", async () => {
+    const user = userEvent.setup();
+    const { onRestoreDefaults } = setup();
+    expect(warning()).toBeNull();
+
+    await user.click(open());
+
+    expect(warning()).toBeInTheDocument();
+    expect(onRestoreDefaults).not.toHaveBeenCalled();
+  });
+
+  it("spells out what is lost — palettes included — and what is kept", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(open());
+
+    const text = warning()!.textContent ?? "";
+    expect(text).toMatch(/cannot be undone/i);
+    expect(text).toMatch(/palette/i);
+    expect(text).toMatch(/saved drawings are kept/i);
+  });
+
+  it("restores only once the warning is confirmed", async () => {
+    const user = userEvent.setup();
+    const { onRestoreDefaults } = setup();
+    await user.click(open());
+    await user.click(
+      within(warning()!).getByRole("button", { name: "Restore Factory Settings" }),
+    );
+    expect(onRestoreDefaults).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancelling leaves everything alone", async () => {
+    const user = userEvent.setup();
+    const { onRestoreDefaults, onClose } = setup();
+    await user.click(open());
+    await user.click(within(warning()!).getByRole("button", { name: "Cancel" }));
+
+    expect(onRestoreDefaults).not.toHaveBeenCalled();
+    expect(warning()).toBeNull();
+    // Cancelling the warning must not also dismiss Preferences underneath it.
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Preferences" })).toBeInTheDocument();
+  });
+
+  it("focuses Cancel, so a stray Enter cannot wipe anything", async () => {
+    const user = userEvent.setup();
+    const { onRestoreDefaults } = setup();
+    await user.click(open());
+
+    expect(within(warning()!).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(onRestoreDefaults).not.toHaveBeenCalled();
+  });
+
+  it("Escape cancels the warning without closing Preferences", async () => {
+    const user = userEvent.setup();
+    const { onRestoreDefaults, onClose } = setup();
+    await user.click(open());
+    await user.keyboard("{Escape}");
+
+    expect(warning()).toBeNull();
+    expect(onRestoreDefaults).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

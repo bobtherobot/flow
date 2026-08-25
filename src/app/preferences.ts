@@ -412,3 +412,39 @@ function writeJson(key: string, value: unknown): void {
     // Quota / disabled storage: preference simply won't persist this session.
   }
 }
+
+/**
+ * The namespace every flow preference key lives under. Load-bearing: the
+ * factory reset sweeps by this prefix, so a key outside it would survive a
+ * reset and a key inside it that is NOT a preference would be destroyed by one.
+ */
+export const FLOW_PREFS_PREFIX = "flow.";
+
+/**
+ * Restore every user-configurable setting to its shipped default: toolbars,
+ * panel layouts, grid, colors, palettes, recents — everything this module owns.
+ *
+ * Deliberately sweeps by prefix rather than deleting an enumerated list. A list
+ * has to be kept in step with every preference added later, and forgetting one
+ * produces a *partial* reset — the worst outcome here, because the surface that
+ * kept its old value looks like a bug in the reset rather than a missing line.
+ *
+ * Saved documents are untouched: they live in IndexedDB (see
+ * `src/storage/indexeddb-provider.ts`), not in localStorage, so nothing here can
+ * reach them. That separation is what lets this be a blunt sweep.
+ *
+ * Reads the key list up front, because removing during a live `key(i)` walk
+ * reindexes the store underneath the loop and skips entries.
+ */
+export function resetFactorySettings(): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key !== null && key.startsWith(FLOW_PREFS_PREFIX)) keys.push(key);
+    }
+    for (const key of keys) localStorage.removeItem(key);
+  } catch {
+    // Quota / disabled storage: there was nothing persisted to clear anyway.
+  }
+}

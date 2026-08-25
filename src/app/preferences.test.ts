@@ -18,11 +18,14 @@ import {
   setColorNumericMode,
   getShapebarState,
   setShapebarState,
+  resetFactorySettings,
+  FLOW_PREFS_PREFIX,
 } from "./preferences";
 import { DEFAULT_TOOLBAR_STATE, DEFAULT_SHAPEBAR_STATE } from "../ui/toolbar/toolbar-state";
 import { DEFAULT_QUICKBAR_STATE } from "../ui/quickbar/quickbar-state";
 import { DEFAULT_LASER_HEX } from "../lib/laser-color";
-import { DEFAULT_GRID_COLOR } from "../lib/grid";
+import { DEFAULT_GRID_COLOR, DEFAULT_GRID_SIZE } from "../lib/grid";
+import { DEFAULT_SLOPPINESS } from "../lib/roughness";
 
 // Mock localStorage with a simple in-memory implementation
 const mockStorage: Record<string, string> = {};
@@ -351,5 +354,65 @@ describe("shapebar state", () => {
   it("falls back to the default on a junk payload", () => {
     localStorage.setItem("flow.shapebar", "{not json");
     expect(getShapebarState()).toEqual(DEFAULT_SHAPEBAR_STATE);
+  });
+});
+
+describe("resetFactorySettings", () => {
+  /** Every stored key, read through the Storage API rather than Object.keys —
+   *  which on a stubbed storage object would return its method names. */
+  const storedKeys = () =>
+    Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)!);
+
+  beforeEach(() => localStorage.clear());
+
+  it("removes every flow preference, including ones it was never told about", () => {
+    setSloppiness(2);
+    setGridSize(45);
+    setShapebarState({ ...DEFAULT_SHAPEBAR_STATE, floating: true });
+    // A preference added after this function was written. Sweeping by prefix is
+    // the whole point: an enumerated list would silently leave this behind, and
+    // a half-reset is worse than none.
+    localStorage.setItem(`${FLOW_PREFS_PREFIX}futureSetting`, "whatever");
+
+    resetFactorySettings();
+
+    expect(storedKeys().filter((k) => k.startsWith(FLOW_PREFS_PREFIX))).toEqual([]);
+  });
+
+  it("reads back as defaults afterwards", () => {
+    setSloppiness(2);
+    setGridSize(45);
+    setShapebarState({ ...DEFAULT_SHAPEBAR_STATE, floating: true });
+
+    resetFactorySettings();
+
+    expect(getSloppiness()).toBe(DEFAULT_SLOPPINESS);
+    expect(getGridSize()).toBe(DEFAULT_GRID_SIZE);
+    expect(getShapebarState()).toEqual(DEFAULT_SHAPEBAR_STATE);
+  });
+
+  it("leaves storage that is not flow's alone", () => {
+    localStorage.setItem("theme", "dark");
+    // Prefix-matching on "flow" alone would take this one too.
+    localStorage.setItem("flowers", "kept");
+    setSloppiness(2);
+
+    resetFactorySettings();
+
+    expect(localStorage.getItem("theme")).toBe("dark");
+    expect(localStorage.getItem("flowers")).toBe("kept");
+  });
+
+  it("does not throw when storage refuses the delete", () => {
+    setSloppiness(2);
+    const original = localStorage.removeItem;
+    localStorage.removeItem = () => {
+      throw new Error("denied");
+    };
+    try {
+      expect(() => resetFactorySettings()).not.toThrow();
+    } finally {
+      localStorage.removeItem = original;
+    }
   });
 });

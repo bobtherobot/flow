@@ -173,3 +173,39 @@
   top: auto;
   bottom: calc(100% + 6px);
 }
+
+/* Restore factory settings. Sits at the end of General, set apart by a rule so
+   it does not read as one more setting in the list above it. */
+.flow-prefs__reset {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eef0f5;
+}
+.flow-prefs__reset-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #4a5163;
+}
+.flow-prefs__reset-btn {
+  margin-top: 0.625rem;
+}
+
+/* Warning copy inside the confirmation. */
+.flow-prefs__warn {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #4a5163;
+}
+.flow-prefs__warn-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #4a5163;
+}
+.flow-prefs__warn-list li + li {
+  margin-top: 0.25rem;
+}
+

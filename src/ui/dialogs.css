@@ -234,3 +234,26 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* A confirmation stacked on top of another dialog (e.g. the factory-reset
+   warning over Preferences). One step above .flow-dialog-backdrop's 1000 so the
+   dialog beneath is dimmed rather than competing for clicks. */
+.flow-dialog-backdrop--over {
+  z-index: 1001;
+}
+
+/* Destructive confirm button. Deliberately not the accent colour: the whole
+   point is that it should not read as the safe, expected choice. */
+.flow-btn--danger {
+  background: #d92d20;
+  color: #ffffff;
+}
+.flow-btn--danger:hover {
+  background: #b42318;
+}
+
+/* Keeps a menu path ("File ▸ Open") from wrapping onto the arrow. */
+.flow-nowrap {
+  white-space: nowrap;
+}
+
