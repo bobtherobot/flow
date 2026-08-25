@@ -1,0 +1,143 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { renderHook, act } from "@testing-library/react";
+import { useHoverTarget } from "./useHoverTarget";
+import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
+
+type El = Record<string, unknown> & { id: string; type: string };
+
+interface ApiOverrides {
+  activeTool?: { type: string };
+  selectedElementIds?: Record<string, boolean>;
+  selectedLinearElement?: { isEditing: boolean } | null;
+}
+
+function makeApi(elements: El[], over: ApiOverrides = {}) {
+  const listeners: Array<() => void> = [];
+  const appState = {
+    zoom: { value: 1 },
+    scrollX: 0,
+    scrollY: 0,
+    offsetLeft: 0,
+    offsetTop: 0,
+    activeTool: { type: "selection" },
+    selectedElementIds: {},
+    selectedLinearElement: null,
+    ...over,
+  };
+  const api = {
+    getSceneElements: () => elements,
+    getAppState: () => appState,
+    onChange: (cb: () => void) => {
+      listeners.push(cb);
+      return () => {};
+    },
+  } as unknown as ExcalidrawAPI;
+  return { api, appState, fire: () => listeners.forEach((cb) => cb()) };
+}
+
+const rect = (over: Partial<El> = {}): El => ({
+  id: "r",
+  type: "rectangle",
+  x: 0,
+  y: 0,
+  width: 100,
+  height: 50,
+  angle: 0,
+  locked: false,
+  ...over,
+});
+
+/** Dispatch a window pointermove, the only input this hook has. */
+function movePointer(x: number, y: number, buttons = 0) {
+  act(() => {
+    window.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, buttons }));
+  });
+}
+
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
+
+describe("useHoverTarget", () => {
+  it("returns the element under the pointer", () => {
+    const { api } = makeApi([rect()]);
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(50, 25);
+    expect(result.current?.id).toBe("r");
+  });
+
+  it("keeps the element while the pointer is out in the halo", () => {
+    const { api } = makeApi([rect()]);
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(50, -20);
+    expect(result.current?.id).toBe("r");
+  });
+
+  it("drops the element only after the grace period", () => {
+    const { api } = makeApi([rect()]);
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(50, 25);
+    movePointer(500, 500);
+    expect(result.current?.id, "still held during the grace window").toBe("r");
+    act(() => void vi.advanceTimersByTime(150));
+    expect(result.current).toBeNull();
+  });
+
+  it("returns the topmost element when two overlap", () => {
+    const { api } = makeApi([rect({ id: "under" }), rect({ id: "over" })]);
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(50, 25);
+    expect(result.current?.id).toBe("over");
+  });
+
+  it("returns nothing while a drawing tool is armed", () => {
+    const { api } = makeApi([rect()], { activeTool: { type: "rectangle" } });
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(50, 25);
+    expect(result.current).toBeNull();
+  });
+
+  it("re-evaluates on an appState change, without the pointer moving", () => {
+    // This is the Cmd/Ctrl override case: holding the modifier switches the
+    // active tool to selection while the pointer is perfectly still, and the
+    // arrows must appear anyway.
+    const { api, appState, fire } = makeApi([rect()], { activeTool: { type: "rectangle" } });
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(50, 25);
+    expect(result.current).toBeNull();
+    act(() => {
+      appState.activeTool = { type: "selection" };
+      fire();
+    });
+    expect(result.current?.id).toBe("r");
+  });
+
+  it("returns nothing for a non-bindable element", () => {
+    const { api } = makeApi([rect({ type: "freedraw" })]);
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(50, 25);
+    expect(result.current).toBeNull();
+  });
+
+  it("returns nothing while more than one element is selected", () => {
+    const { api } = makeApi([rect()], { selectedElementIds: { a: true, b: true } });
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(50, 25);
+    expect(result.current).toBeNull();
+  });
+
+  it("returns nothing while a linear element is being edited", () => {
+    const { api } = makeApi([rect()], { selectedLinearElement: { isEditing: true } });
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(50, 25);
+    expect(result.current).toBeNull();
+  });
+
+  it("returns nothing while a mouse button is held", () => {
+    // Dragging the shape itself keeps the selection tool active and the
+    // pointer over the element; the arrows should get out of the way.
+    const { api } = makeApi([rect()]);
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(50, 25, 1);
+    expect(result.current).toBeNull();
+  });
+});

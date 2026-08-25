@@ -1,0 +1,119 @@
+import { useEffect, useRef, useState } from "react";
+import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
+import type { SceneElement } from "../shapes/useShapeSelection";
+import { isBindableForQuickArrows } from "./bindable";
+import { isInHaloRegion, type Viewport } from "./quick-arrow-geometry";
+
+/** How long the arrows survive the pointer leaving their region. Without it,
+ *  the boundary flickers as the pointer wobbles across it. */
+const HOVER_GRACE_MS = 120;
+
+interface HoverAppState {
+  zoom: { value: number };
+  scrollX: number;
+  scrollY: number;
+  offsetLeft: number;
+  offsetTop: number;
+  activeTool: { type: string };
+  selectedElementIds: Record<string, boolean>;
+  selectedLinearElement?: { isEditing?: boolean } | null;
+}
+
+function viewportOf(s: HoverAppState): Viewport {
+  return {
+    zoom: s.zoom.value,
+    scrollX: s.scrollX,
+    scrollY: s.scrollY,
+    offsetLeft: s.offsetLeft,
+    offsetTop: s.offsetTop,
+  };
+}
+
+/**
+ * The element whose quick arrows should be on screen right now, or null.
+ *
+ * Hover-driven, not selection-driven: point at any bindable shape and its
+ * arrows appear whether or not it is selected.
+ *
+ * Two inputs, not one. Pointer position is the obvious one. The second is
+ * `api.onChange`, and it is not optional: holding Cmd/Ctrl engages flow's
+ * temporary-selection override by calling `setActiveTool({type: "selection"})`
+ * (`useToolOverride.ts`), which must reveal the arrows **with the pointer
+ * perfectly still**. A hook driven by pointer events alone would leave the
+ * user jiggling the mouse to make them show up.
+ *
+ * Subscribes to `onChange` directly, so — like `useShapeSelection` — its
+ * caller must be a sibling of `<Excalidraw>`, never inside `App`. A state bump
+ * from `onChange` that re-renders `<Excalidraw>` makes `componentDidUpdate`
+ * re-fire `onChange`, looping forever.
+ */
+export function useHoverTarget(api: ExcalidrawAPI | null): SceneElement | null {
+  const [target, setTarget] = useState<SceneElement | null>(null);
+  // Last known pointer position, so an appState change can re-evaluate hover
+  // without waiting for the pointer to move. `buttons` rides along: any held
+  // button means some other gesture owns the canvas.
+  const pointer = useRef<{ x: number; y: number; buttons: number } | null>(null);
+  const graceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!api) return;
+
+    const clearGrace = () => {
+      if (graceTimer.current !== null) {
+        clearTimeout(graceTimer.current);
+        graceTimer.current = null;
+      }
+    };
+
+    const evaluate = () => {
+      const p = pointer.current;
+      if (!p) return;
+      const next = p.buttons !== 0 ? null : resolve(api, p.x, p.y);
+      if (next) {
+        clearGrace();
+        setTarget(next);
+        return;
+      }
+      // Losing the target is delayed; gaining one is immediate.
+      if (graceTimer.current === null) {
+        graceTimer.current = setTimeout(() => {
+          graceTimer.current = null;
+          setTarget(null);
+        }, HOVER_GRACE_MS);
+      }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      pointer.current = { x: e.clientX, y: e.clientY, buttons: e.buttons };
+      evaluate();
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    const unsubscribe = api.onChange(evaluate);
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      unsubscribe();
+      clearGrace();
+    };
+  }, [api]);
+
+  return target;
+}
+
+/** The topmost bindable element whose halo region contains the pointer. */
+function resolve(api: ExcalidrawAPI, x: number, y: number): SceneElement | null {
+  const state = api.getAppState() as unknown as HoverAppState;
+  if (state.activeTool.type !== "selection") return null;
+  if (state.selectedLinearElement?.isEditing) return null;
+  if (Object.keys(state.selectedElementIds ?? {}).length > 1) return null;
+
+  const v = viewportOf(state);
+  const elements = api.getSceneElements();
+  // Last in the array paints on top, so walk backwards to find the topmost.
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i];
+    if (!isBindableForQuickArrows(el)) continue;
+    if (isInHaloRegion(el, v, x, y)) return el;
+  }
+  return null;
+}
