@@ -31,6 +31,29 @@ interface DragAppState {
 type SetToolArg = Parameters<ExcalidrawAPI["setActiveTool"]>[0];
 
 /**
+ * Events that can end a quick-arrow gesture. Neither `pointerup` nor
+ * `pointercancel` is guaranteed to arrive: a right-click opening the context
+ * menu mid-drag, or releasing over another application (alt-tab), can end the
+ * gesture without either ever firing, so a window `blur` ends it too. Same
+ * reasoning, same fix, as `useScrubDrag.ts`'s identical gap.
+ *
+ * Vendor has its own recovery for a missing pointerup
+ * (`maybeCleanupAfterMissingPointerUp`), but it invokes its stored handler
+ * directly as a function call rather than dispatching a `"pointerup"` DOM
+ * event (vendor App.tsx), so it never reaches a `window.addEventListener`
+ * here — this gesture has to detect the loss itself.
+ */
+const GESTURE_END_EVENTS = ["pointerup", "pointercancel", "blur"] as const;
+
+function addGestureEndListeners(handler: () => void): void {
+  for (const type of GESTURE_END_EVENTS) window.addEventListener(type, handler);
+}
+
+function removeGestureEndListeners(handler: () => void): void {
+  for (const type of GESTURE_END_EVENTS) window.removeEventListener(type, handler);
+}
+
+/**
  * Turn a press on one quick-arrow triangle into a real Excalidraw
  * arrow-draw gesture.
  *
@@ -134,7 +157,7 @@ export function useQuickArrowDrag({
       // pointerup and hang in drag state — and it is also what makes "a click
       // does nothing" true.
       const onEarlyUp = () => {
-        window.removeEventListener("pointerup", onEarlyUp);
+        removeGestureEndListeners(onEarlyUp);
         cleanup.current = null;
         if (frame.current !== null) cancelAnimationFrame(frame.current);
         frame.current = null;
@@ -142,27 +165,27 @@ export function useQuickArrowDrag({
       };
 
       const onGestureUp = () => {
-        window.removeEventListener("pointerup", onGestureUp);
+        removeGestureEndListeners(onGestureUp);
         cleanup.current = null;
         restore();
       };
 
       beginToolGesture();
       cleanup.current = () => {
-        window.removeEventListener("pointerup", onEarlyUp);
-        window.removeEventListener("pointerup", onGestureUp);
+        removeGestureEndListeners(onEarlyUp);
+        removeGestureEndListeners(onGestureUp);
         if (frame.current !== null) cancelAnimationFrame(frame.current);
         frame.current = null;
         endToolGesture();
       };
-      window.addEventListener("pointerup", onEarlyUp);
+      addGestureEndListeners(onEarlyUp);
 
       setAppState({ currentItemArrowType: "elbow" });
       api.setActiveTool({ type: "arrow", locked: true } as SetToolArg);
 
       frame.current = requestAnimationFrame(() => {
         frame.current = null;
-        window.removeEventListener("pointerup", onEarlyUp);
+        removeGestureEndListeners(onEarlyUp);
         canvas.dispatchEvent(
           new PointerEvent("pointerdown", {
             // React delegates at the root container, so the event has to
@@ -185,7 +208,7 @@ export function useQuickArrowDrag({
         // pointerdown — one frame earlier — would put it FIRST, so the tool
         // would be switched back out from under vendor before it finalized
         // the arrow.
-        window.addEventListener("pointerup", onGestureUp);
+        addGestureEndListeners(onGestureUp);
       });
     },
     [api, element, side, styleMemory],

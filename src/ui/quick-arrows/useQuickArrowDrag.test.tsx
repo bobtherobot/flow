@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useQuickArrowDrag } from "./useQuickArrowDrag";
-import { resetToolRestoreState, setSuspendedTool } from "../toolbar/tool-restore";
+import {
+  isToolGestureActive,
+  resetToolRestoreState,
+  setSuspendedTool,
+} from "../toolbar/tool-restore";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
 type El = Record<string, unknown> & { id: string; type: string };
@@ -182,18 +186,78 @@ describe("useQuickArrowDrag", () => {
     expect(order).toEqual(["vendor", "restore"]);
   });
 
-  it("puts the previous arrow type back so the gesture leaves no preference behind", () => {
-    const api = makeApi();
+  it("puts the previous arrow type back before restoreTool's style-memory reload reads it", () => {
+    // `restore()` deliberately writes currentItemArrowType back BEFORE calling
+    // restoreTool, because restoreTool's own style-memory reload re-reads
+    // appState -- get the order wrong and the gesture's temporary "elbow"
+    // gets folded into the linear bucket as if the user had chosen it. To see
+    // that ordering at all, the fake `updateScene` has to actually apply its
+    // appState patch (a bare vi.fn() leaves getAppState() and the reload
+    // blind to it), and a styleMemory mock has to be supplied so restoreTool's
+    // reloadCategory branch is exercised in the first place.
+    const api = makeApi("rectangle");
+    const state = api.getAppState() as unknown as Record<string, unknown>;
+    (api.updateScene as ReturnType<typeof vi.fn>).mockImplementation(
+      (arg: { appState?: Record<string, unknown> }) => {
+        Object.assign(state, arg.appState ?? {});
+      },
+    );
+    const reloadCategory = vi.fn();
+    installCanvas();
+    const { result } = renderHook(() =>
+      useQuickArrowDrag({
+        api,
+        element: rect() as never,
+        side: "e",
+        styleMemory: { reloadCategory },
+      }),
+    );
+    act(() => result.current(pointerDownEvent()));
+    flushFrame();
+    act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
+
+    expect(api.updateScene).toHaveBeenCalledWith({
+      appState: { currentItemArrowType: "sharp" },
+    });
+    // The reload must see the RESTORED arrow type ("sharp"), not the
+    // gesture's temporary "elbow" -- proof the write lands before the reload
+    // reads it, not after.
+    expect(reloadCategory).toHaveBeenCalledWith("shape", "rectangle", "sharp");
+  });
+
+  it("does not strand the tool-gesture flag when pointercancel arrives instead of pointerup", () => {
+    // Neither pointerup nor pointercancel is guaranteed to arrive on a real
+    // gesture end, but when pointercancel DOES fire (e.g. a right-click
+    // opening the context menu mid-drag) it must be treated exactly like a
+    // pointerup. Otherwise `gestureActive` stays true forever, which per
+    // useToolOverride.ts permanently disables the Cmd/Ctrl override's restore.
+    const api = makeApi("rectangle");
     installCanvas();
     const { result } = renderHook(() =>
       useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
     );
     act(() => result.current(pointerDownEvent()));
     flushFrame();
-    act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
-    expect(api.updateScene).toHaveBeenCalledWith({
-      appState: { currentItemArrowType: "sharp" },
-    });
+    act(() => void window.dispatchEvent(new PointerEvent("pointercancel")));
+    expect(isToolGestureActive()).toBe(false);
+    expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: "rectangle", locked: true });
+  });
+
+  it("does not strand the tool-gesture flag when the window loses focus mid-drag", () => {
+    // Alt-tab, or the OS bringing another application forward, can end a
+    // drag with neither a pointerup nor a pointercancel ever firing. A window
+    // blur is the only signal left, and without listening for it the arrow
+    // tool stays armed and currentItemArrowType stays "elbow" until reload.
+    const api = makeApi("rectangle");
+    installCanvas();
+    const { result } = renderHook(() =>
+      useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
+    );
+    act(() => result.current(pointerDownEvent()));
+    flushFrame();
+    act(() => void window.dispatchEvent(new Event("blur")));
+    expect(isToolGestureActive()).toBe(false);
+    expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: "rectangle", locked: true });
   });
 
   it("does nothing when there is no api", () => {
