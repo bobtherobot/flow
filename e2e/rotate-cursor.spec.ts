@@ -39,11 +39,16 @@ async function drawBox(page: Page) {
 // [808, 284, 8, 8], so its centre is (812, 288).
 const ROTATE_HANDLE = { x: 812, y: 288 };
 
-// Where the handle USED to be. Kept as a negative assertion: if a submodule
-// rebase silently restores the vendor placement, this is what catches it.
-// Deliberately off-centre horizontally so it can never land on the top quick
-// arrow (an 18px-wide glyph centred at x=650).
-const OLD_ROTATE_SPOT = { x: 600, y: 284 };
+// The exact centre of where the rotation handle used to be: the pre-fix rect
+// was [646,280]-[654,288]. Revert the fork edit and this point gets the rotate
+// cursor again, so this assertion genuinely catches a lost rebase — unlike a
+// point merely "somewhere above the top edge", which passes either way.
+//
+// This point is ALSO where Task 4's top quick arrow will sit ([641,274]-[659,286]),
+// and that collision is the whole reason the handle moved. Task 4 owns
+// converting this assertion when the overlay lands and starts intercepting the
+// pointermove that sets the canvas cursor.
+const OLD_ROTATE_SPOT = { x: 650, y: 284 };
 
 test("the rotation handle sits outside the NE corner, not above the top edge", async ({
   page,
