@@ -4,7 +4,7 @@ import { renderHook } from "@testing-library/react";
 import { useToolOverride } from "./useToolOverride";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { StyleMemoryHandle } from "../useStyleMemory";
-import { resetToolRestoreState } from "./tool-restore";
+import { beginToolGesture, endToolGesture, resetToolRestoreState } from "./tool-restore";
 
 // Module state in tool-restore.ts is shared across every test in this file
 // (and would otherwise leak between them, e.g. a test that presses without
@@ -60,6 +60,21 @@ describe("useToolOverride", () => {
     press();
     release();
     expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: "rectangle", locked: true });
+  });
+
+  it("does not hand the tool back on release while a canvas gesture owns it", () => {
+    const { api } = fakeApi();
+    renderHook(() => useToolOverride(api));
+    press();
+    beginToolGesture();
+    release();
+    // Only the engage-time switch to selection happened. Releasing the modifier
+    // must NOT also restore the suspended tool while a canvas gesture (a
+    // quick-arrow drag) is mid-flight and has claimed the restore for itself —
+    // doing so would switch the tool out from under vendor's live drag.
+    expect(api.setActiveTool).toHaveBeenCalledTimes(1);
+    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "selection", locked: true });
+    endToolGesture();
   });
 
   it("re-applies the selection read at release time, not at engage time", () => {
