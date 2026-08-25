@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import { QuickArrows } from "./QuickArrows";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
+import {
+  beginToolGesture,
+  endToolGesture,
+  resetToolRestoreState,
+} from "../toolbar/tool-restore";
 
 type El = Record<string, unknown> & { id: string; type: string };
 
@@ -46,7 +51,10 @@ function movePointer(x: number, y: number) {
   });
 }
 
-beforeEach(() => vi.useFakeTimers());
+beforeEach(() => {
+  vi.useFakeTimers();
+  resetToolRestoreState();
+});
 afterEach(() => vi.useRealTimers());
 
 describe("QuickArrows", () => {
@@ -107,6 +115,41 @@ describe("QuickArrows", () => {
       fire();
     });
     expect(up().style.transform).toContain("translate(50px, -50px)");
+  });
+
+  it("freezes the overlay while a gesture owns the tool, zoom included", () => {
+    // The hole the re-render fix above opened. `visibleSides` is recomputed on
+    // every render and is zoom-dependent (MIN_SIDE_PX), and vendor allows
+    // wheel/pinch zoom during a live drag -- so an unconditional bump would
+    // let a mid-drag zoom-out UNMOUNT the very glyph being dragged. That runs
+    // `useQuickArrowDrag`'s armed unmount cleanup: the tool is handed back and
+    // the gesture-end listeners are torn down while vendor is still drawing,
+    // and `isToolGestureActive()` goes false so the grace timer blanks the
+    // overlay too. The gesture guard therefore has to sit ABOVE the bump, not
+    // only inside `evaluate`.
+    const { api, appState, fire } = makeApi([rect()]);
+    render(<QuickArrows api={api} />);
+    movePointer(50, 25);
+    const right = () => screen.queryByRole("button", { name: "Quick arrow right" });
+    const frozen = right()!.style.transform;
+
+    beginToolGesture("selection");
+    act(() => {
+      // 50 * 0.3 = 15, below MIN_SIDE_PX: the e/w glyphs would be dropped by
+      // the very next render.
+      appState.zoom = { value: 0.3 };
+      appState.scrollY = -30;
+      fire();
+    });
+    expect(right(), "the dragged glyph survives a mid-gesture zoom").not.toBeNull();
+    expect(right()!.style.transform, "and does not move under the drag").toBe(frozen);
+
+    // And the freeze is only for the gesture: the next onChange after it ends
+    // repaints normally, so nothing is left stale.
+    endToolGesture();
+    act(() => void fire());
+    expect(right(), "the e/w glyphs go once the shape really is too short").toBeNull();
+    expect(screen.getByRole("button", { name: "Quick arrow up" })).toBeTruthy();
   });
 
   it("renders nothing when there is no api yet", () => {

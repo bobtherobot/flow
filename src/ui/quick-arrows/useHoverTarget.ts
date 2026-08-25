@@ -58,7 +58,8 @@ function viewportOf(s: HoverAppState): Viewport {
  * viewport. A glyph stranded outside the live hover region dismisses the
  * arrows as the pointer travels toward it — precisely the failure the halo
  * exists to prevent. Measured: hover a shape, scroll 60px, and the glyph's `y`
- * stayed put while `scrollY` went 0 -> -60.
+ * stayed put while `scrollY` went 0 -> -60. The one state that bump must NOT
+ * reach is a gesture in flight — see the guard on the subscription itself.
  */
 export function useHoverTarget(api: ExcalidrawAPI | null): SceneElement | null {
   const [target, setTarget] = useState<SceneElement | null>(null);
@@ -119,8 +120,24 @@ export function useHoverTarget(api: ExcalidrawAPI | null): SceneElement | null {
 
     window.addEventListener("pointermove", onPointerMove);
     const unsubscribe = api.onChange(() => {
-      // Bump first, and unconditionally: `evaluate` re-renders only when the
-      // hovered element itself changes, and pan/zoom changes neither.
+      // The gesture guard is hoisted ABOVE the bump, and that ordering is
+      // load-bearing in its own right — `evaluate`'s own copy of the guard is
+      // not enough. `QuickArrows` recomputes `visibleSides` on every render
+      // and that set is zoom-dependent (`MIN_SIDE_PX`), while vendor allows
+      // wheel/pinch zoom during a live drag. So a bump that got through here
+      // mid-gesture could unmount the very glyph being dragged: that runs the
+      // armed unmount cleanup, which hands the tool back and tears down the
+      // end listeners while vendor is still drawing, and drops
+      // `isToolGestureActive()` so the grace timer blanks the overlay too.
+      // Freezing the overlay for the duration of a gesture is the same
+      // guarantee `evaluate` has always given; the bump has to live inside it.
+      //
+      // Nothing is stranded by the freeze: the restore at the end of a gesture
+      // calls `setActiveTool` and `updateScene`, each of which fires another
+      // `onChange` with the gesture over.
+      if (isToolGestureActive()) return;
+      // Then bump unconditionally: `evaluate` re-renders only when the hovered
+      // element itself changes, and pan/zoom changes neither.
       bump();
       evaluate();
     });
