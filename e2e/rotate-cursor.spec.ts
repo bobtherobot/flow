@@ -44,10 +44,11 @@ const ROTATE_HANDLE = { x: 812, y: 288 };
 // cursor again, so this assertion genuinely catches a lost rebase — unlike a
 // point merely "somewhere above the top edge", which passes either way.
 //
-// This point is ALSO where Task 4's top quick arrow will sit ([641,274]-[659,286]),
-// and that collision is the whole reason the handle moved. Task 4 owns
-// converting this assertion when the overlay lands and starts intercepting the
-// pointermove that sets the canvas cursor.
+// This point is ALSO where Task 4's top quick arrow sits ([641,274]-[659,286]),
+// and that collision is the whole reason the handle moved. Task 4 converted
+// the assertion below from a negative cursor check to a positive one, since
+// the quick-arrow overlay now intercepts the pointermove that would have set
+// the canvas cursor at this spot.
 const OLD_ROTATE_SPOT = { x: 650, y: 284 };
 
 test("the rotation handle sits outside the NE corner, not above the top edge", async ({
@@ -60,8 +61,20 @@ test("the rotation handle sits outside the NE corner, not above the top edge", a
   await page.mouse.move(ROTATE_HANDLE.x, ROTATE_HANDLE.y);
   await expect.poll(() => canvasCursor(page)).toContain("data:image/svg+xml");
 
-  await page.mouse.move(OLD_ROTATE_SPOT.x, OLD_ROTATE_SPOT.y);
-  await expect.poll(() => canvasCursor(page)).not.toContain("data:image/svg+xml");
+  // The top edge midpoint now belongs to the quick arrow. Before the Task 1
+  // fork edit the rotation handle sat at [646,280]-[654,288]; the top glyph
+  // covers [641,274]-[659,286]. That overlap is why the handle moved to the
+  // corner, so assert the invariant positively rather than reading a canvas
+  // cursor the glyph now intercepts.
+  await page.mouse.move(500, 350); // inside the shape, so the arrows appear
+  const glyph = await page
+    .getByRole("button", { name: "Quick arrow up" })
+    .boundingBox();
+  expect(glyph).not.toBeNull();
+  expect(OLD_ROTATE_SPOT.x).toBeGreaterThanOrEqual(glyph!.x);
+  expect(OLD_ROTATE_SPOT.x).toBeLessThanOrEqual(glyph!.x + glyph!.width);
+  expect(OLD_ROTATE_SPOT.y).toBeGreaterThanOrEqual(glyph!.y);
+  expect(OLD_ROTATE_SPOT.y).toBeLessThanOrEqual(glyph!.y + glyph!.height);
 });
 
 test("the rotation handle shows a circular-arrow cursor, and keeps it while rotating", async ({
