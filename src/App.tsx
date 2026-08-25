@@ -537,7 +537,7 @@ export default function App() {
 
       <ShapeHandles api={excalidrawApi} />
 
-      <QuickArrows api={excalidrawApi} />
+      <QuickArrows api={excalidrawApi} styleMemory={styleMemory} />
 
       <QuickBar
         api={excalidrawApi}

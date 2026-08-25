@@ -3,6 +3,7 @@ import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { SceneElement } from "../shapes/useShapeSelection";
 import { isBindableForQuickArrows } from "./bindable";
 import { isInHaloRegion, type Viewport } from "./quick-arrow-geometry";
+import { isToolGestureActive } from "../toolbar/tool-restore";
 
 /** How long the arrows survive the pointer leaving their region. Without it,
  *  the boundary flickers as the pointer wobbles across it. */
@@ -73,6 +74,12 @@ export function useHoverTarget(api: ExcalidrawAPI | null): SceneElement | null {
     };
 
     const evaluate = () => {
+      // A quick-arrow drag owns the tool right now (Task 5's
+      // `isToolGestureActive`, tool-restore.ts). Recomputing would null the
+      // target out -- a drag holds a button down, and a held button hides
+      // the arrows -- unmounting the very triangle being dragged and tearing
+      // down the gesture's pointerup listener before it can restore the tool.
+      if (isToolGestureActive()) return;
       const p = pointer.current;
       if (!p) return;
       const next = p.buttons !== 0 ? null : resolve(api, p.x, p.y);

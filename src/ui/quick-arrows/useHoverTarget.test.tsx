@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useHoverTarget } from "./useHoverTarget";
+import { beginToolGesture, endToolGesture, resetToolRestoreState } from "../toolbar/tool-restore";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 
 type El = Record<string, unknown> & { id: string; type: string };
@@ -54,7 +55,10 @@ function movePointer(x: number, y: number, buttons = 0) {
   });
 }
 
-beforeEach(() => vi.useFakeTimers());
+beforeEach(() => {
+  vi.useFakeTimers();
+  resetToolRestoreState();
+});
 afterEach(() => vi.useRealTimers());
 
 describe("useHoverTarget", () => {
@@ -143,6 +147,27 @@ describe("useHoverTarget", () => {
     const { result } = renderHook(() => useHoverTarget(api));
     movePointer(50, 25, 1);
     expect(result.current).toBeNull();
+  });
+
+  it("holds an already-resolved target while a quick-arrow gesture owns the tool", () => {
+    // A quick-arrow drag holds a button down for its whole duration, which
+    // would otherwise read as "some other gesture owns the canvas" and null
+    // the target out from under the very triangle being dragged.
+    const { api } = makeApi([rect()]);
+    const { result } = renderHook(() => useHoverTarget(api));
+    movePointer(50, 25);
+    expect(result.current?.id).toBe("r");
+
+    beginToolGesture();
+    movePointer(50, 25, 1);
+    expect(result.current?.id, "held during the gesture despite buttons!=0").toBe("r");
+    act(() => void vi.advanceTimersByTime(200)); // well past the grace window
+    expect(result.current?.id, "still held after the grace window elapses").toBe("r");
+
+    endToolGesture();
+    movePointer(50, 25, 1); // button still physically held, gesture just ended
+    act(() => void vi.advanceTimersByTime(130)); // past the grace window
+    expect(result.current, "clears as before once the gesture releases its hold").toBeNull();
   });
 
   it("returns nothing, and drops any stale target, once the api goes away", () => {
