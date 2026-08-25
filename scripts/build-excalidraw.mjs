@@ -112,6 +112,11 @@ const FORK_EDITS = [
     file: "dist/types/excalidraw/types.d.ts",
     why: "paste-position preference read by the clipboard paste path (see src/lib/paste-position.ts)",
   },
+  {
+    symbol: "getLineHeight",
+    file: "dist/types/excalidraw/index.d.ts",
+    why: "per-font default line height, so the Text panel can tell a user-chosen line height from the font's own (see src/lib/line-height.ts)",
+  },
 ];
 
 const missing = FORK_EDITS.filter(({ symbol, file }) => {

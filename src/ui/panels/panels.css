@@ -587,7 +587,9 @@ body.flow-scrubbing * {
   font-weight: 700;
   line-height: 1;
 }
-.flow-ctl-size--xl {
+/* Wider preset captions (XL, 1.5) drop 2px so they still clear the 28px button. */
+.flow-ctl-size--xl,
+.flow-ctl-size--wide {
   font-size: 10px;
 }
 .flow-pnl-sub__resize {

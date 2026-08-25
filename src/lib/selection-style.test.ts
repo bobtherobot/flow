@@ -5,6 +5,7 @@ import {
   getCommonValue,
   readFormValue,
   updateSelected,
+  resolveBoundTextIds,
   resolveTextTargetIds,
 } from "./selection-style";
 
@@ -156,5 +157,53 @@ describe("resolveTextTargetIds", () => {
   it("ignores unselected elements", () => {
     const els = [text("t1"), text("t2")];
     expect(resolveTextTargetIds(els, { t2: true })).toEqual({ t2: true });
+  });
+});
+
+describe("resolveBoundTextIds", () => {
+  const label = (id: string, containerId: string) => ({
+    id,
+    type: "text" as const,
+    containerId,
+  });
+  const text = (id: string) => ({ id, type: "text" as const });
+  const container = (id: string, type: string, boundTextId?: string) => ({
+    id,
+    type,
+    boundElements: boundTextId ? [{ id: boundTextId, type: "text" }] : null,
+  });
+
+  it("includes the bound text of a selected shape container", () => {
+    const els = [container("r1", "rectangle", "t1"), label("t1", "r1")];
+    expect(resolveBoundTextIds(els, { r1: true })).toEqual({ t1: true });
+  });
+
+  it("includes bound text selected directly", () => {
+    const els = [container("r1", "rectangle", "t1"), label("t1", "r1")];
+    expect(resolveBoundTextIds(els, { t1: true })).toEqual({ t1: true });
+  });
+
+  it("excludes loose text, which has no box to align within", () => {
+    expect(resolveBoundTextIds([text("t1")], { t1: true })).toEqual({});
+  });
+
+  it("excludes an arrow label, which rides the line instead", () => {
+    const els = [container("a1", "arrow", "t1"), label("t1", "a1")];
+    expect(resolveBoundTextIds(els, { a1: true })).toEqual({});
+  });
+
+  it("keeps the shape labels in a mixed selection", () => {
+    const els = [
+      container("r1", "rectangle", "t1"),
+      label("t1", "r1"),
+      container("a1", "arrow", "t2"),
+      label("t2", "a1"),
+      text("t3"),
+    ];
+    expect(resolveBoundTextIds(els, { r1: true, a1: true, t3: true })).toEqual({ t1: true });
+  });
+
+  it("tolerates a dangling containerId", () => {
+    expect(resolveBoundTextIds([label("t1", "gone")], { t1: true })).toEqual({});
   });
 });

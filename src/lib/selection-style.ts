@@ -30,6 +30,9 @@ type TextResolvable = Identified & {
   boundElements?: readonly { id: string; type: string }[] | null;
 };
 
+/** A text target plus the link back to the shape it is bound to, if any. */
+type BoundTextResolvable = TextResolvable & { containerId?: string | null };
+
 /**
  * The ids that a "text color" edit should touch: selected text elements, plus
  * the bound text of any selected container (e.g. a rectangle with a caption).
@@ -46,6 +49,26 @@ export function resolveTextTargetIds(
     for (const bound of el.boundElements ?? []) {
       if (bound.type === "text") targets[bound.id] = true;
     }
+  }
+  return targets;
+}
+
+/**
+ * Of the ids a text edit touches, those whose text sits *inside a shape*: bound
+ * text with a non-arrow container. Drives the vertical-align control — loose
+ * text has no box to align within, and an arrow label rides the line rather
+ * than a box, the same distinction vendor's `shouldAllowVerticalAlign` draws.
+ */
+export function resolveBoundTextIds(
+  elements: readonly BoundTextResolvable[],
+  selectedElementIds: SelectedElementIds,
+): SelectedElementIds {
+  const byId = new Map(elements.map((el) => [el.id, el]));
+  const targets: Record<string, true> = {};
+  for (const id of Object.keys(resolveTextTargetIds(elements, selectedElementIds))) {
+    const containerId = byId.get(id)?.containerId;
+    const container = containerId ? byId.get(containerId) : undefined;
+    if (container && container.type !== "arrow") targets[id] = true;
   }
   return targets;
 }

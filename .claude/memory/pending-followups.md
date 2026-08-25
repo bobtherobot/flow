@@ -186,3 +186,38 @@ against. Do not reach for `--workers=1` as a discriminator: none of the causes
 were load-related, and the menubar race reproduced serially too. `retries: 1`
 in CI now masks nothing worth masking, but it would hide a newly-introduced
 flake, so prefer reading the first-attempt result.
+
+## Ctrl+Z is dead right after committing any panel number field (found 2026-08-25)
+
+**Scope of the bug:** every numeric field in the controls dock — Font size, Line
+height, Padding, the Transform panel's W/H/X/Y, arrowhead sizes. Reproduced
+deliberately on Padding, so it long predates the line-height work that surfaced it.
+
+**The mechanism, in three parts:**
+
+1. `useNumberField` commits a typed value on Enter *and then calls
+   `e.currentTarget.blur()`* (`src/lib/history-shortcuts.ts` is unrelated; the
+   blur is in `useNumberField.ts`'s `onKeyDown`). Nothing re-focuses anything,
+   so `document.activeElement` becomes **`<body>`**.
+2. flow forwards history shortcuts from `PanelsRoot.tsx`'s **React `onKeyDown`,
+   which is bound to the dock wrapper `<div>`** — it only ever sees keydowns
+   whose target is inside the dock. That handler exists because flow's panels
+   are a DOM *sibling* of `<Excalidraw>`, which binds its own keydown on its own
+   container.
+3. `<body>` is a sibling of both. A keydown targeted there is inside neither
+   subtree, so **no handler runs at all** — not flow's, not Excalidraw's.
+
+**Symptom:** type a value, press Enter, press Ctrl+Z → nothing happens. Click
+anywhere first (canvas or any panel control) and undo works normally. The
+history entry itself is fine — measured: `undoStack` grew 1 → 2 → 3 correctly
+across three commits, so this is purely key *routing*, not history capture.
+
+**Why it was left alone:** the fix is to widen where that listener lives (window
+or document level, or re-focus something after a field commits), and global
+key-routing changes are the exact class of change this repo has been bitten by
+repeatedly — see [[tool-override]] (the `Q` swallow, the 23-site modifier sweep,
+the arrow-binding inversion found at 6 sites not 3). It wants its own pass with
+its own e2e coverage, not a drive-by. See [[text-vertical-align]] for where it
+was found; `e2e/text-panel.spec.ts`'s line-height undo test calls `.focus()` on a
+panel control first, with a comment pointing here.
+
