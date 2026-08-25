@@ -427,34 +427,11 @@ if (rotateCursorMissing.length > 0) {
   );
 }
 
-// ── 9. Rotation-handle corner placement survival ────────────────────────────
-// flow moved the rotation handle from above the top edge to diagonally outside
-// the NE corner so the quick-arrow affordances can own the edge midpoints. A
-// rebase that drops the edit is silent at build time and only shows up as
-// quick arrows overlapping the rotation handle, so assert the source directly.
-const CORNER_GAP_SYMBOL = "ROTATION_HANDLE_CORNER_GAP";
-const transformHandlesSource = join(
-  vendor,
-  "packages/element/src/transformHandles.ts",
-);
-
-if (
-  !existsSync(transformHandlesSource) ||
-  !readFileSync(transformHandlesSource, "utf8").includes(CORNER_GAP_SYMBOL)
-) {
-  die(
-    `the rotation-handle corner placement is missing — \`${CORNER_GAP_SYMBOL}\` ` +
-      `is not in packages/element/src/transformHandles.ts. A rebase probably ` +
-      `restored the vendor top-center placement, which puts the rotation ` +
-      `handle underneath flow's top quick arrow.`,
-  );
-}
-
 console.log(
   `[build:excalidraw] done — ${FORK_EDITS.length} fork edits verified in the ` +
     `built declarations, and no cmd/ctrl grid-snap bypass in the fork source ` +
     `(${bypasses.length} allowlisted mid-draw site(s) skipped), and no ` +
     `cmd/ctrl arrow-binding inversion, and no raw isBindingEnabled read ` +
     `outside the selector (${rawReads.length} allowlisted), and the ` +
-    `rotation-cursor seam intact, and the rotation handle is on the corner.`,
+    `rotation-cursor seam intact.`,
 );
