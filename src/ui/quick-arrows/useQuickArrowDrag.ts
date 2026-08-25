@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { SceneElement } from "../shapes/useShapeSelection";
 import type { StyleMemoryHandle } from "../useStyleMemory";
@@ -31,6 +32,13 @@ interface DragAppState {
 type SetToolArg = Parameters<ExcalidrawAPI["setActiveTool"]>[0];
 
 /**
+ * Squared-distance gate before a press becomes a drag — same idiom and
+ * default as `src/ui/panels/dock/useDrag.ts`'s `threshold` option, matched
+ * for consistency rather than re-derived.
+ */
+const MOVE_THRESHOLD_SQ = 4;
+
+/**
  * Events that can end a quick-arrow gesture. Neither `pointerup` nor
  * `pointercancel` is guaranteed to arrive: a right-click opening the context
  * menu mid-drag, or releasing over another application (alt-tab), can end the
@@ -57,30 +65,72 @@ function removeGestureEndListeners(handler: () => void): void {
  * Turn a press on one quick-arrow triangle into a real Excalidraw
  * arrow-draw gesture.
  *
- * flow does **not** draw the arrow. It arms the elbow arrow tool and hands
- * vendor a single synthesized `pointerdown` on `canvas.interactive`; from
- * there vendor owns the gesture, because `handleCanvasPointerDown` registers
- * its move/up listeners on `window` rather than on the pointerdown target
- * (vendor App.tsx). Binding, elbow routing, the binding highlight, snapping,
- * escape-to-cancel and single-entry undo therefore all come for free, and
- * none of them is reimplemented here.
+ * flow does **not** draw the arrow. Once a press turns into a drag, it arms
+ * the elbow arrow tool and hands vendor a single synthesized `pointerdown` on
+ * `canvas.interactive`; from there vendor owns the gesture, because
+ * `handleCanvasPointerDown` registers its move/up listeners on `window`
+ * rather than on the pointerdown target (vendor App.tsx). Binding, elbow
+ * routing, the binding highlight, snapping, escape-to-cancel and
+ * single-entry undo therefore all come for free, and none of them is
+ * reimplemented here.
  *
- * Two details are load-bearing and neither is obvious:
+ * Four details are load-bearing and none of them is obvious:
+ *
+ * **Nothing is armed until the pointer actually moves.** A plain click has
+ * to do nothing at all — no tool change, no undo entry. An earlier version
+ * tried to detect a click by racing the `pointerup` against the
+ * animation-frame wait below ("if it fires first, cancel"), on the premise
+ * that a real click is fast enough to win that race. Measured: it is not —
+ * a frame is ~16.7ms and a real human click is 40-100ms, so the cancel path
+ * almost never fired and every plain click quietly minted a degenerate,
+ * start-only-bound arrow. Movement is the only reliable signal: focusing the
+ * container, arming the tool, the rAF and the dispatch all wait for the
+ * first `pointermove` to clear `MOVE_THRESHOLD_SQ`, exactly the gate
+ * `useDrag.ts` uses for the same click-vs-drag question.
+ *
+ * **The gesture flag is claimed at pointerdown, before movement is even
+ * confirmed — everything else waits, this doesn't.** `useHoverTarget`
+ * treats any held button as "some other gesture owns the canvas" and arms a
+ * 120ms grace timer to clear the hovered target; that timer, once armed,
+ * fires unconditionally and does not re-check the flag. Waiting for `arm()`
+ * to claim it (matching every other movement-gated step) leaves a window,
+ * right after pointerdown and before the first qualifying move, where a
+ * button is already held but the flag isn't set yet — long enough for that
+ * timer to arm, and it then fires moments later and unmounts the very
+ * triangle mid-gesture (measured: the unmount landed ~120ms after
+ * pointerdown, tearing down `onGestureUp` before vendor's real pointerup
+ * ever arrived, stranding the arrow tool armed). Claiming the flag here,
+ * before `useHoverTarget`'s own first `pointermove` handler can ever see
+ * this press, keeps that timer from arming in the first place.
+ * `onUnarmedEnd` releases the flag again if the press never becomes a drag,
+ * so a plain click still leaves `isToolGestureActive()` false once it's
+ * done.
  *
  * **The origin is the grabbed edge's midpoint, not the pointer.**
  * `maxBindingDistance_simple` is only ~15px at zoom 1, so a gesture
  * originating out on the triangle would silently fail to bind to the source
  * shape — the most important half of the feature, lost with no error. It also
  * gives the elbow route its outgoing heading, so the top arrow produces an
- * arrow that leaves upward.
+ * arrow that leaves upward. The pointer having wandered away from the glyph
+ * before the movement threshold trips is fine and expected; the origin never
+ * tracks the pointer.
  *
- * **The dispatch waits one animation frame.** React has not committed the
- * tool change by the time this handler returns, so a same-tick dispatch
- * reaches vendor with `activeTool` still `"selection"` and draws a selection
- * marquee instead of an arrow (measured, not assumed). The pointer-up handler
- * cancels a still-pending frame, which is both what keeps a very fast click
- * from leaving vendor stuck mid-drag and what makes "a click does nothing"
- * true.
+ * **The dispatch waits one animation frame after arming, and arming itself
+ * must flush synchronously.** React only flushes a state update
+ * synchronously when it originates from React's own event dispatch; `arm()`
+ * runs from a plain native `window.addEventListener("pointermove", ...)`
+ * callback, not from vendor's React-owned pointerdown handler, so a bare
+ * `setActiveTool` call schedules its flush asynchronously instead. Measured:
+ * without wrapping it in `flushSync`, the `requestAnimationFrame` below can
+ * fire before that flush lands — sometimes within under a millisecond, since
+ * a callback requested while already inside a frame's event-handling phase
+ * can run later in that same frame — so the dispatch still saw
+ * `activeTool: "selection"` and drew a marquee instead of an arrow.
+ * `flushSync` forces the commit (and vendor's own `componentDidUpdate`) to
+ * finish before arming returns, so the rAF wait is timing vendor's own
+ * settling, not racing React. A release landing inside that one frame (rare,
+ * but still possible) cancels the pending dispatch instead of leaving vendor
+ * mid-drag with no matching pointerup.
  */
 export function useQuickArrowDrag({
   api,
@@ -107,109 +157,164 @@ export function useQuickArrowDrag({
       const canvas = document.querySelector("canvas.interactive");
       if (!canvas) return;
 
-      // The `preventDefault()` above suppresses the focus transfer a genuine
-      // canvas pointerdown would perform, so without this the Excalidraw
-      // container never takes focus and the user's next keystroke -- undo,
-      // Escape, Delete -- is silently dead on arrival, even though the arrow
-      // this gesture draws really does land in the undo stack. Measured: the
-      // arrow was present in `history.undoStack` while Ctrl+Z did nothing,
-      // with `document.activeElement` still on the glyph's own rail button.
-      (document.querySelector(".excalidraw-container") as HTMLElement | null)?.focus({
-        preventScroll: true,
-      });
-
-      const state = api.getAppState() as unknown as DragAppState;
-      const v: Viewport = {
-        zoom: state.zoom.value,
-        scrollX: state.scrollX,
-        scrollY: state.scrollY,
-        offsetLeft: state.offsetLeft,
-        offsetTop: state.offsetTop,
-      };
-      const mid = edgeMidpoint(element, side);
-      const origin = toViewport(mid.x, mid.y, v);
-
-      // What to hand back afterwards. While the Cmd/Ctrl override is engaged
-      // the active tool reads "selection", but the tool the user actually
-      // wants back is the one the override suspended.
-      const previousTool = getSuspendedTool() ?? state.activeTool.type;
-
+      // Only what the movement gate itself needs. Everything else (viewport,
+      // previousTool, previousArrowType) is read fresh at arm time, once a
+      // drag is actually confirmed, rather than snapshotted here.
+      const startX = e.clientX;
+      const startY = e.clientY;
       const { pointerId, pointerType } = e;
-      const previousArrowType = state.currentItemArrowType;
 
-      const setAppState = (appState: Record<string, unknown>) =>
-        api.updateScene({ appState } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
-
-      /** Hand the tool, and the arrow-type preference, back. */
-      const restore = () => {
-        endToolGesture();
-        // Before restoreTool, not after: its style-memory reload reads
-        // `currentItemArrowType` and would otherwise fold this gesture's
-        // temporary "elbow" into the linear bucket as if the user had chosen
-        // it. The already-drawn arrow keeps its own elbowed geometry — this
-        // only puts the *next* arrow's default back.
-        setAppState({ currentItemArrowType: previousArrowType });
-        restoreTool(api, previousTool, styleMemory);
-      };
-
-      // Released before the dispatch: a click, not a drag. Cancelling matters
-      // — vendor would otherwise receive a pointerdown with no matching
-      // pointerup and hang in drag state — and it is also what makes "a click
-      // does nothing" true.
-      const onEarlyUp = () => {
-        removeGestureEndListeners(onEarlyUp);
-        cleanup.current = null;
-        if (frame.current !== null) cancelAnimationFrame(frame.current);
-        frame.current = null;
-        restore();
-      };
-
-      const onGestureUp = () => {
-        removeGestureEndListeners(onGestureUp);
-        cleanup.current = null;
-        restore();
-      };
-
+      // Claimed immediately — see the hook docstring's second point. Every
+      // OTHER consequence of a press (focus, tool change, the dispatch)
+      // still waits for confirmed movement; only this flag can't, because
+      // `useHoverTarget`'s grace timer doesn't re-check it once armed.
       beginToolGesture();
-      cleanup.current = () => {
-        removeGestureEndListeners(onEarlyUp);
-        removeGestureEndListeners(onGestureUp);
-        if (frame.current !== null) cancelAnimationFrame(frame.current);
-        frame.current = null;
+
+      // Nothing else has been armed yet: no focus change, no tool change. A
+      // release before movement is a genuine no-op click, so there is
+      // nothing to restore beyond handing the gesture flag back.
+      const onUnarmedEnd = () => {
+        removeGestureEndListeners(onUnarmedEnd);
+        window.removeEventListener("pointermove", onMove);
+        cleanup.current = null;
         endToolGesture();
       };
-      addGestureEndListeners(onEarlyUp);
 
-      setAppState({ currentItemArrowType: "elbow" });
-      api.setActiveTool({ type: "arrow", locked: true } as SetToolArg);
+      const onMove = (moveEvent: PointerEvent) => {
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+        if (dx * dx + dy * dy < MOVE_THRESHOLD_SQ) return;
+        window.removeEventListener("pointermove", onMove);
+        removeGestureEndListeners(onUnarmedEnd);
+        arm();
+      };
 
-      frame.current = requestAnimationFrame(() => {
-        frame.current = null;
-        removeGestureEndListeners(onEarlyUp);
-        canvas.dispatchEvent(
-          new PointerEvent("pointerdown", {
-            // React delegates at the root container, so the event has to
-            // bubble for vendor's onPointerDown to see it at all.
-            bubbles: true,
-            cancelable: true,
-            composed: true,
-            pointerId,
-            pointerType,
-            isPrimary: true,
-            button: 0,
-            buttons: 1,
-            clientX: origin.x,
-            clientY: origin.y,
-          }),
-        );
-        // Registered AFTER the dispatch, and this ordering is load-bearing.
-        // Window pointerup listeners fire in registration order, and vendor
-        // registers its own inside the dispatch above. Registering ours at
-        // pointerdown — one frame earlier — would put it FIRST, so the tool
-        // would be switched back out from under vendor before it finalized
-        // the arrow.
-        addGestureEndListeners(onGestureUp);
-      });
+      window.addEventListener("pointermove", onMove);
+      addGestureEndListeners(onUnarmedEnd);
+      // A press can sit unarmed indefinitely waiting for movement, or never
+      // move at all. If the triangle unmounts before that happens, these
+      // listeners — and the gesture flag claimed above — must not outlive
+      // the component either.
+      cleanup.current = () => {
+        window.removeEventListener("pointermove", onMove);
+        removeGestureEndListeners(onUnarmedEnd);
+        endToolGesture();
+      };
+
+      /** Movement confirmed a drag: arm the tool and start the real gesture. */
+      function arm() {
+        // `api` and `canvas` are narrowed non-null above, but TypeScript
+        // doesn't carry that narrowing into this nested function declaration.
+        if (!api || !canvas) return;
+
+        // The `preventDefault()` above suppresses the focus transfer a
+        // genuine canvas pointerdown would perform, so without this the
+        // Excalidraw container never takes focus and the user's next
+        // keystroke -- undo, Escape, Delete -- is silently dead on arrival,
+        // even though the arrow this gesture draws really does land in the
+        // undo stack. Measured: the arrow was present in
+        // `history.undoStack` while Ctrl+Z did nothing, with
+        // `document.activeElement` still on the glyph's own rail button.
+        (document.querySelector(".excalidraw-container") as HTMLElement | null)?.focus({
+          preventScroll: true,
+        });
+
+        const state = api.getAppState() as unknown as DragAppState;
+        const v: Viewport = {
+          zoom: state.zoom.value,
+          scrollX: state.scrollX,
+          scrollY: state.scrollY,
+          offsetLeft: state.offsetLeft,
+          offsetTop: state.offsetTop,
+        };
+        const mid = edgeMidpoint(element, side);
+        const origin = toViewport(mid.x, mid.y, v);
+
+        // What to hand back afterwards. While the Cmd/Ctrl override is
+        // engaged the active tool reads "selection", but the tool the user
+        // actually wants back is the one the override suspended.
+        const previousTool = getSuspendedTool() ?? state.activeTool.type;
+        const previousArrowType = state.currentItemArrowType;
+
+        const setAppState = (appState: Record<string, unknown>) =>
+          api.updateScene({ appState } as unknown as Parameters<ExcalidrawAPI["updateScene"]>[0]);
+
+        /** Hand the tool, and the arrow-type preference, back. */
+        const restore = () => {
+          endToolGesture();
+          // Before restoreTool, not after: its style-memory reload reads
+          // `currentItemArrowType` and would otherwise fold this gesture's
+          // temporary "elbow" into the linear bucket as if the user had
+          // chosen it. The already-drawn arrow keeps its own elbowed
+          // geometry — this only puts the *next* arrow's default back.
+          setAppState({ currentItemArrowType: previousArrowType });
+          restoreTool(api, previousTool, styleMemory);
+        };
+
+        // Released before the dispatch: the frame lost its race, a rare but
+        // still real case now that arming itself requires movement.
+        // Cancelling matters — vendor would otherwise receive a pointerdown
+        // with no matching pointerup and hang in drag state.
+        const onEarlyUp = () => {
+          removeGestureEndListeners(onEarlyUp);
+          cleanup.current = null;
+          if (frame.current !== null) cancelAnimationFrame(frame.current);
+          frame.current = null;
+          restore();
+        };
+
+        const onGestureUp = () => {
+          removeGestureEndListeners(onGestureUp);
+          cleanup.current = null;
+          restore();
+        };
+
+        cleanup.current = () => {
+          removeGestureEndListeners(onEarlyUp);
+          removeGestureEndListeners(onGestureUp);
+          if (frame.current !== null) cancelAnimationFrame(frame.current);
+          frame.current = null;
+          endToolGesture();
+        };
+        addGestureEndListeners(onEarlyUp);
+
+        // flushSync, not a bare call — see the hook docstring's fourth
+        // point: arm() runs outside React's own event dispatch, so without
+        // this the rAF below can fire before the state update actually
+        // commits.
+        flushSync(() => {
+          setAppState({ currentItemArrowType: "elbow" });
+          api.setActiveTool({ type: "arrow", locked: true } as SetToolArg);
+        });
+
+        frame.current = requestAnimationFrame(() => {
+          frame.current = null;
+          removeGestureEndListeners(onEarlyUp);
+          canvas.dispatchEvent(
+            new PointerEvent("pointerdown", {
+              // React delegates at the root container, so the event has to
+              // bubble for vendor's onPointerDown to see it at all.
+              bubbles: true,
+              cancelable: true,
+              composed: true,
+              pointerId,
+              pointerType,
+              isPrimary: true,
+              button: 0,
+              buttons: 1,
+              clientX: origin.x,
+              clientY: origin.y,
+            }),
+          );
+          // Registered AFTER the dispatch, and this ordering is
+          // load-bearing. Window pointerup listeners fire in registration
+          // order, and vendor registers its own inside the dispatch above.
+          // Registering ours at pointerdown — one frame earlier — would put
+          // it FIRST, so the tool would be switched back out from under
+          // vendor before it finalized the arrow.
+          addGestureEndListeners(onGestureUp);
+        });
+      }
     },
     [api, element, side, styleMemory],
   );

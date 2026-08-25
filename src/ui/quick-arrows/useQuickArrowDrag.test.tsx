@@ -73,6 +73,20 @@ function pointerDownEvent() {
   } as unknown as React.PointerEvent;
 }
 
+/**
+ * A `pointermove` from the press origin above, offset by (dx, dy). The hook
+ * arms nothing until a move clears its squared-distance threshold (4, same
+ * default as `useDrag.ts`) — the default offset here (10, 0) clears it with
+ * plenty of margin.
+ */
+function movePointer(dx = 10, dy = 0) {
+  act(() =>
+    void window.dispatchEvent(
+      new PointerEvent("pointermove", { clientX: 130 + dx, clientY: 25 + dy }),
+    ),
+  );
+}
+
 /** Run the queued animation frame callbacks. */
 function flushFrame() {
   act(() => void vi.advanceTimersByTime(20));
@@ -96,47 +110,95 @@ afterEach(() => {
 });
 
 describe("useQuickArrowDrag", () => {
-  it("arms the elbow arrow tool on pointer down", () => {
+  it("arms the elbow arrow tool once the pointer moves past the threshold", () => {
     const api = makeApi();
     installCanvas();
     const { result } = renderHook(() =>
       useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
     );
     act(() => result.current(pointerDownEvent()));
+    expect(api.setActiveTool, "not armed until the pointer moves").not.toHaveBeenCalled();
+
+    movePointer();
     expect(api.updateScene).toHaveBeenCalledWith({
       appState: { currentItemArrowType: "elbow" },
     });
     expect(api.setActiveTool).toHaveBeenCalledWith({ type: "arrow", locked: true });
   });
 
-  it("dispatches the pointerdown on the canvas one frame later, at the edge midpoint", () => {
+  it("does not arm on a movement that stays inside the threshold", () => {
+    // A 1px jitter is not a drag. Nothing may be focused, tool-changed, or
+    // dispatched until the pointer clears the gate -- the gesture flag is
+    // the one exception (see the hook's docstring on why it is claimed at
+    // pointerdown rather than waiting for arm()), so this checks the flag
+    // clears again on release, not that it was never set.
+    const api = makeApi();
+    installCanvas();
+    const { result } = renderHook(() =>
+      useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
+    );
+    act(() => result.current(pointerDownEvent()));
+    movePointer(1, 0);
+    expect(api.setActiveTool, "not armed by a sub-threshold move").not.toHaveBeenCalled();
+    act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
+    expect(isToolGestureActive()).toBe(false);
+  });
+
+  it("dispatches the pointerdown on the canvas one frame after arming, at the edge midpoint", () => {
     const api = makeApi();
     const { seen } = installCanvas();
     const { result } = renderHook(() =>
       useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
     );
     act(() => result.current(pointerDownEvent()));
-    expect(seen, "not dispatched in the same tick").toHaveLength(0);
+    movePointer();
+    expect(seen, "not dispatched in the same tick as arming").toHaveLength(0);
 
     flushFrame();
     expect(seen).toHaveLength(1);
-    // East edge midpoint of a 100x50 box at the origin, identity viewport.
+    // East edge midpoint of a 100x50 box at the origin, identity viewport --
+    // the dispatch origin is the shape's edge, not wherever the pointer
+    // wandered to while arming the gesture.
     expect(seen[0].clientX).toBe(100);
     expect(seen[0].clientY).toBe(25);
     expect(seen[0].pointerId).toBe(7);
     expect(seen[0].bubbles).toBe(true);
   });
 
-  it("cancels the dispatch if the pointer is released before the frame", () => {
+  it("cancels the dispatch if the pointer is released inside the frame after arming", () => {
+    // Rare now that arming itself requires movement, but still possible: the
+    // pointer clears the threshold and is released again before the
+    // animation frame elapses.
     const api = makeApi();
     const { seen } = installCanvas();
     const { result } = renderHook(() =>
       useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
     );
     act(() => result.current(pointerDownEvent()));
+    movePointer();
     act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
     flushFrame();
-    expect(seen, "a click must not leave vendor mid-drag").toHaveLength(0);
+    expect(seen, "vendor must not be left mid-drag with no matching pointerup").toHaveLength(0);
+  });
+
+  it("a click with no movement dispatches nothing, arms nothing, and leaves no gesture flag", () => {
+    // The bug this test exists to catch: an earlier version decided
+    // click-vs-drag by racing pointerup against the animation frame, and
+    // that race was lost almost every real click, quietly minting a
+    // degenerate arrow bound only at its start. There is no race now --
+    // without movement, arm() never runs at all.
+    const api = makeApi("rectangle");
+    const { seen } = installCanvas();
+    const { result } = renderHook(() =>
+      useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
+    );
+    act(() => result.current(pointerDownEvent()));
+    flushFrame();
+    act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
+
+    expect(seen).toHaveLength(0);
+    expect(api.setActiveTool).not.toHaveBeenCalled();
+    expect(isToolGestureActive()).toBe(false);
   });
 
   it("restores the previous tool on pointer up", () => {
@@ -146,6 +208,7 @@ describe("useQuickArrowDrag", () => {
       useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
     );
     act(() => result.current(pointerDownEvent()));
+    movePointer();
     flushFrame();
     act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
     expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: "rectangle", locked: true });
@@ -161,6 +224,7 @@ describe("useQuickArrowDrag", () => {
       useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
     );
     act(() => result.current(pointerDownEvent()));
+    movePointer();
     flushFrame();
     act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
     expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: "ellipse", locked: true });
@@ -181,6 +245,7 @@ describe("useQuickArrowDrag", () => {
       },
     );
     act(() => result.current(pointerDownEvent()));
+    movePointer();
     flushFrame();
     act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
     expect(order).toEqual(["vendor", "restore"]);
@@ -213,6 +278,7 @@ describe("useQuickArrowDrag", () => {
       }),
     );
     act(() => result.current(pointerDownEvent()));
+    movePointer();
     flushFrame();
     act(() => void window.dispatchEvent(new PointerEvent("pointerup")));
 
@@ -237,6 +303,7 @@ describe("useQuickArrowDrag", () => {
       useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
     );
     act(() => result.current(pointerDownEvent()));
+    movePointer();
     flushFrame();
     act(() => void window.dispatchEvent(new PointerEvent("pointercancel")));
     expect(isToolGestureActive()).toBe(false);
@@ -254,6 +321,7 @@ describe("useQuickArrowDrag", () => {
       useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
     );
     act(() => result.current(pointerDownEvent()));
+    movePointer();
     flushFrame();
     act(() => void window.dispatchEvent(new Event("blur")));
     expect(isToolGestureActive()).toBe(false);
