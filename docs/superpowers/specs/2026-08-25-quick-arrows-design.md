@@ -313,3 +313,19 @@ the element's right edge.
   work.
 - **Quick arrows on multi-selection.** Excalidraw has no notion of binding to a
   group, so what the start binds to would be arbitrary.
+
+## Postscript (2026-08-25)
+
+The NE-corner rotation-handle placement described above as a mitigation for
+the arrow/handle collision was implemented, then **reverted**: vendor's
+`rotateSingleElement`/`rotateMultipleElements` derive the rotation angle from
+the pointer's absolute direction from the element centre with no grab offset,
+which assumes the handle sits due north — any displaced handle snaps the
+element's angle on grab by its angular offset from north (aspect-dependent,
+measured 45–74° across three test shapes). The handle is back at vendor's
+stock top-centre position; the quick arrows moved outward instead
+(`ARROW_GAP` 14 → 24) to clear it. Four-corner rotation handles remain a
+desired feature, planned as a separate follow-up built on a grab-offset
+capture rather than corner geometry. See `.claude/memory/quick-arrows.md` for
+the full account. The rest of this document is left as the historical record
+of what was actually decided and shipped at the time.

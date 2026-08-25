@@ -104,18 +104,49 @@ the Cmd/Ctrl override's restore (`useToolOverride` early-returns whenever
 already uses, whose own comment says plainly that neither pointerup nor
 pointercancel is guaranteed to arrive.
 
-## Fork edit
+## The rotation handle: tried on the corner, reverted — this branch has zero fork edits of its own
 
-One: the rotation handle moved from above the top edge to diagonally outside
-the NE corner (`ROTATION_HANDLE_CORNER_GAP` in
-`packages/element/src/transformHandles.ts`), so the quick arrows can own the
-edge midpoints. Cheap because `resizeTest.ts` and the [[rotate-cursor]] edit
-both read `getTransformHandlesFromCoords` — one site, not three. Guarded by
-**build stage 9** (`scripts/build-excalidraw.mjs`), which greps the vendor
-source for the symbol directly — a rebase that silently restores the vendor
-top-center placement would otherwise only show up as quick arrows overlapping
-the rotation handle. `e2e/rotate-cursor.spec.ts` carries both the new
-coordinate and a negative assertion at the old one.
+An earlier pass on this branch moved the rotation handle from above the top
+edge to diagonally outside the NE corner (`ROTATION_HANDLE_CORNER_GAP` in
+`packages/element/src/transformHandles.ts`) so the quick arrows could own the
+edge midpoints without competing for the same pixels. **That broke rotation
+itself and was reverted** (`git -C vendor/excalidraw revert 49b08582`). The
+handle is back at vendor's stock top-centre position, build stage 9 (the
+guard for the deleted edit) is removed, and the quick arrows were moved out
+instead — `ARROW_GAP` went from 14 to 24 (`quick-arrow-geometry.ts`) so the
+top glyph clears vendor's handle (`ROTATION_RESIZE_HANDLE_GAP = 16`) by 4px.
+
+**Why it broke rotation, precisely — this is expensive knowledge, worth not
+re-learning:** `rotateSingleElement` and `rotateMultipleElements`
+(`vendor/excalidraw/packages/element/src/resizeElements.ts:203` and its
+multi-element sibling) compute the element's new angle from the pointer's
+**ABSOLUTE direction from the element centre** —
+`angle = 5π/2 + atan2(pointerY - cy, pointerX - cx)` — with **no grab offset**.
+That formula hard-codes the assumption that the handle sits due north of the
+centre. Displace the handle anywhere else and grabbing it snaps the element's
+angle instantly to the handle's angular offset from north, before the pointer
+even moves. Measured on the NE-corner placement: **60.6°** on a 300×160 shape,
+**73.8°** on 400×100, **45.3°** on 150×150 — the snap angle is aspect-ratio
+dependent, so no single corrective constant can fix it; the fix has to change
+where the angle comes from, not add a compensating offset.
+
+The agreed follow-up (separate branch, not this one): **four-corner rotation
+handles**, done by capturing a grab offset at pointerdown —
+`offset = computed_angle_at_grab − element.angle`, subtracted every frame
+— rather than per-corner geometry. That needs no corner identity, no gap
+constant, and no zoom threading, and it fixes the same bug for *any* handle
+placement, not just one corner.
+
+`e2e/rotate-cursor.spec.ts` reflects the revert: `ROTATE_HANDLE` is back at
+the top-centre point (650, 284) for its test box, and the invariant that used
+to assert the top quick-arrow glyph *covers* that point now asserts the
+opposite — the glyph's bounding box and the handle's rect must be disjoint.
+
+The `895ada0e` rotate-cursor edit predates this branch and is unaffected. With
+the corner-placement commit reverted, **`feat/quick-arrows` now contains zero
+fork edits of its own** — every vendor-side thing this feature needed turned
+out to be reachable without touching the fork. Worth knowing before assuming
+this branch left a submodule diff behind.
 
 ## Deliberate divergence
 
