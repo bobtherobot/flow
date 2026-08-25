@@ -32,26 +32,20 @@ async function drawBox(page: Page) {
   await page.getByRole("button", { name: "Selection" }).click();
 }
 
-// flow moved the rotation handle off the top edge and out past the NE corner,
-// so quick-arrow affordances can hug the bounds without fighting it for the
-// same pixels (see docs/superpowers/specs/2026-08-25-quick-arrows-design.md).
-// For a box of (500,300)-(800,460) at zoom 1 the handle rect is
-// [808, 284, 8, 8], so its centre is (812, 288).
-const ROTATE_HANDLE = { x: 812, y: 288 };
+// flow tried moving the rotation handle off the top edge and out past the NE
+// corner so quick-arrow affordances could hug the bounds without fighting it
+// for the same pixels, but that broke rotation itself: vendor's
+// `rotateSingleElement`/`rotateMultipleElements` derive the new angle from the
+// pointer's ABSOLUTE direction from the element centre with no grab offset,
+// which silently assumes the handle sits due north — see
+// `.claude/memory/quick-arrows.md`. The corner placement is reverted; vendor's
+// top-centre handle is back, and the quick arrows moved out to `ARROW_GAP =
+// 24` to clear it instead. For a box of (500,300)-(800,460) at zoom 1 the
+// handle rect is [646, 280, 8, 8], so its centre is (650, 284).
+const ROTATE_HANDLE = { x: 650, y: 284 };
+const ROTATE_HANDLE_RECT = { x: 646, y: 280, width: 8, height: 8 };
 
-// The exact centre of where the rotation handle used to be: the pre-fix rect
-// was [646,280]-[654,288]. Revert the fork edit and this point gets the rotate
-// cursor again, so this assertion genuinely catches a lost rebase — unlike a
-// point merely "somewhere above the top edge", which passes either way.
-//
-// This point is ALSO where Task 4's top quick arrow sits ([641,274]-[659,286]),
-// and that collision is the whole reason the handle moved. Task 4 converted
-// the assertion below from a negative cursor check to a positive one, since
-// the quick-arrow overlay now intercepts the pointermove that would have set
-// the canvas cursor at this spot.
-const OLD_ROTATE_SPOT = { x: 650, y: 284 };
-
-test("the rotation handle sits outside the NE corner, not above the top edge", async ({
+test("the rotation handle sits above the top edge, clear of the quick arrow", async ({
   page,
 }) => {
   await gotoApp(page);
@@ -61,20 +55,26 @@ test("the rotation handle sits outside the NE corner, not above the top edge", a
   await page.mouse.move(ROTATE_HANDLE.x, ROTATE_HANDLE.y);
   await expect.poll(() => canvasCursor(page)).toContain("data:image/svg+xml");
 
-  // The top edge midpoint now belongs to the quick arrow. Before the Task 1
-  // fork edit the rotation handle sat at [646,280]-[654,288]; the top glyph
-  // covers [641,274]-[659,286]. That overlap is why the handle moved to the
-  // corner, so assert the invariant positively rather than reading a canvas
-  // cursor the glyph now intercepts.
+  // Before the revert this invariant was the opposite: the top quick arrow's
+  // bounding box was asserted to COVER the rotation handle's old top-centre
+  // spot, because the handle had moved out of the way to the NE corner. Now
+  // that the handle is back at top-centre, the two affordances occupy the
+  // same neighbourhood on purpose (`ARROW_GAP = 24` was chosen specifically
+  // to clear `ROTATION_RESIZE_HANDLE_GAP = 16` by 4px), so the invariant is
+  // exactly inverted: the glyph's box and the handle's rect must be disjoint,
+  // not overlapping.
   await page.mouse.move(500, 350); // inside the shape, so the arrows appear
   const glyph = await page
     .getByRole("button", { name: "Quick arrow up" })
     .boundingBox();
   expect(glyph).not.toBeNull();
-  expect(OLD_ROTATE_SPOT.x).toBeGreaterThanOrEqual(glyph!.x);
-  expect(OLD_ROTATE_SPOT.x).toBeLessThanOrEqual(glyph!.x + glyph!.width);
-  expect(OLD_ROTATE_SPOT.y).toBeGreaterThanOrEqual(glyph!.y);
-  expect(OLD_ROTATE_SPOT.y).toBeLessThanOrEqual(glyph!.y + glyph!.height);
+  const disjointHorizontally =
+    glyph!.x + glyph!.width <= ROTATE_HANDLE_RECT.x ||
+    ROTATE_HANDLE_RECT.x + ROTATE_HANDLE_RECT.width <= glyph!.x;
+  const disjointVertically =
+    glyph!.y + glyph!.height <= ROTATE_HANDLE_RECT.y ||
+    ROTATE_HANDLE_RECT.y + ROTATE_HANDLE_RECT.height <= glyph!.y;
+  expect(disjointHorizontally || disjointVertically).toBe(true);
 });
 
 test("the rotation handle shows a circular-arrow cursor, and keeps it while rotating", async ({
