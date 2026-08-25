@@ -57,6 +57,7 @@ import { MenuBar } from "./ui/menubar/MenuBar";
 import { PanelsRoot } from "./ui/panels/PanelsRoot";
 import { ToolRails } from "./ui/toolbar/ToolRails";
 import { ShapeHandles } from "./ui/shapes/ShapeHandles";
+import { QuickArrows } from "./ui/quick-arrows/QuickArrows";
 import { railGutter } from "./ui/toolbar/rail-layout";
 import { DEFAULT_TOOLBAR_STATE, DEFAULT_SHAPEBAR_STATE, type ToolbarState } from "./ui/toolbar/toolbar-state";
 import { QuickBar } from "./ui/quickbar/QuickBar";
@@ -535,6 +536,8 @@ export default function App() {
       />
 
       <ShapeHandles api={excalidrawApi} />
+
+      <QuickArrows api={excalidrawApi} styleMemory={styleMemory} />
 
       <QuickBar
         api={excalidrawApi}

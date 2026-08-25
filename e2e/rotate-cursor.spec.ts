@@ -32,9 +32,50 @@ async function drawBox(page: Page) {
   await page.getByRole("button", { name: "Selection" }).click();
 }
 
-// The rotation handle sits above the top edge, past the n-resize band:
-// measured at y≈282–288 for a top edge of y=300, so 284 is comfortably inside.
+// flow tried moving the rotation handle off the top edge and out past the NE
+// corner so quick-arrow affordances could hug the bounds without fighting it
+// for the same pixels, but that broke rotation itself: vendor's
+// `rotateSingleElement`/`rotateMultipleElements` derive the new angle from the
+// pointer's ABSOLUTE direction from the element centre with no grab offset,
+// which silently assumes the handle sits due north — see
+// `.claude/memory/quick-arrows.md`. The corner placement is reverted; vendor's
+// top-centre handle is back, and the quick arrows moved out to `ARROW_GAP =
+// 24` to clear it instead. For a box of (500,300)-(800,460) at zoom 1 the
+// handle rect is [646, 280, 8, 8], so its centre is (650, 284).
 const ROTATE_HANDLE = { x: 650, y: 284 };
+const ROTATE_HANDLE_RECT = { x: 646, y: 280, width: 8, height: 8 };
+
+test("the rotation handle sits above the top edge, clear of the quick arrow", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.waitForSelector(".flow-pnl");
+  await drawBox(page);
+
+  await page.mouse.move(ROTATE_HANDLE.x, ROTATE_HANDLE.y);
+  await expect.poll(() => canvasCursor(page)).toContain("data:image/svg+xml");
+
+  // Before the revert this invariant was the opposite: the top quick arrow's
+  // bounding box was asserted to COVER the rotation handle's old top-centre
+  // spot, because the handle had moved out of the way to the NE corner. Now
+  // that the handle is back at top-centre, the two affordances occupy the
+  // same neighbourhood on purpose (`ARROW_GAP = 24` was chosen specifically
+  // to clear `ROTATION_RESIZE_HANDLE_GAP = 16` by 4px), so the invariant is
+  // exactly inverted: the glyph's box and the handle's rect must be disjoint,
+  // not overlapping.
+  await page.mouse.move(500, 350); // inside the shape, so the arrows appear
+  const glyph = await page
+    .getByRole("button", { name: "Quick arrow up" })
+    .boundingBox();
+  expect(glyph).not.toBeNull();
+  const disjointHorizontally =
+    glyph!.x + glyph!.width <= ROTATE_HANDLE_RECT.x ||
+    ROTATE_HANDLE_RECT.x + ROTATE_HANDLE_RECT.width <= glyph!.x;
+  const disjointVertically =
+    glyph!.y + glyph!.height <= ROTATE_HANDLE_RECT.y ||
+    ROTATE_HANDLE_RECT.y + ROTATE_HANDLE_RECT.height <= glyph!.y;
+  expect(disjointHorizontally || disjointVertically).toBe(true);
+});
 
 test("the rotation handle shows a circular-arrow cursor, and keeps it while rotating", async ({
   page,
@@ -57,7 +98,7 @@ test("the rotation handle shows a circular-arrow cursor, and keeps it while rota
   // rotation gesture keeps, and reverting to a hand mid-rotate would be worse
   // than never changing it.
   await page.mouse.down();
-  await page.mouse.move(700, 260, { steps: 6 });
+  await page.mouse.move(860, 320, { steps: 6 });
   expect(await canvasCursor(page)).toContain("data:image/svg+xml");
   await page.mouse.up();
   expect(await page.evaluate(() => window.h.elements[0].angle)).not.toBe(0);

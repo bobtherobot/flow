@@ -4,6 +4,17 @@ import { renderHook } from "@testing-library/react";
 import { useToolOverride } from "./useToolOverride";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { StyleMemoryHandle } from "../useStyleMemory";
+import {
+  beginToolGesture,
+  endToolGesture,
+  getSuspendedTool,
+  resetToolRestoreState,
+} from "./tool-restore";
+
+// Module state in tool-restore.ts is shared across every test in this file
+// (and would otherwise leak between them, e.g. a test that presses without
+// releasing leaving `suspendedTool` set for the next one).
+beforeEach(() => resetToolRestoreState());
 
 /** Mutable appState behind the fake api, so a test can model the canvas
  *  changing between engage and restore (an undo landing mid-hold). */
@@ -54,6 +65,38 @@ describe("useToolOverride", () => {
     press();
     release();
     expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: "rectangle", locked: true });
+  });
+
+  it("does not hand the tool back on release while a canvas gesture owns it", () => {
+    const { api } = fakeApi();
+    renderHook(() => useToolOverride(api));
+    press();
+    beginToolGesture("rectangle");
+    release();
+    // Only the engage-time switch to selection happened. Releasing the modifier
+    // must NOT also restore the suspended tool while a canvas gesture (a
+    // quick-arrow drag) is mid-flight and has claimed the restore for itself —
+    // doing so would switch the tool out from under vendor's live drag.
+    expect(api.setActiveTool).toHaveBeenCalledTimes(1);
+    expect(api.setActiveTool).toHaveBeenCalledWith({ type: "selection", locked: true });
+    endToolGesture();
+  });
+
+  it("keeps its claim on record when it hands the restore to a gesture", () => {
+    // The other half of the test above, and the one whose absence was the
+    // Critical. Not restoring is only half the job: `restore` also used to
+    // clear `suspendedTool` on its way to the early return, so by the time the
+    // gesture ended there was nothing left saying which tool the user wanted.
+    // A Cmd-held click on a glyph then lost the armed tool permanently.
+    const { api } = fakeApi();
+    renderHook(() => useToolOverride(api));
+    press();
+    beginToolGesture("selection");
+    release();
+    expect(getSuspendedTool(), "the gesture inherits the claim intact").toBe("rectangle");
+    // And the gesture, not the override, is what clears it.
+    expect(endToolGesture()).toBe("rectangle");
+    expect(getSuspendedTool()).toBeNull();
   });
 
   it("re-applies the selection read at release time, not at engage time", () => {
