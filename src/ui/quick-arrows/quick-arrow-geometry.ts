@@ -96,7 +96,12 @@ export function edgeMidpoint(box: Box, side: QuickArrowSide): { x: number; y: nu
   const cx = box.width / 2;
   const cy = box.height / 2;
   const [ox, oy] = OUTWARD[side];
-  const [dx, dy] = rotate(ox * cx, oy * cy, box.angle);
+  // Absolute half-extents, signed centre. Excalidraw can hand us a negative
+  // width or height; `box.x + cx` is still the true centre in that case, but
+  // `oy * cy` would flip which side "n" means and hand the gesture an origin
+  // on the opposite edge. `visibleSides` and `isInHaloRegion` already guard
+  // this way — this makes all four consistent.
+  const [dx, dy] = rotate(ox * Math.abs(cx), oy * Math.abs(cy), box.angle);
   return { x: box.x + cx + dx, y: box.y + cy + dy };
 }
 

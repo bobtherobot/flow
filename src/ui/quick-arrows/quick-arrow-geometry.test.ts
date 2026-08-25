@@ -47,6 +47,14 @@ describe("edgeMidpoint", () => {
     expect(m.x).toBeCloseTo(75);
     expect(m.y).toBeCloseTo(25);
   });
+
+  it("resolves sides by geometry, not by sign, for a negative-dimension box", () => {
+    // Excalidraw can hand us a box with negative width/height. "n" must still
+    // mean the visually top edge; without absolute half-extents it returns the
+    // bottom one, and the gesture would start from the wrong side.
+    expect(edgeMidpoint(box({ height: -50 }), "n")).toEqual({ x: 50, y: -50 });
+    expect(edgeMidpoint(box({ width: -100 }), "w")).toEqual({ x: -100, y: 25 });
+  });
 });
 
 describe("arrowPlacement", () => {
@@ -75,6 +83,15 @@ describe("arrowPlacement", () => {
   it("rotates the glyph with the element", () => {
     const p = arrowPlacement(box({ angle: Math.PI / 2 }), "n", V);
     expect(p.rotation).toBeCloseTo(90);
+  });
+
+  it("places a rotated element's glyph outside the rotated edge, not inside", () => {
+    // 100x50 box, quarter turn: the north edge swings to the east, so the
+    // glyph must sit further east still. A sign error in the outward normal
+    // would place it at x=55 — back inside the shape.
+    const p = arrowPlacement(box({ angle: Math.PI / 2 }), "n", V);
+    expect(p.x).toBeCloseTo(95);
+    expect(p.y).toBeCloseTo(25);
   });
 });
 
@@ -110,11 +127,13 @@ describe("isInHaloRegion", () => {
     expect(isInHaloRegion(box(), V, 50, -(HALO + 1))).toBe(false);
   });
 
-  it("follows the element's rotation", () => {
-    const rotated = box({ angle: Math.PI / 2 });
-    // Centre is (50, 25); after a quarter turn the box is 50 wide and 100 tall,
-    // so a point 40px above the centre is inside, and one 40px to the left is not.
-    expect(isInHaloRegion(rotated, V, 50, -15)).toBe(true);
-    expect(isInHaloRegion(rotated, V, -20, 25)).toBe(false);
+  it("follows the element's rotation, including the direction of the rotation", () => {
+    // A quarter turn cannot test this: 90 degrees only permutes and flips
+    // axes, so un-rotating by -angle and by +angle give identical verdicts for
+    // every point. At 45 degrees, with halfW (76) and halfH (51) differing,
+    // these two points swap answers if the un-rotation sign is wrong.
+    const rotated = box({ angle: Math.PI / 4 });
+    expect(isInHaloRegion(rotated, V, 120, 45)).toBe(true);
+    expect(isInHaloRegion(rotated, V, 70, -45)).toBe(false);
   });
 });
