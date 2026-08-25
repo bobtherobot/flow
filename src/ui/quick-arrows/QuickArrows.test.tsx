@@ -16,11 +16,16 @@ function makeApi(elements: El[]) {
     selectedElementIds: {},
     selectedLinearElement: null,
   };
-  return {
+  const listeners: Array<() => void> = [];
+  const api = {
     getSceneElements: () => elements,
     getAppState: () => appState,
-    onChange: () => () => {},
+    onChange: (cb: () => void) => {
+      listeners.push(cb);
+      return () => {};
+    },
   } as unknown as ExcalidrawAPI;
+  return { api, appState, fire: () => listeners.forEach((cb) => cb()) };
 }
 
 const rect = (over: Partial<El> = {}): El => ({
@@ -46,12 +51,12 @@ afterEach(() => vi.useRealTimers());
 
 describe("QuickArrows", () => {
   it("renders nothing until something is hovered", () => {
-    render(<QuickArrows api={makeApi([rect()])} />);
+    render(<QuickArrows api={makeApi([rect()]).api} />);
     expect(screen.queryByRole("button", { name: "Quick arrow up" })).toBeNull();
   });
 
   it("renders all four arrows for a hovered shape", () => {
-    render(<QuickArrows api={makeApi([rect()])} />);
+    render(<QuickArrows api={makeApi([rect()]).api} />);
     movePointer(50, 25);
     for (const name of [
       "Quick arrow up",
@@ -64,7 +69,7 @@ describe("QuickArrows", () => {
   });
 
   it("positions each arrow outside its edge and points it outward", () => {
-    render(<QuickArrows api={makeApi([rect()])} />);
+    render(<QuickArrows api={makeApi([rect()]).api} />);
     movePointer(50, 25);
     const up = screen.getByRole("button", { name: "Quick arrow up" });
     // Edge midpoint (50, 0), out by ARROW_GAP + ARROW_DEPTH / 2 = 20.
@@ -76,10 +81,32 @@ describe("QuickArrows", () => {
   });
 
   it("omits the arrows a box is too small to carry", () => {
-    render(<QuickArrows api={makeApi([rect({ width: 10 })])} />);
+    render(<QuickArrows api={makeApi([rect({ width: 10 })]).api} />);
     movePointer(5, 25);
     expect(screen.queryByRole("button", { name: "Quick arrow up" })).toBeNull();
     expect(screen.getByRole("button", { name: "Quick arrow right" })).toBeTruthy();
+  });
+
+  it("re-renders the glyph positions when the canvas scrolls under a still pointer", () => {
+    // A scroll mutates no element, so `useHoverTarget` hands `setTarget` the
+    // identical object reference and React bails out of the re-render — while
+    // this component reads the live viewport at render time. Measured: the
+    // glyph stayed painted at its old screen y as `scrollY` went 0 -> -60.
+    // That is not cosmetic: `isInHaloRegion` tests against the LIVE viewport,
+    // so a stranded glyph can sit outside the live hover region and moving
+    // toward it dismisses the arrows — the exact failure the halo prevents.
+    const { api, appState, fire } = makeApi([rect()]);
+    render(<QuickArrows api={api} />);
+    movePointer(50, 25);
+    const up = () => screen.getByRole("button", { name: "Quick arrow up" });
+    // North edge midpoint (50, 0), out by ARROW_GAP + ARROW_DEPTH / 2 = 20.
+    expect(up().style.transform).toContain("translate(50px, -20px)");
+
+    act(() => {
+      appState.scrollY = -30;
+      fire();
+    });
+    expect(up().style.transform).toContain("translate(50px, -50px)");
   });
 
   it("renders nothing when there is no api yet", () => {

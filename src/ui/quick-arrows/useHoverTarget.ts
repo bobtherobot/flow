@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import type { ExcalidrawAPI } from "../../lib/excalidraw-scene";
 import type { SceneElement } from "../shapes/useShapeSelection";
 import { isBindableForQuickArrows, isFrameLikeForQuickArrows } from "./bindable";
@@ -47,9 +47,24 @@ function viewportOf(s: HoverAppState): Viewport {
  * caller must be a sibling of `<Excalidraw>`, never inside `App`. A state bump
  * from `onChange` that re-renders `<Excalidraw>` makes `componentDidUpdate`
  * re-fire `onChange`, looping forever.
+ *
+ * The `onChange` subscription bumps a render counter **unconditionally**, the
+ * same `useReducer((n) => n + 1, 0)` this hook's model `useShapeSelection`
+ * uses, and that is not redundant with the target state. The overlay reads the
+ * live viewport (`scrollX`/`scrollY`/`zoom`) at render time, but a scroll
+ * mutates no element: `setTarget` is handed the identical object reference,
+ * React bails out of the re-render, and the glyphs stay painted at their old
+ * screen positions while `isInHaloRegion` goes on testing against the new
+ * viewport. A glyph stranded outside the live hover region dismisses the
+ * arrows as the pointer travels toward it — precisely the failure the halo
+ * exists to prevent. Measured: hover a shape, scroll 60px, and the glyph's `y`
+ * stayed put while `scrollY` went 0 -> -60.
  */
 export function useHoverTarget(api: ExcalidrawAPI | null): SceneElement | null {
   const [target, setTarget] = useState<SceneElement | null>(null);
+  // Re-render on every appState change, whether or not the target moved — see
+  // the docstring's third paragraph.
+  const [, bump] = useReducer((n: number) => n + 1, 0);
   // Last known pointer position, so an appState change can re-evaluate hover
   // without waiting for the pointer to move. `buttons` rides along: any held
   // button means some other gesture owns the canvas.
@@ -103,7 +118,12 @@ export function useHoverTarget(api: ExcalidrawAPI | null): SceneElement | null {
     };
 
     window.addEventListener("pointermove", onPointerMove);
-    const unsubscribe = api.onChange(evaluate);
+    const unsubscribe = api.onChange(() => {
+      // Bump first, and unconditionally: `evaluate` re-renders only when the
+      // hovered element itself changes, and pan/zoom changes neither.
+      bump();
+      evaluate();
+    });
     return () => {
       window.removeEventListener("pointermove", onPointerMove);
       unsubscribe();
