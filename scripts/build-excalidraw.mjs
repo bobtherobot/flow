@@ -400,10 +400,38 @@ if (unexpectedRaw.length > 0) {
   );
 }
 
+// ── 8. Rotation-cursor seam survival ────────────────────────────────────────
+// The rotation transform handle's cursor is a one-line fork edit in
+// `resizeTest.ts`: it returns a CSS custom property instead of the literal
+// "grab", so flow's own circular-arrow cursor (src/index.css) can take over.
+// Stage 4 can't see it — a string inside a function body never reaches the
+// built .d.ts — and the failure is silent: the cursor quietly reverts to a
+// grabber hand with nothing else broken. So it gets its own source check.
+const ROTATE_CURSOR_VAR = "--flow-rotate-cursor";
+const rotateCursorSource = join(vendor, "packages/element/src/resizeTest.ts");
+const rotateCursorCss = join(root, "src/index.css");
+
+const rotateCursorMissing = [rotateCursorSource, rotateCursorCss].filter(
+  (path) => !existsSync(path) || !readFileSync(path, "utf8").includes(ROTATE_CURSOR_VAR),
+);
+
+if (rotateCursorMissing.length > 0) {
+  die(
+    `the rotation-handle cursor seam is broken — \`${ROTATE_CURSOR_VAR}\` is ` +
+      `missing from:\n` +
+      rotateCursorMissing.map((p) => `  - ${p.replace(`${root}/`, "")}`).join("\n") +
+      `\n\n  Both halves are needed: resizeTest.ts must return ` +
+      `\`var(${ROTATE_CURSOR_VAR}, grab)\` for the "rotation" handle, and ` +
+      `flow's stylesheet must define that variable. Losing either one silently ` +
+      `restores the vendor grabber hand.`,
+  );
+}
+
 console.log(
   `[build:excalidraw] done — ${FORK_EDITS.length} fork edits verified in the ` +
     `built declarations, and no cmd/ctrl grid-snap bypass in the fork source ` +
     `(${bypasses.length} allowlisted mid-draw site(s) skipped), and no ` +
     `cmd/ctrl arrow-binding inversion, and no raw isBindingEnabled read ` +
-    `outside the selector (${rawReads.length} allowlisted).`,
+    `outside the selector (${rawReads.length} allowlisted), and the ` +
+    `rotation-cursor seam intact.`,
 );
