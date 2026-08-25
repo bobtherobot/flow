@@ -1,0 +1,44 @@
+/* src/ui/quick-arrows/quick-arrows.css
+ * Quick-arrow overlay: four fat translucent triangles around the hovered
+ * shape, each the grab handle for drawing an elbow arrow from that side
+ * (geometry in quick-arrow-geometry.ts, drag in useQuickArrowDrag.ts). */
+
+.flow-quick-arrows {
+  position: fixed;
+  inset: 0;
+  /* The overlay must never steal canvas events — only the triangles
+     themselves (pointer-events: auto below) intercept anything. */
+  pointer-events: none;
+  /* Same tier as the shape-handle overlay (shape-handles.css): above the
+     canvas, below both rail tiers and the quickbar/bottombar. */
+  z-index: 80;
+}
+
+.flow-quick-arrow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Keep these in sync with ARROW_WIDTH / ARROW_DEPTH in
+     quick-arrow-geometry.ts — the module computes positions from those two
+     numbers, and a mismatch here shifts the glyph off its anchor. */
+  width: 18px;
+  height: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(115, 190, 245, 0.5);
+  /* A triangle pointing up at rotation 0, which is the convention
+     `arrowPlacement` returns its `rotation` in. */
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  cursor: crosshair;
+  pointer-events: auto;
+  /* Positioned via `transform: translate(...)` so panning and zooming move a
+     compositor-friendly property instead of triggering layout. */
+  will-change: transform;
+}
+
+.flow-quick-arrow:hover,
+.flow-quick-arrow:focus-visible {
+  background: rgba(59, 165, 240, 0.85);
+  outline: none;
+}
