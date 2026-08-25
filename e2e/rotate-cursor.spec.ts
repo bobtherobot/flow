@@ -32,9 +32,32 @@ async function drawBox(page: Page) {
   await page.getByRole("button", { name: "Selection" }).click();
 }
 
-// The rotation handle sits above the top edge, past the n-resize band:
-// measured at y≈282–288 for a top edge of y=300, so 284 is comfortably inside.
-const ROTATE_HANDLE = { x: 650, y: 284 };
+// flow moved the rotation handle off the top edge and out past the NE corner,
+// so quick-arrow affordances can hug the bounds without fighting it for the
+// same pixels (see docs/superpowers/specs/2026-08-25-quick-arrows-design.md).
+// For a box of (500,300)-(800,460) at zoom 1 the handle rect is
+// [808, 284, 8, 8], so its centre is (812, 288).
+const ROTATE_HANDLE = { x: 812, y: 288 };
+
+// Where the handle USED to be. Kept as a negative assertion: if a submodule
+// rebase silently restores the vendor placement, this is what catches it.
+// Deliberately off-centre horizontally so it can never land on the top quick
+// arrow (an 18px-wide glyph centred at x=650).
+const OLD_ROTATE_SPOT = { x: 600, y: 284 };
+
+test("the rotation handle sits outside the NE corner, not above the top edge", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.waitForSelector(".flow-pnl");
+  await drawBox(page);
+
+  await page.mouse.move(ROTATE_HANDLE.x, ROTATE_HANDLE.y);
+  await expect.poll(() => canvasCursor(page)).toContain("data:image/svg+xml");
+
+  await page.mouse.move(OLD_ROTATE_SPOT.x, OLD_ROTATE_SPOT.y);
+  await expect.poll(() => canvasCursor(page)).not.toContain("data:image/svg+xml");
+});
 
 test("the rotation handle shows a circular-arrow cursor, and keeps it while rotating", async ({
   page,
@@ -57,7 +80,7 @@ test("the rotation handle shows a circular-arrow cursor, and keeps it while rota
   // rotation gesture keeps, and reverting to a hand mid-rotate would be worse
   // than never changing it.
   await page.mouse.down();
-  await page.mouse.move(700, 260, { steps: 6 });
+  await page.mouse.move(860, 320, { steps: 6 });
   expect(await canvasCursor(page)).toContain("data:image/svg+xml");
   await page.mouse.up();
   expect(await page.evaluate(() => window.h.elements[0].angle)).not.toBe(0);
