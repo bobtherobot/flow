@@ -63,13 +63,13 @@ function installCanvas() {
 }
 
 /** A minimal stand-in for React's synthetic pointer event. */
-function pointerDownEvent() {
+function pointerDownEvent(button = 0) {
   return {
     pointerId: 7,
     pointerType: "mouse",
     clientX: 130,
     clientY: 25,
-    button: 0,
+    button,
     stopPropagation: vi.fn(),
     preventDefault: vi.fn(),
   } as unknown as React.PointerEvent;
@@ -80,11 +80,15 @@ function pointerDownEvent() {
  * arms nothing until a move clears its squared-distance threshold (4, same
  * default as `useDrag.ts`) — the default offset here (10, 0) clears it with
  * plenty of margin.
+ *
+ * `pointerId` defaults to the one `pointerDownEvent()` presses with, because
+ * the hook ignores movement from any other pointer; pass a different one to
+ * exercise that guard.
  */
-function movePointer(dx = 10, dy = 0) {
+function movePointer(dx = 10, dy = 0, pointerId = 7) {
   act(() =>
     void window.dispatchEvent(
-      new PointerEvent("pointermove", { clientX: 130 + dx, clientY: 25 + dy, pointerId: 7 }),
+      new PointerEvent("pointermove", { clientX: 130 + dx, clientY: 25 + dy, pointerId }),
     ),
   );
 }
@@ -378,6 +382,65 @@ describe("useQuickArrowDrag", () => {
     act(() => void window.dispatchEvent(new Event("blur")));
     expect(isToolGestureActive()).toBe(false);
     expect(api.setActiveTool).toHaveBeenLastCalledWith({ type: "rectangle", locked: true });
+  });
+
+  it("ignores a right-button press, which must keep its native context menu", () => {
+    // Measured without the guard: a right-button drag off a glyph drew an
+    // arrow AND opened the context menu. The synthesized pointerdown
+    // hard-codes button 0 / buttons 1, so vendor is told a left-drag started
+    // whatever was really pressed -- the guard has to be at the source.
+    const api = makeApi();
+    const { seen } = installCanvas();
+    const { result } = renderHook(() =>
+      useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
+    );
+    const event = pointerDownEvent(2);
+    act(() => result.current(event));
+    movePointer();
+    flushFrame();
+
+    expect(seen).toHaveLength(0);
+    expect(api.setActiveTool).not.toHaveBeenCalled();
+    expect(isToolGestureActive(), "no claim is made at all").toBe(false);
+    // Not swallowed either: suppressing the default is what would eat the
+    // context menu.
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("ignores a middle-button press, which is flow's own pan gesture", () => {
+    const api = makeApi();
+    const { seen } = installCanvas();
+    const { result } = renderHook(() =>
+      useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
+    );
+    act(() => result.current(pointerDownEvent(1)));
+    movePointer();
+    flushFrame();
+
+    expect(seen).toHaveLength(0);
+    expect(api.setActiveTool).not.toHaveBeenCalled();
+    expect(isToolGestureActive()).toBe(false);
+  });
+
+  it("ignores movement from a pointer other than the one that pressed", () => {
+    // A second finger's movement must not arm a first finger's stationary
+    // press: the gesture handed to vendor would not be the one the user
+    // started, and its origin would be the wrong glyph's edge.
+    const api = makeApi();
+    const { seen } = installCanvas();
+    const { result } = renderHook(() =>
+      useQuickArrowDrag({ api, element: rect() as never, side: "e" }),
+    );
+    act(() => result.current(pointerDownEvent()));
+    movePointer(60, 60, 9); // a different pointerId, well past the threshold
+    flushFrame();
+    expect(api.setActiveTool, "another pointer cannot arm this press").not.toHaveBeenCalled();
+    expect(seen).toHaveLength(0);
+
+    // The press itself is untouched and still arms on its own pointer's move.
+    movePointer();
+    flushFrame();
+    expect(seen).toHaveLength(1);
   });
 
   it("does nothing when there is no api", () => {

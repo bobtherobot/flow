@@ -156,6 +156,17 @@ export function useQuickArrowDrag({
 
   return useCallback(
     (e: React.PointerEvent) => {
+      // Primary button only, the same guard and the same shape as the two
+      // sibling drag primitives in this repo (`useDrag.ts`,
+      // `useScrubDrag.ts`). Measured without it: a RIGHT-button drag off a
+      // glyph drew an arrow *and* opened the context menu, and a MIDDLE-button
+      // drag drew one instead of panning (middle-drag is flow's own pan
+      // gesture). The synthesized pointerdown below hard-codes
+      // `button: 0, buttons: 1`, so vendor is told a left-drag started
+      // whichever button was really pressed — the guard has to be here, at the
+      // source. It comes BEFORE `preventDefault`, so a right-click keeps its
+      // native context menu.
+      if (e.button !== 0) return;
       e.stopPropagation();
       e.preventDefault();
       if (!api) return;
@@ -204,6 +215,10 @@ export function useQuickArrowDrag({
       };
 
       const onMove = (moveEvent: PointerEvent) => {
+        // Scoped to the pointer that started this press. Without it a second
+        // pointer's movement arms a first pointer's stationary press, and the
+        // gesture handed to vendor is not the one the user started.
+        if (moveEvent.pointerId !== pointerId) return;
         const dx = moveEvent.clientX - startX;
         const dy = moveEvent.clientY - startY;
         if (dx * dx + dy * dy < MOVE_THRESHOLD_SQ) return;
