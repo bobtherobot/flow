@@ -1,24 +1,19 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ToolButton } from "./ToolButton";
+import { BottomButton } from "./BottomButton";
 
-describe("ToolButton", () => {
+describe("BottomButton", () => {
   it("exposes the label as its accessible name", () => {
-    render(<ToolButton icon={<i />} label="Rectangle" active={false} onClick={() => {}} />);
-    expect(screen.getByRole("button", { name: "Rectangle" })).toBeInTheDocument();
-  });
-
-  it("reflects active state via aria-pressed", () => {
-    render(<ToolButton icon={<i />} label="Rectangle" active onClick={() => {}} />);
-    expect(screen.getByRole("button", { name: "Rectangle" })).toHaveAttribute("aria-pressed", "true");
+    render(<BottomButton icon={<i />} label="Grid" active={false} onClick={() => {}} />);
+    expect(screen.getByRole("button", { name: "Grid" })).toBeInTheDocument();
   });
 
   it("fires onClick when pressed", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
-    render(<ToolButton icon={<i />} label="Rectangle" active={false} onClick={onClick} />);
-    await user.click(screen.getByRole("button", { name: "Rectangle" }));
+    render(<BottomButton icon={<i />} label="Grid" active={false} onClick={onClick} />);
+    await user.click(screen.getByRole("button", { name: "Grid" }));
     expect(onClick).toHaveBeenCalledOnce();
   });
 
@@ -30,8 +25,8 @@ describe("ToolButton", () => {
 
     const user = userEvent.setup();
     const onClick = vi.fn();
-    render(<ToolButton icon={<i />} label="Rectangle" active={false} onClick={onClick} />);
-    await user.click(screen.getByRole("button", { name: "Rectangle" }));
+    render(<BottomButton icon={<i />} label="Grid" active={false} onClick={onClick} />);
+    await user.click(screen.getByRole("button", { name: "Grid" }));
 
     expect(onClick).toHaveBeenCalledOnce();
     expect(document.activeElement).toBe(canvasContainer);

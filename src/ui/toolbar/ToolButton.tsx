@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { focusCanvas } from "../../lib/focus-canvas";
 
 interface ToolButtonProps {
   icon: ReactNode;
@@ -21,7 +22,13 @@ export function ToolButton({ icon, label, shortcut, active, onClick }: ToolButto
       aria-pressed={active}
       data-active={active || undefined}
       title={shortcut ? `${label} — ${shortcut}` : label}
-      onClick={onClick}
+      onClick={() => {
+        // Fire-and-forget: this button is never a popup trigger, so once its
+        // action has run, hand keyboard focus straight back to the canvas
+        // (see focusCanvas) rather than leaving it stranded on this button.
+        onClick();
+        focusCanvas();
+      }}
     >
       {icon}
     </button>
