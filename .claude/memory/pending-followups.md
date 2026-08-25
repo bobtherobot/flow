@@ -45,6 +45,21 @@ is pushed **and** the parent gitlink is bumped — `dist/` is gitignored, so
 nothing else reveals a missing push until CI or a fresh clone fails.)_
 
 ## Keyboard shortcuts unreachable from flow's chrome (added 2026-08-05)
+
+**Mostly fixed 2026-08-25 on `fix/canvas-focus-return` — see [[canvas-focus-return]].**
+Rather than forwarding more shortcuts (the `history-shortcuts.ts` approach) or
+flipping `handleKeyboardGlobally` (rejected below, still true), the fix hands
+keyboard focus itself back to `.excalidraw-container` once a fire-and-forget
+chrome control has done its job: the three rail/bar buttons (`ToolButton`,
+`QuickButton`, `BottomButton`) after `onClick`, and panel number fields after
+Enter commits (not blur — that would break Tab-between-fields). That covers
+undo, Escape, Delete and arrow nudges after the interactions that used to kill
+them. **Known remaining gap, left alone deliberately: the menubar** — Radix
+restores focus to its own trigger on menu close by design, and overriding that
+risks breaking keyboard menu navigation.
+
+Original notes below, still accurate for what ISN'T covered by the above:
+
 `PanelsRoot`, `ToolBar`, `QuickBar`, `BottomBar` and `MenuBar` are all DOM
 siblings of `<Excalidraw>`, which binds keydown on its own container unless
 `handleKeyboardGlobally` is set (flow never sets it). Only undo/redo are
