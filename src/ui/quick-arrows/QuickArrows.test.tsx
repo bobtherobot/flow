@@ -80,8 +80,8 @@ describe("QuickArrows", () => {
     render(<QuickArrows api={makeApi([rect()]).api} />);
     movePointer(50, 25);
     const up = screen.getByRole("button", { name: "Quick arrow up" });
-    // Edge midpoint (50, 0), out by ARROW_GAP + ARROW_DEPTH / 2 = 20.
-    expect(up.style.transform).toContain("translate(50px, -20px)");
+    // Edge midpoint (50, 0), out by ARROW_GAP + ARROW_DEPTH / 2 = 30.
+    expect(up.style.transform).toContain("translate(50px, -30px)");
     expect(up.style.transform).toContain("rotate(0deg)");
 
     const right = screen.getByRole("button", { name: "Quick arrow right" });
@@ -107,14 +107,14 @@ describe("QuickArrows", () => {
     render(<QuickArrows api={api} />);
     movePointer(50, 25);
     const up = () => screen.getByRole("button", { name: "Quick arrow up" });
-    // North edge midpoint (50, 0), out by ARROW_GAP + ARROW_DEPTH / 2 = 20.
-    expect(up().style.transform).toContain("translate(50px, -20px)");
+    // North edge midpoint (50, 0), out by ARROW_GAP + ARROW_DEPTH / 2 = 30.
+    expect(up().style.transform).toContain("translate(50px, -30px)");
 
     act(() => {
       appState.scrollY = -30;
       fire();
     });
-    expect(up().style.transform).toContain("translate(50px, -50px)");
+    expect(up().style.transform).toContain("translate(50px, -60px)");
   });
 
   it("freezes the overlay while a gesture owns the tool, zoom included", () => {

@@ -13,8 +13,15 @@ export type QuickArrowSide = "n" | "e" | "s" | "w";
 
 export const QUICK_ARROW_SIDES: readonly QuickArrowSide[] = ["n", "e", "s", "w"];
 
-/** Viewport px from the element's bounds to the triangle's base. */
-export const ARROW_GAP = 14;
+/**
+ * Viewport px from the element's bounds to the triangle's base. Must clear
+ * vendor's top-centre rotation handle (`ROTATION_RESIZE_HANDLE_GAP = 16` in
+ * `transformHandles.ts`, handle box `handleMarginY..+handleHeight` above the
+ * top edge): at gap 24 the top glyph sits 4px clear of the handle. All four
+ * sides share this one offset so the halo stays symmetrical, even though only
+ * the top side actually collides with anything.
+ */
+export const ARROW_GAP = 24;
 /** Viewport px across the triangle's base. */
 export const ARROW_WIDTH = 18;
 /** Viewport px from the triangle's base to its tip. */

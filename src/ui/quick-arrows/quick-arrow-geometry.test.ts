@@ -88,9 +88,9 @@ describe("arrowPlacement", () => {
   it("places a rotated element's glyph outside the rotated edge, not inside", () => {
     // 100x50 box, quarter turn: the north edge swings to the east, so the
     // glyph must sit further east still. A sign error in the outward normal
-    // would place it at x=55 — back inside the shape.
+    // would place it at x=45 — back inside the shape.
     const p = arrowPlacement(box({ angle: Math.PI / 2 }), "n", V);
-    expect(p.x).toBeCloseTo(95);
+    expect(p.x).toBeCloseTo(75 + ARROW_GAP + ARROW_DEPTH / 2);
     expect(p.y).toBeCloseTo(25);
   });
 });
@@ -130,7 +130,7 @@ describe("isInHaloRegion", () => {
   it("follows the element's rotation, including the direction of the rotation", () => {
     // A quarter turn cannot test this: 90 degrees only permutes and flips
     // axes, so un-rotating by -angle and by +angle give identical verdicts for
-    // every point. At 45 degrees, with halfW (76) and halfH (51) differing,
+    // every point. At 45 degrees, with halfW (86) and halfH (61) differing,
     // these two points swap answers if the un-rotation sign is wrong.
     const rotated = box({ angle: Math.PI / 4 });
     expect(isInHaloRegion(rotated, V, 120, 45)).toBe(true);
