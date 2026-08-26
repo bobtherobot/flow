@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { resetDeferred } from "../../../lib/deferred-commit";
+import { focusCanvas } from "../../../lib/focus-canvas";
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -183,6 +184,14 @@ export function useNumberField({ value, min, max, step, onChange }: UseNumberFie
       if (e.key === "Enter") {
         commit();
         e.currentTarget.blur();
+        // Enter means "I'm done" — hand focus back to the canvas so the
+        // user's very next keystroke (undo, Escape, Delete, a nudge) reaches
+        // it instead of landing on this now-inert field. Blur alone (Tab, or
+        // clicking elsewhere) must NOT do this: focus there is already headed
+        // somewhere the user chose, and stealing it back would break
+        // Tab-between-fields. Called after blur() so the field's own blur
+        // handling (commitPending/reflect) runs first and doesn't fight this.
+        focusCanvas();
       } else if (e.key === "Escape") {
         cancelled.current = true;
         e.currentTarget.blur(); // blur handler reverts (commit is skipped)

@@ -93,6 +93,61 @@ describe("useNumberField", () => {
     expect(result.current.text).toBe("20");
   });
 
+  it("returns focus to the canvas when Enter commits the value", () => {
+    const canvasContainer = document.createElement("div");
+    canvasContainer.className = "excalidraw-container";
+    canvasContainer.tabIndex = 0;
+    document.body.appendChild(canvasContainer);
+
+    const onChange = vi.fn();
+    const { result } = renderHook(() =>
+      useNumberField({ value: 20, min: 5, max: 100, onChange }),
+    );
+
+    act(() => result.current.onFocus());
+    act(() => result.current.onChange({ target: { value: "42" } } as any));
+    act(() =>
+      result.current.onKeyDown({
+        key: "Enter",
+        currentTarget: { blur: () => act(() => result.current.onBlur()) },
+      } as any),
+    );
+
+    expect(onChange).toHaveBeenCalledWith(42, false);
+    expect(document.activeElement).toBe(canvasContainer);
+
+    canvasContainer.remove();
+  });
+
+  it("does NOT return focus to the canvas on a plain blur — Tab-between-fields must keep working", () => {
+    const canvasContainer = document.createElement("div");
+    canvasContainer.className = "excalidraw-container";
+    canvasContainer.tabIndex = 0;
+    document.body.appendChild(canvasContainer);
+
+    // Simulate focus already having moved on to the next field, the way a
+    // real Tab keypress would before this field's blur handler ever runs.
+    const nextField = document.createElement("input");
+    document.body.appendChild(nextField);
+    nextField.focus();
+
+    const onChange = vi.fn();
+    const { result } = renderHook(() =>
+      useNumberField({ value: 20, min: 5, max: 100, onChange }),
+    );
+
+    act(() => result.current.onFocus());
+    act(() => result.current.onChange({ target: { value: "42" } } as any));
+    act(() => result.current.onBlur());
+
+    expect(onChange).toHaveBeenCalledWith(42, false);
+    // Focus must stay wherever it already went — never stolen back to canvas.
+    expect(document.activeElement).toBe(nextField);
+
+    canvasContainer.remove();
+    nextField.remove();
+  });
+
   // Helper matching what a real <input> does: ArrowUp/ArrowDown fire keydown
   // (once per tap, N times while auto-repeating during a hold) then exactly
   // one keyup when the physical key is released.
