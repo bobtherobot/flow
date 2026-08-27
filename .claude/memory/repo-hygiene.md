@@ -5,24 +5,52 @@ metadata:
   type: project
 ---
 
-# Repo hygiene (2026-08-11)
+# Repo hygiene (2026-08-11, updated 2026-08-27)
 
 A tidy-up pass over both repos. No code behaviour changed; the only source edit
 was the version bump.
 
-## Branches: main is the only branch
+## Branches: main plus the `snapshot/*` rollback points
 
 Five fully-merged local branches were deleted (`master`, `v0.02`,
 `backup-pre-scrub`, `feat/fork-excalidraw-text-color`,
 `upgrade/excalidraw-master`). Every one was an ancestor of `main`, so nothing
-was lost. **`git branch` should show only `main`** — if a stale branch reappears,
-it is a leftover, not history.
+was lost.
+
+**Superseded 2026-08-27 — `main` is no longer the only branch.** Long-lived
+`snapshot/*` branches now preserve rollback points and are deliberate, not
+leftovers (see "Rollback points" below). Any *other* stale branch reappearing is
+still a leftover, not history.
 
 `upgrade/excalidraw-master` needed `-D` rather than `-d`: it was 1 commit ahead
 of its *remote* counterpart, so git refused the safe delete even though the
 commit was in `main` via merge `82cf577`. That warning is about the GitHub copy
 being behind, not about unmerged work — verify with
 `git merge-base --is-ancestor <sha> main` before forcing.
+
+## Rollback points (`snapshot/*`), added 2026-08-27
+
+A `snapshot/vX.Y.Z` branch preserves the state at that version so work on `main`
+can be discarded back to it. All are pushed to `origin` — a rollback point that
+exists only on one machine is not one.
+
+| Branch | Commit | Marks |
+|---|---|---|
+| `snapshot/v0.0.4` | `e0f5151` | end of the 0.0.4 cycle |
+| `snapshot/v0.0.5` | `f4f17d9` | end of the 0.0.5 cycle |
+| `snapshot/v0.0.6-base` | `37ced67` | **start** of 0.0.6 — the active rollback point |
+
+Roll back with `git reset --hard snapshot/v0.0.6-base`.
+
+Two naming traps:
+
+- The bare `snapshot/vX.Y.Z` form means the state at the **end** of that
+  version's development. `snapshot/v0.0.6-base` carries the suffix because it
+  marks the *start* of 0.0.6; a bare `snapshot/v0.0.6` would collide with the
+  name wanted when 0.0.6 wraps.
+- **Snapshot the state *before* the bump, then bump.** Resetting to a snapshot
+  cut pre-bump also reverts `package.json` — which is why the current rollback
+  point sits on the bump commit, one past `snapshot/v0.0.5`.
 
 ## Tags replace milestone branches
 
@@ -37,6 +65,12 @@ chronologically:
 | `pre-search-panel` | 2026-07-09 | pre-existing |
 | `v0.0.2` | 2026-08-08 | was branch `v0.02`; pre-upgrade (see [[excalidraw-upgrade]]) |
 | `v0.0.3` | 2026-08-11 | color system + fork upgrade |
+| `v0.0.5` | 2026-08-27 | retro-tagged; quick arrows, paste position, zen mode, text vertical-align/line-height |
+
+**`v0.0.4` is deliberately untagged** (asked and declined 2026-08-27);
+`snapshot/v0.0.4` preserves that state. Tag placement is **not** consistent:
+`v0.0.5` sits on the last commit reading 0.0.5, but `v0.0.3` sits mid-cycle at
+`d9d99c2` — that cycle ran on to `e3a38a9`. Pick one rule before the next tag.
 
 **Versioning is three-part semver** (`v0.0.3`, not `v0.03`) because `package.json`
 cannot hold a two-part version and it is the single source of truth for the
@@ -47,9 +81,17 @@ version the app displays.
 `package.json` read `0.0.1` from 2026-07-08 until 2026-08-11 — the `v0.02` branch
 was cut without bumping it, so **File ▸ Help ▸ About under-reported for 92
 commits**. `src/lib/app-version.ts` imports `version` straight from
-`package.json`, and `PropertiesDialog` does the same, so **bumping `package.json`
-is the entire fix** — no component edit. Use `npm version <x.y.z>
---no-git-tag-version` so the lockfile stays in step, then tag.
+`package.json`, and `PropertiesDialog` does the same, so no component edit is
+ever needed. Use `npm version <x.y.z> --no-git-tag-version` so the lockfile
+stays in step, then tag.
+
+**But `package.json` alone is NOT the whole bump** (corrected 2026-08-27):
+`dist/app.js` is *tracked* and inlines the version at build time, so a bump
+without `npm run build` ships an About dialog still reporting the old version.
+A bump commit is exactly three files — `package.json`, `package-lock.json`,
+`dist/app.js`. Verify with `grep -c '<new>' dist/app.js` (expect 1) and
+`grep -c '<old>' dist/app.js` (expect 0). Commit message convention:
+`chore(version): open X.Y.Z for development`.
 
 Note `AboutDialog.test.tsx` asserts against `APP_VERSION` itself, so it is
 self-referential and **cannot catch a stale version**. Check the literal.
